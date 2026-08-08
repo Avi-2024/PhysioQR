@@ -37,6 +37,8 @@ const KpiCard = ({
   loading = false,
   className,
 }: KpiCardProps) => {
+  const isPositiveTrend = trend && trend.value >= 0;
+
   const cardContent = (
     <>
       {/* Header row */}
