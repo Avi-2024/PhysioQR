@@ -182,7 +182,7 @@ export function DoctorDashboardOverviewPage({ onNavigate }: DoctorDashboardOverv
       <div style={{ display: 'grid', gridTemplateColumns: '1.8fr 1fr', gap: '1.25rem' }}>
         {/* 12.8 Recent Patients Table */}
         <div className="card-section">
-          <div style={{ display: 'flex', justify: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h3 className="section-card-title">Recent Referrals</h3>
             <button className="btn-outline" style={{ padding: '4px 10px', fontSize: '12px' }} onClick={() => onNavigate('patients')}>
               View All Patients →

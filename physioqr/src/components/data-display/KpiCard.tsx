@@ -37,43 +37,8 @@ const KpiCard = ({
   loading = false,
   className,
 }: KpiCardProps) => {
-  const isPositiveTrend = trend && trend.value >= 0;
-
-  const Wrapper = onClick ? 'button' : 'div';
-  const wrapperProps = onClick
-    ? {
-        type: 'button' as const,
-        onClick,
-        'aria-label': `${title}: ${value}`,
-        className: cn(
-          'w-full text-left rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-200',
-          'transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 hover:ring-primary-200',
-          'focus:outline-none focus:ring-2 focus:ring-primary-500 cursor-pointer',
-          className
-        ),
-      }
-    : {
-        className: cn(
-          'rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-200',
-          className
-        ),
-      };
-
-  if (loading) {
-    return (
-      <div className={cn('rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-200', className)}>
-        <div className="flex items-start justify-between mb-4">
-          <Skeleton className="h-4 w-28" />
-          <Skeleton className="h-10 w-10 rounded-xl" />
-        </div>
-        <Skeleton className="h-8 w-24 mb-2" />
-        <Skeleton className="h-3 w-20" />
-      </div>
-    );
-  }
-
-  return (
-    <Wrapper {...(wrapperProps as React.ComponentPropsWithoutRef<typeof Wrapper>)}>
+  const cardContent = (
+    <>
       {/* Header row */}
       <div className="flex items-start justify-between mb-4">
         <p className="text-sm font-medium text-gray-500">{title}</p>
@@ -116,7 +81,36 @@ const KpiCard = ({
           </span>
         )}
       </div>
-    </Wrapper>
+    </>
+  );
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        aria-label={`${title}: ${value}`}
+        className={cn(
+          'w-full text-left rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-200',
+          'transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 hover:ring-primary-200',
+          'focus:outline-none focus:ring-2 focus:ring-primary-500 cursor-pointer',
+          className
+        )}
+      >
+        {cardContent}
+      </button>
+    );
+  }
+
+  return (
+    <div
+      className={cn(
+        'rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-200',
+        className
+      )}
+    >
+      {cardContent}
+    </div>
   );
 };
 

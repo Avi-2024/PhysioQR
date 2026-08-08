@@ -79,7 +79,7 @@ export function LandingFooter({ onOpenPortal }: LandingFooterProps) {
             borderTop: '1px solid rgba(255, 255, 255, 0.08)',
             paddingTop: '20px',
             display: 'flex',
-            justify: 'space-between',
+          
             alignItems: 'center',
             flexWrap: 'wrap',
             gap: '12px',

@@ -80,7 +80,7 @@ export default function LoginPage() {
     <div className="min-h-screen bg-neutral-50 flex items-center justify-center p-4 sm:p-6 lg:p-8">
       <div className="max-w-4xl w-full bg-white rounded-2xl shadow-modal overflow-hidden grid grid-cols-1 lg:grid-cols-2 border border-neutral-200">
         {/* Left Hero Panel */}
-        <div className="bg-gradient-to-br from-primary-900 via-primary-800 to-neutral-900 p-8 text-white flex flex-col justify-between hidden sm:flex">
+        <div className="bg-gradient-to-br from-primary-900 via-primary-800 to-neutral-900 p-8 text-white  flex-col justify-between  sm:flex">
           <div>
             <div className="flex items-center gap-3 mb-8">
               <Logo width={40} height={40} withText={false} />

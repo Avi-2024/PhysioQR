@@ -33,7 +33,9 @@ export function LandingPage({ onNavigateToPortal }: LandingPageProps) {
 
   const handleSelectRoleFromModal = (role: UserRole) => {
     setPortalModalOpen(false);
-    onNavigateToPortal(role);
+    if (onNavigateToPortal) {
+      onNavigateToPortal(role);
+    }
   };
 
   return (

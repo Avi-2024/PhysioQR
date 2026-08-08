@@ -13,6 +13,7 @@ function StubPage({ title }: { title: string }) {
 
 export const AdminAgentsPage = () => <StubPage title="Agent Management" />;
 export const AdminAgentDetailPage = () => <StubPage title="Agent Details" />;
+export const AdminDoctorsPage = () => <StubPage title="Doctor Management" />;
 export const AdminDoctorNewPage = () => <StubPage title="Register New Doctor" />;
 export const AdminDoctorDetailPage = () => <StubPage title="Doctor Details" />;
 export const AdminPatientsPage = () => <StubPage title="Patient Management" />;
