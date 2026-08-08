@@ -13,7 +13,7 @@ export function NotificationsPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      <div style={{ display: 'flex', justify: 'space-between', alignItems: 'center' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h2 style={{ fontSize: '22px', fontWeight: 800, color: '#17212B' }}>Notifications & System Alerts</h2>
           <p style={{ fontSize: '13.5px', color: '#5D6975', marginTop: '2px' }}>

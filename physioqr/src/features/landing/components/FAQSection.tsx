@@ -44,7 +44,7 @@ export function FAQSection() {
                     width: '100%',
                     padding: '18px 24px',
                     display: 'flex',
-                    justify: 'space-between',
+                    justifyContent: 'space-between',
                     alignItems: 'center',
                     background: 'transparent',
                     border: 'none',

@@ -13,7 +13,7 @@ export function DoctorLayout() {
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const isSplitModel = user?.revenueModel === 'split_model' || user?.revenueModel === undefined;
+  const isSplitModel = (user as any)?.revenueModel === 'split_model' || (user as any)?.revenueModel === undefined;
 
   const NAV_ITEMS = [
     { label: 'Overview', path: '/doctor/dashboard', icon: LayoutDashboard },

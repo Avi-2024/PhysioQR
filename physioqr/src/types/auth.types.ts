@@ -7,6 +7,7 @@ export interface AuthUser {
   mobile: string;
   role: UserRole;
   avatarUrl?: string;
+  revenueModel?: 'split_model' | 'platform_fee_model';
 }
 
 export interface AuthTokens {

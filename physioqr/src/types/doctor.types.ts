@@ -1,15 +1,6 @@
-export type DoctorAccountStatus =
-  | 'active'
-  | 'inactive'
-  | 'suspended'
-  | 'verification_required';
+import type { DoctorStatus, PaymentStatus, WithdrawalStatus } from './common.types';
 
-export type PaymentStatus =
-  | 'paid'
-  | 'pending'
-  | 'failed'
-  | 'refunded'
-  | 'partially_refunded';
+export type DoctorAccountStatus = DoctorStatus;
 
 export type CommissionStatus =
   | 'pending'
@@ -25,16 +16,6 @@ export type ProgramStatus =
   | 'paused'
   | 'completed'
   | 'expired';
-
-export type WithdrawalStatus =
-  | 'requested'
-  | 'under_review'
-  | 'approved'
-  | 'processing'
-  | 'paid'
-  | 'rejected'
-  | 'failed'
-  | 'cancelled';
 
 export type KycDocumentStatus =
   | 'not_submitted'
@@ -70,8 +51,6 @@ export interface DoctorProfile {
   kycStatus: KycDocumentStatus;
   bankVerificationStatus: KycDocumentStatus;
 }
-
-export type DoctorStatus = DoctorAccountStatus;
 
 export interface ReferralPatient {
   id: string;

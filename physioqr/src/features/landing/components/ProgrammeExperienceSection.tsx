@@ -68,7 +68,7 @@ export function ProgrammeExperienceSection() {
                     key={idx}
                     style={{
                       display: 'flex',
-                      justify: 'space-between',
+                      justifyContent: 'space-between',
                       alignItems: 'center',
                       background: isToday ? '#FFFFFF' : isCompleted ? 'rgba(255,255,255,0.7)' : '#F8FAFC',
                       border: isToday ? '1.5px solid var(--teal-600)' : '1px solid var(--border-soft)',

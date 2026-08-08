@@ -179,7 +179,7 @@ export function WithdrawalsPage() {
 
       {/* 16.3 Confirmation Modal */}
       {showConfirmModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyCenter: 'center', padding: '1rem' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
           <div style={{ background: '#FFFFFF', borderRadius: '16px', maxWidth: '440px', width: '100%', padding: '1.75rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', boxShadow: '0 20px 50px rgba(0,0,0,0.2)' }}>
             <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#17212B' }}>Confirm Withdrawal Request</h3>
             
