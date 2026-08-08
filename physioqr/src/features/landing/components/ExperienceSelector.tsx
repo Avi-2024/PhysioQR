@@ -31,11 +31,11 @@ export function ExperienceSelector({ onOpenPortal }: ExperienceSelectorProps) {
               padding: '36px',
               display: 'flex',
               flexDirection: 'column',
-              justify: 'space-between'
+              justifyContent: 'space-between'
             }}
           >
             <div>
-              <div style={{ display: 'flex', itemsCenter: 'center', gap: '10px', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
                 <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'var(--teal-600)', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <HeartPulse className="w-6 h-6" />
                 </div>
@@ -82,11 +82,11 @@ export function ExperienceSelector({ onOpenPortal }: ExperienceSelectorProps) {
               padding: '36px',
               display: 'flex',
               flexDirection: 'column',
-              justify: 'space-between'
+              justifyContent: 'space-between'
             }}
           >
             <div>
-              <div style={{ display: 'flex', itemsCenter: 'center', gap: '10px', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
                 <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'var(--teal-950)', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <Stethoscope className="w-6 h-6" />
                 </div>

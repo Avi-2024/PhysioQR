@@ -62,7 +62,7 @@ export function SafetySection() {
                   border: '1px solid var(--teal-200)',
                   display: 'flex',
                   alignItems: 'center',
-                  justify: 'center'
+                  justifyContent: 'center'
                 }}
               >
                 {iconMap[rule.iconName] || <ShieldCheck className="w-6 h-6 text-teal-600" />}

@@ -64,7 +64,7 @@ export function FinalCTASection({ onOpenPortal }: FinalCTAProps) {
               padding: '36px',
               display: 'flex',
               flexDirection: 'column',
-              justify: 'space-between',
+              justifyContent: 'space-between',
               gap: '28px',
               cursor: 'pointer',
               boxShadow: '0 12px 32px rgba(20, 117, 110, 0.12)',
@@ -102,7 +102,7 @@ export function FinalCTASection({ onOpenPortal }: FinalCTAProps) {
               className="rc-btn-primary"
               style={{
                 width: '100%',
-                justify: 'center',
+                justifyContent: 'center',
                 padding: '16px',
                 fontSize: '16px',
                 borderRadius: '14px',
@@ -125,7 +125,7 @@ export function FinalCTASection({ onOpenPortal }: FinalCTAProps) {
               padding: '36px',
               display: 'flex',
               flexDirection: 'column',
-              justify: 'space-between',
+              justifyContent: 'space-between',
               gap: '28px',
               cursor: 'pointer',
               boxShadow: '0 12px 32px rgba(6, 47, 46, 0.08)',
@@ -162,7 +162,7 @@ export function FinalCTASection({ onOpenPortal }: FinalCTAProps) {
             <button
               style={{
                 width: '100%',
-                justify: 'center',
+                justifyContent: 'center',
                 padding: '16px',
                 fontSize: '16px',
                 borderRadius: '14px',

@@ -31,7 +31,7 @@ export function CapabilitiesSection() {
               padding: '32px',
               display: 'flex',
               flexDirection: 'column',
-              justify: 'space-between',
+              justifyContent: 'space-between',
               gap: '24px'
             }}
           >

@@ -42,7 +42,7 @@ export function ProgrammeExperienceSection() {
               borderRadius: '24px',
               display: 'flex',
               flexDirection: 'column',
-              justify: 'space-between',
+              justifyContent: 'space-between',
               gap: '24px'
             }}
           >
@@ -117,7 +117,7 @@ export function ProgrammeExperienceSection() {
               boxShadow: 'var(--shadow-elevated)',
               display: 'flex',
               flexDirection: 'column',
-              justify: 'space-between',
+              justifyContent: 'space-between',
               gap: '24px'
             }}
           >
@@ -147,7 +147,7 @@ export function ProgrammeExperienceSection() {
                 borderRadius: '18px',
                 display: 'flex',
                 flexDirection: 'column',
-                justify: 'space-between',
+                justifyContent: 'space-between',
                 padding: '20px',
                 color: '#FFFFFF',
                 position: 'relative',

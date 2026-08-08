@@ -120,7 +120,7 @@ export function MyPatientsPage() {
                     {pat.programName}
                   </td>
                   <td>
-                    <div style={{ display: 'flex', itemsCenter: 'center', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <div style={{ flex: 1, height: '6px', background: '#E2E8ED', borderRadius: '4px', overflow: 'hidden', minWidth: '60px' }}>
                         <div style={{ width: `${pat.programProgress}%`, height: '100%', background: pat.programProgress === 100 ? '#0E8345' : '#14756E' }}></div>
                       </div>

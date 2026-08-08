@@ -39,7 +39,7 @@ export function NotificationsPage() {
               gap: '1rem'
             }}
           >
-            <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: item.isRead ? '#F6F8FA' : '#DDF3F0', color: '#0F5F5A', display: 'flex', alignItems: 'center', justify: 'center', flexShrink: 0 }}>
+            <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: item.isRead ? '#F6F8FA' : '#DDF3F0', color: '#0F5F5A', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <Bell className="w-4 h-4" />
             </div>
 

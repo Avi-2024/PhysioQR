@@ -18,7 +18,7 @@ export function CareJourney() {
     <section id="how-it-works" className="rc-section" style={{ background: '#FFFFFF', borderBottom: '1px solid var(--border-default)' }}>
       <div className="rc-container">
         {/* Section Header */}
-        <div style={{ textAlignment: 'center', textAlign: 'center', maxWidth: '680px', margin: '0 auto 56px auto' }}>
+        <div style={{ textAlign: 'center', maxWidth: '680px', margin: '0 auto 56px auto' }}>
           <span className="rc-eyebrow">STRUCTURED CLINICAL WORKFLOW</span>
           <h2 className="rc-heading-section" style={{ marginTop: '8px', marginBottom: '12px' }}>
             One connected rehabilitation journey

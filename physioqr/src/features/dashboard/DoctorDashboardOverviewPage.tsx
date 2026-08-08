@@ -38,7 +38,7 @@ export function DoctorDashboardOverviewPage({ onNavigate }: DoctorDashboardOverv
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       {/* 12.1 Dashboard Header */}
-      <div style={{ display: 'flex', justify: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h2 style={{ fontSize: '24px', fontWeight: 800, color: '#17212B' }}>Good afternoon, {profile.name}</h2>
           <p style={{ fontSize: '14px', color: '#5D6975', marginTop: '2px' }}>
@@ -151,22 +151,22 @@ export function DoctorDashboardOverviewPage({ onNavigate }: DoctorDashboardOverv
           <h3 className="section-card-title" style={{ color: '#0F5F5A' }}>Commission Rules & Status</h3>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div style={{ display: 'flex', justify: 'space-between', borderBottom: '1px solid #DDF3F0', paddingBottom: '8px', fontSize: '13px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #DDF3F0', paddingBottom: '8px', fontSize: '13px' }}>
               <span style={{ color: '#5D6975' }}>Commission Rate:</span>
               <strong style={{ color: '#0F5F5A' }}>{profile.commissionPercentage}% of patient fee</strong>
             </div>
 
-            <div style={{ display: 'flex', justify: 'space-between', borderBottom: '1px solid #DDF3F0', paddingBottom: '8px', fontSize: '13px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #DDF3F0', paddingBottom: '8px', fontSize: '13px' }}>
               <span style={{ color: '#5D6975' }}>Holding Period:</span>
               <strong style={{ color: '#0F5F5A' }}>{profile.holdingPeriodDays} days after payment</strong>
             </div>
 
-            <div style={{ display: 'flex', justify: 'space-between', borderBottom: '1px solid #DDF3F0', paddingBottom: '8px', fontSize: '13px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #DDF3F0', paddingBottom: '8px', fontSize: '13px' }}>
               <span style={{ color: '#5D6975' }}>Pending Commission:</span>
               <strong style={{ color: '#B45309' }}>{formatCurrency(summary.pendingCommission)}</strong>
             </div>
 
-            <div style={{ display: 'flex', justify: 'space-between', paddingTop: '4px', fontSize: '14px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '4px', fontSize: '14px' }}>
               <span style={{ fontWeight: 700, color: '#17212B' }}>Available Balance:</span>
               <strong style={{ fontSize: '18px', color: '#0F5F5A' }}>{formatCurrency(summary.availableCommission)}</strong>
             </div>
