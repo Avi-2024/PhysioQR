@@ -1,0 +1,9 @@
+node_modules
+apps/*/generated
+.env
+.env.*
+!.env.example
+coverage
+dist
+.DS_Store
+*.log
