@@ -29,7 +29,7 @@ export function CareJourney() {
         </div>
 
         {/* 5-Step Stepper (Section 30-35) */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '16px', position: 'relative' }} className="grid-cols-1 md:grid-cols-3 lg:grid-cols-5">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '16px', position: 'relative' }} className="rc-responsive-grid-5 grid-cols-1 md:grid-cols-3 lg:grid-cols-5">
           {JOURNEY_STEPS.map((step) => (
             <div
               key={step.stepNumber}

@@ -19,15 +19,15 @@ export function HeroSection({ onOpenPortal }: HeroSectionProps) {
       }}
     >
       <div className="rc-container">
-        <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: '48px', alignItems: 'center' }} className="grid-cols-1 lg:grid-cols-2">
+        <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: '48px', alignItems: 'center' }} className="rc-hero-grid grid-cols-1 lg:grid-cols-2">
           {/* Left Column (55% Copy) */}
-          <div>
-            <div className="rc-eyebrow" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'var(--teal-100)', color: 'var(--teal-800)', padding: '4px 12px', borderRadius: '20px' }}>
+          <div className="rc-hero-copy">
+            <div className="rc-eyebrow" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#E6F4F1', color: '#0B4F4A', padding: '4px 12px', borderRadius: '20px' }}>
               <span>CONNECTED DIGITAL REHABILITATION</span>
             </div>
 
-            <h1 className="rc-heading-hero" style={{ marginTop: '16px', marginBottom: '20px' }}>
-              From doctor referral to <span style={{ color: 'var(--teal-600)' }}>guided recovery</span>.
+            <h1 className="rc-heading-hero" style={{ color: '#062F2E', marginTop: '16px', marginBottom: '20px' }}>
+              From doctor referral to <span style={{ color: '#14756E' }}>guided recovery</span>.
             </h1>
 
             <p className="rc-subheading" style={{ marginBottom: '32px' }}>
@@ -35,8 +35,8 @@ export function HeroSection({ onOpenPortal }: HeroSectionProps) {
             </p>
 
             {/* CTAs (Section 26) */}
-            <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '36px' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div className="rc-hero-actions" style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '36px' }}>
+              <div className="rc-hero-action" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <button className="rc-btn-primary" onClick={() => onOpenPortal('patient')} style={{ padding: '14px 28px', fontSize: '16px' }}>
                   <span>I'm a Patient</span>
                   <ArrowRight className="w-4 h-4" />
@@ -46,7 +46,7 @@ export function HeroSection({ onOpenPortal }: HeroSectionProps) {
                 </span>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <div className="rc-hero-action" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <button className="rc-btn-outline" onClick={() => onOpenPortal('doctor')} style={{ padding: '14px 28px', fontSize: '16px' }}>
                   <span>I'm a Doctor</span>
                   <ArrowRight className="w-4 h-4" />
@@ -58,7 +58,7 @@ export function HeroSection({ onOpenPortal }: HeroSectionProps) {
             </div>
 
             {/* Trust Row (Section 27) */}
-            <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', paddingTop: '20px', borderTop: '1px solid var(--border-default)' }}>
+            <div className="rc-hero-trust-row" style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', paddingTop: '20px', borderTop: '1px solid var(--border-default)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-secondary)', fontWeight: 600 }}>
                 <Stethoscope className="w-4 h-4 text-teal-600" />
                 <span>Doctor connected</span>
@@ -84,7 +84,7 @@ export function HeroSection({ onOpenPortal }: HeroSectionProps) {
           {/* Right Column Product Visual (Section 28) */}
           <div style={{ position: 'relative' }}>
             <div
-              className="rc-card"
+              className="rc-card rc-hero-visual-card"
               style={{
                 background: '#FFFFFF',
                 borderRadius: 'var(--radius-showcase)',
@@ -97,23 +97,23 @@ export function HeroSection({ onOpenPortal }: HeroSectionProps) {
               }}
             >
               {/* Doctor Referral Badge Card */}
-              <div style={{ background: 'var(--teal-950)', color: '#FFFFFF', borderRadius: '14px', padding: '18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div className="rc-hero-referral-card" style={{ background: 'var(--teal-950)', color: '#FFFFFF', borderRadius: '14px', padding: '18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
                   <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--teal-600)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '13px' }}>DR</div>
-                  <div>
+                  <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: '14.5px', fontWeight: 700 }}>Dr. Amit Sharma</div>
                     <div style={{ fontSize: '11px', color: 'var(--teal-300)' }}>Sharma Orthopaedics · Ref Code: DR001</div>
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(20, 184, 166, 0.2)', padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 700, color: '#14B8A6' }}>
+                <div className="rc-hero-status-badge" style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(20, 184, 166, 0.2)', padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 700, color: '#14B8A6' }}>
                   <QrCode className="w-3.5 h-3.5" />
                   <span>QR Verified</span>
                 </div>
               </div>
 
               {/* Connecting Stepper Indicator */}
-              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', color: 'var(--teal-600)', fontSize: '12px', fontWeight: 700 }}>
+              <div className="rc-hero-connector" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', color: 'var(--teal-600)', fontSize: '12px', fontWeight: 700 }}>
                 <div style={{ height: '20px', width: '2px', background: 'var(--teal-500)' }}></div>
                 <span>Referral Connected → Patient Recovery</span>
                 <div style={{ height: '20px', width: '2px', background: 'var(--teal-500)' }}></div>
@@ -121,20 +121,20 @@ export function HeroSection({ onOpenPortal }: HeroSectionProps) {
 
               {/* Patient Day 5/14 Programme Active Card */}
               <div style={{ background: 'var(--teal-50)', border: '1px solid var(--teal-200)', borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div className="rc-programme-row rc-hero-programme-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
                     <HeartPulse className="w-5 h-5 text-teal-600" />
-                    <div>
+                    <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: '14px', fontWeight: 800, color: 'var(--teal-950)' }}>Knee Mobility Rehabilitation</div>
                       <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>Assigned to Priya Verma · 14-Day Protocol</div>
                     </div>
                   </div>
-                  <span className="badge-status active">PROGRAMME ACTIVE</span>
+                  <span className="badge-status active rc-hero-status-badge">PROGRAMME ACTIVE</span>
                 </div>
 
                 {/* Progress Bar */}
                 <div style={{ background: '#FFFFFF', padding: '12px', borderRadius: '10px', border: '1px solid var(--border-soft)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                  <div className="rc-hero-progress-row" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
                     <span style={{ color: 'var(--text-primary)' }}>Day 05 of 14</span>
                     <span style={{ color: 'var(--teal-700)' }}>36% Completed</span>
                   </div>

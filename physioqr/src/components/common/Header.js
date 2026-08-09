@@ -1,5 +1,6 @@
 import React from "react";
 import { useAuth } from "../../context/AuthContext";
+import { Logo } from "../brand/Logo";
 
 export function Header() {
   const { currentRole, switchRole } = useAuth();
@@ -7,10 +8,9 @@ export function Header() {
   return (
     <header className="main-header">
       <div className="brand-section">
-        <div className="brand-logo-icon">+</div>
+        <Logo width={56} height={56} withText={false} />
         <div>
-          <h1 className="brand-title">PhysioQR</h1>
-          <span className="brand-subtitle">Rehabilitation Platform</span>
+          <h1 className="brand-title">Rehabilitation Platform</h1>
         </div>
       </div>
 

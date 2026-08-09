@@ -57,6 +57,60 @@
   --shadow-card: 0 8px 28px rgba(10, 40, 38, 0.06);
   --shadow-elevated: 0 20px 50px rgba(10, 40, 38, 0.10);
 }
+/* Dual Portal / Landing section styles */
+.dual-portal-section {
+  background: linear-gradient(180deg, #FFFFFF 0%, #F2FAF8 100%);
+  padding: 3.25rem 0;
+}
+
+.dual-portal-inner {
+  max-width: 1140px;
+  margin: 0 auto;
+  padding: 0 2rem;
+  display: grid;
+  grid-template-columns: 1fr 420px;
+  gap: 2.25rem;
+  align-items: center;
+}
+
+.eyebrow-badge {
+  display: inline-block;
+  background: var(--teal-100);
+  color: var(--teal-800);
+  font-weight: 800;
+  padding: 8px 14px;
+  border-radius: 9999px;
+  font-size: 11px;
+  letter-spacing: 0.9px;
+}
+
+.dual-portal-title {
+  font-size: 34px;
+  font-weight: 800;
+  color: var(--teal-950);
+  line-height: 1.06;
+}
+
+.dual-portal-accent {
+  background: linear-gradient(90deg, var(--teal-600), #34D399);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.dual-portal-columns {
+  display: grid;
+  gap: 0.875rem;
+  margin-top: 1rem;
+}
+
+.dual-portal-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--border-soft);
+}
+
+.dual-portal-cta { margin-top: 1.25rem; display: inline-flex; gap: 12px; align-items: center; }
 
 * {
   box-sizing: border-box;
@@ -74,10 +128,11 @@ body {
 
 /* Container Constraint (Section 11) */
 .rc-container {
+  width: 100%;
   max-width: 1280px;
   margin: 0 auto;
-  padding-left: 32px;
-  padding-right: 32px;
+  padding-left: clamp(16px, 3vw, 48px);
+  padding-right: clamp(16px, 3vw, 48px);
 }
 
 @media (max-width: 1024px) {
@@ -96,8 +151,8 @@ body {
 
 /* Section Vertical Spacing (Section 12) */
 .rc-section {
-  padding-top: 96px;
-  padding-bottom: 96px;
+  padding-top: clamp(64px, 7vw, 96px);
+  padding-bottom: clamp(64px, 7vw, 96px);
 }
 
 @media (max-width: 768px) {
@@ -118,23 +173,23 @@ body {
 }
 
 .rc-heading-hero {
-  font-size: 56px;
+  font-size: clamp(32px, 4vw, 56px);
   font-weight: 800;
   color: var(--text-primary);
   line-height: 1.15;
-  letter-spacing: -1px;
+  letter-spacing: 0;
 }
 
 .rc-heading-section {
-  font-size: 36px;
+  font-size: clamp(28px, 3vw, 42px);
   font-weight: 800;
   color: var(--text-primary);
   line-height: 1.25;
-  letter-spacing: -0.5px;
+  letter-spacing: 0;
 }
 
 .rc-subheading {
-  font-size: 18px;
+  font-size: clamp(15px, 1.6vw, 18px);
   font-weight: 500;
   color: var(--text-secondary);
   line-height: 1.6;
@@ -233,15 +288,20 @@ body {
   background: var(--bg-surface);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-card);
-  padding: 24px;
+  padding: clamp(16px, 2vw, 24px);
   box-shadow: var(--shadow-card);
   transition: transform 200ms ease-out, border-color 200ms ease-out, box-shadow 200ms ease-out;
+  min-width: 0;
 }
 
 .rc-card-interactive:hover {
   transform: translateY(-2px);
   border-color: var(--teal-400);
   box-shadow: var(--shadow-elevated);
+}
+
+.rc-header-signin {
+  display: inline-flex;
 }
 
 /* Modal Focus & Overlay (Section 67) */
@@ -254,19 +314,371 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 16px;
+  padding: 12px;
   animation: fadeIn 200ms ease-out;
 }
 
 .rc-modal-container {
   background: #FFFFFF;
   border-radius: var(--radius-large-panel);
-  max-width: 540px;
-  width: 100%;
-  padding: 32px;
+  width: min(calc(100% - 8px), 540px);
+  max-height: calc(100dvh - 24px);
+  overflow-y: auto;
+  padding: clamp(18px, 4vw, 32px);
   box-shadow: var(--shadow-elevated);
   position: relative;
   animation: slideUp 200ms ease-out;
+}
+
+/* Responsive landing/grid primitives layered over legacy inline layout styles. */
+.rc-hero-grid,
+.rc-responsive-grid-2,
+.rc-responsive-grid-3,
+.rc-responsive-grid-4,
+.rc-responsive-grid-5,
+.rc-dashboard-grid-2,
+.rc-programme-grid {
+  width: 100%;
+  min-width: 0;
+}
+
+.rc-hero-grid {
+  max-width: 1160px;
+  margin-inline: auto;
+  grid-template-columns: minmax(0, 1.05fr) minmax(340px, 0.95fr) !important;
+}
+
+.rc-hero-visual-wrap {
+  width: 100%;
+  max-width: 560px;
+  justify-self: center;
+}
+
+.rc-responsive-grid-2,
+.rc-dashboard-grid-2,
+.rc-programme-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+
+.rc-responsive-grid-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+.rc-responsive-grid-4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+}
+
+.rc-responsive-grid-5 {
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+}
+
+.rc-centered-section-header {
+  text-align: center;
+  max-width: 760px;
+  margin-inline: auto;
+}
+
+.rc-card-row {
+  min-width: 0;
+}
+
+.rc-portal-card-header,
+.rc-modal-card-header,
+.rc-programme-row,
+.rc-capability-card-header,
+.rc-capability-preview {
+  min-width: 0;
+}
+
+@media (max-width: 1023px) {
+  .rc-landing-header-grid {
+    grid-template-columns: minmax(0, 1fr) auto !important;
+  }
+
+  .rc-hero-grid,
+  .rc-dashboard-grid-2,
+  .rc-programme-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 32px !important;
+  }
+
+  .rc-hero-visual-wrap {
+    margin-inline: auto;
+  }
+
+  .rc-responsive-grid-5 {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .rc-responsive-grid-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .rc-hero-copy {
+    text-align: center;
+    max-width: 760px;
+    margin-inline: auto;
+  }
+
+  .rc-hero-actions,
+  .rc-hero-trust-row {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 767px) {
+  .rc-responsive-grid-2,
+  .rc-responsive-grid-3,
+  .rc-responsive-grid-4,
+  .rc-responsive-grid-5 {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 20px !important;
+  }
+
+  .rc-portal-card-header,
+  .rc-modal-card-header,
+  .rc-programme-row {
+    flex-wrap: wrap;
+    align-items: flex-start !important;
+  }
+
+  .rc-modal-card-header {
+    gap: 8px;
+  }
+
+  .rc-modal-card-header > span {
+    margin-top: 4px;
+  }
+}
+
+@media (max-width: 640px) {
+  section:has(.rc-hero-grid) {
+    padding-top: 40px !important;
+    padding-bottom: 56px !important;
+  }
+
+  .rc-hero-grid {
+    gap: 28px !important;
+  }
+
+  .rc-hero-copy {
+    text-align: left;
+  }
+
+  .rc-hero-actions {
+    gap: 12px !important;
+  }
+
+  .rc-hero-action {
+    width: 100%;
+  }
+
+  .rc-hero-action > button {
+    width: 100%;
+    justify-content: center;
+    padding-inline: 16px !important;
+  }
+
+  .rc-hero-action > span {
+    text-align: left !important;
+    padding-left: 2px;
+  }
+
+  .rc-hero-trust-row {
+    justify-content: flex-start;
+    gap: 12px 16px !important;
+  }
+
+  .rc-hero-visual-card {
+    padding: 16px !important;
+    border-radius: 18px !important;
+    gap: 16px !important;
+  }
+
+  .rc-capability-card-header {
+    align-items: flex-start !important;
+    gap: 12px !important;
+  }
+
+  .rc-capability-icon {
+    width: 42px !important;
+    height: 42px !important;
+    min-width: 42px;
+    min-height: 42px;
+    border-radius: 12px !important;
+  }
+
+  .rc-capability-icon svg {
+    width: 21px !important;
+    height: 21px !important;
+  }
+
+  .rc-capability-badge {
+    align-self: flex-start;
+    white-space: normal;
+    text-align: left;
+    max-width: 160px;
+    line-height: 1.25;
+  }
+
+  .rc-capability-preview {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .rc-hero-referral-card,
+  .rc-hero-programme-row {
+    align-items: flex-start !important;
+  }
+
+  .rc-hero-referral-card {
+    padding: 14px !important;
+  }
+
+  .rc-hero-referral-card > div:first-child {
+    width: 100%;
+  }
+
+  .rc-hero-status-badge {
+    flex-shrink: 0;
+    white-space: normal;
+    line-height: 1.2;
+  }
+
+  .rc-hero-connector {
+    align-items: center;
+    line-height: 1.35;
+    text-align: center;
+  }
+
+  .rc-hero-connector span {
+    min-width: 0;
+  }
+
+  .rc-hero-programme-row {
+    flex-direction: column;
+  }
+
+  .rc-hero-progress-row {
+    flex-wrap: wrap;
+    gap: 4px 12px;
+  }
+
+  .rc-experience-card {
+    gap: 20px !important;
+  }
+
+  .rc-experience-card-header {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 12px !important;
+  }
+
+  .rc-experience-icon {
+    width: 42px !important;
+    height: 42px !important;
+    min-width: 42px;
+    min-height: 42px;
+    border-radius: 12px !important;
+  }
+
+  .rc-experience-icon svg {
+    width: 22px !important;
+    height: 22px !important;
+  }
+
+  .rc-experience-card button {
+    width: 100% !important;
+    justify-content: center;
+  }
+
+  .rc-heading-hero,
+  .rc-heading-section {
+    text-wrap: balance;
+  }
+
+  .rc-heading-hero {
+    font-size: 30px;
+    line-height: 1.18;
+  }
+
+  .rc-heading-section {
+    font-size: 25px;
+    line-height: 1.24;
+  }
+
+  .rc-subheading {
+    font-size: 15px;
+    line-height: 1.55;
+  }
+
+  .rc-eyebrow {
+    font-size: 10.5px;
+    letter-spacing: 0.6px;
+  }
+
+  .rc-card h3,
+  .rc-card h4 {
+    line-height: 1.25;
+  }
+
+  .text-3xl {
+    font-size: 1.5rem !important;
+    line-height: 2rem !important;
+  }
+
+  .text-2xl {
+    font-size: 1.25rem !important;
+    line-height: 1.75rem !important;
+  }
+
+  .text-xl {
+    font-size: 1.125rem !important;
+    line-height: 1.625rem !important;
+  }
+
+  .text-lg {
+    font-size: 1rem !important;
+    line-height: 1.5rem !important;
+  }
+
+  .rc-btn-primary,
+  .rc-btn-outline,
+  .rc-btn-secondary {
+    min-height: 44px;
+    font-size: 14px !important;
+  }
+
+  .rc-header-signin {
+    display: none !important;
+  }
+
+  .rc-modal-overlay {
+    align-items: flex-end;
+  }
+
+  .rc-modal-container {
+    width: min(calc(100% - 12px), 540px);
+    border-radius: 20px 20px 16px 16px;
+  }
+}
+
+@media (max-width: 380px) {
+  .rc-heading-hero {
+    font-size: 28px;
+  }
+
+  .rc-heading-section {
+    font-size: 23px;
+  }
+
+  .rc-subheading {
+    font-size: 14.5px;
+  }
+
+  .text-2xl {
+    font-size: 1.1875rem !important;
+    line-height: 1.65rem !important;
+  }
 }
 
 @keyframes fadeIn {

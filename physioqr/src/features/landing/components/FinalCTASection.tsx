@@ -10,7 +10,7 @@ export function FinalCTASection({ onOpenPortal }: FinalCTAProps) {
   return (
     <section
       style={{
-        background: 'linear-gradient(180deg, #E6F4F1 0%, #F0FAF8 50%, #FFFFFF 100%)',
+        background: 'linear-gradient(180deg, #FFFFFF 0%, #F2FAF8 100%)',
         color: 'var(--text-primary)',
         padding: '92px 0',
         position: 'relative',
@@ -41,7 +41,7 @@ export function FinalCTASection({ onOpenPortal }: FinalCTAProps) {
             <span>PORTAL RECOVERY PATHWAY</span>
           </div>
 
-          <h2 className="rc-heading-section" style={{ color: 'var(--teal-950)', fontSize: '42px', letterSpacing: '-0.8px', lineHeight: '1.2' }}>
+          <h2 className="rc-heading-section" style={{ color: 'var(--teal-950)', fontSize: 'clamp(25px, 3.6vw, 42px)', letterSpacing: 0, lineHeight: '1.2' }}>
             Continue your PhysioQR journey.
           </h2>
 
@@ -51,7 +51,7 @@ export function FinalCTASection({ onOpenPortal }: FinalCTAProps) {
         </div>
 
         {/* 2 World-Class Interactive Role Cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px', maxWidth: '960px', margin: '0 auto' }} className="grid-cols-1 md:grid-cols-2">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px', maxWidth: '960px', margin: '0 auto' }} className="rc-responsive-grid-2 grid-cols-1 md:grid-cols-2">
           
           {/* Card 1: Patient Access */}
           <div
@@ -84,7 +84,7 @@ export function FinalCTASection({ onOpenPortal }: FinalCTAProps) {
               <span style={{ fontSize: '12px', fontWeight: 800, color: 'var(--teal-700)', letterSpacing: '0.6px', textTransform: 'uppercase' }}>
                 PATIENT PORTAL
               </span>
-              <h3 style={{ fontSize: '26px', fontWeight: 800, color: 'var(--teal-950)', marginTop: '4px', marginBottom: '10px' }}>
+              <h3 style={{ fontSize: 'clamp(20px, 2.4vw, 26px)', fontWeight: 800, color: 'var(--teal-950)', marginTop: '4px', marginBottom: '10px' }}>
                 Patient Access
               </h3>
               <p style={{ fontSize: '14.5px', color: 'var(--text-secondary)', lineHeight: '1.6', marginBottom: '20px' }}>
@@ -145,7 +145,7 @@ export function FinalCTASection({ onOpenPortal }: FinalCTAProps) {
               <span style={{ fontSize: '12px', fontWeight: 800, color: 'var(--teal-700)', letterSpacing: '0.6px', textTransform: 'uppercase' }}>
                 DOCTOR PORTAL
               </span>
-              <h3 style={{ fontSize: '26px', fontWeight: 800, color: 'var(--teal-950)', marginTop: '4px', marginBottom: '10px' }}>
+              <h3 style={{ fontSize: 'clamp(20px, 2.4vw, 26px)', fontWeight: 800, color: 'var(--teal-950)', marginTop: '4px', marginBottom: '10px' }}>
                 Doctor Portal
               </h3>
               <p style={{ fontSize: '14.5px', color: 'var(--text-secondary)', lineHeight: '1.6', marginBottom: '20px' }}>

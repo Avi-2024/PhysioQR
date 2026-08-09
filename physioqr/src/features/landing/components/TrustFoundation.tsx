@@ -16,7 +16,7 @@ export function TrustFoundation() {
   return (
     <section style={{ background: 'var(--teal-50)', borderBottom: '1px solid var(--border-default)', padding: '48px 0' }}>
       <div className="rc-container">
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '24px' }} className="grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '24px' }} className="rc-responsive-grid-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
           {TRUST_FOUNDATION_ITEMS.map((item, idx) => (
             <div
               key={idx}

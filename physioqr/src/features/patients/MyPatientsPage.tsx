@@ -18,17 +18,17 @@ export function MyPatientsPage() {
   });
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', minWidth: 0 }}>
       {/* 13.1 Patient List Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-        <div>
-          <h2 style={{ fontSize: '22px', fontWeight: 800, color: '#17212B' }}>My Referred Patients</h2>
+        <div style={{ minWidth: 0 }}>
+          <h2 style={{ fontSize: 'clamp(19px, 2.4vw, 22px)', fontWeight: 800, color: '#17212B' }}>My Referred Patients</h2>
           <p style={{ fontSize: '13.5px', color: '#5D6975', marginTop: '2px' }}>
             {filteredPatients.length} total referrals registered via your QR code
           </p>
         </div>
 
-        <button className="btn-outline" onClick={() => alert('Exporting patient list to CSV...')}>
+        <button className="btn-outline" style={{ minHeight: '44px' }} onClick={() => alert('Exporting patient list to CSV...')}>
           <FileSpreadsheet className="w-4 h-4 text-emerald-700" /> Export CSV
         </button>
       </div>
@@ -36,7 +36,7 @@ export function MyPatientsPage() {
       {/* 13.2 Search and Filters */}
       <div className="card-section" style={{ padding: '1rem 1.25rem' }}>
         <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          <div style={{ flex: 1, minWidth: '240px', position: 'relative' }}>
+          <div style={{ flex: '1 1 240px', minWidth: 0, position: 'relative' }}>
             <Search className="w-4 h-4" style={{ position: 'absolute', left: '12px', top: '12px', color: '#84909C' }} />
             <input
               type="text"
@@ -50,7 +50,7 @@ export function MyPatientsPage() {
           <select
             value={selectedPain}
             onChange={(e) => setSelectedPain(e.target.value)}
-            style={{ padding: '9px 12px', border: '1px solid #E2E8ED', borderRadius: '8px', fontSize: '13px', background: '#FFFFFF' }}
+            style={{ flex: '1 1 180px', minWidth: 0, padding: '9px 12px', border: '1px solid #E2E8ED', borderRadius: '8px', fontSize: '13px', background: '#FFFFFF' }}
           >
             <option value="all">All Pain Categories</option>
             <option value="Knee">Knee Pain</option>
@@ -61,7 +61,7 @@ export function MyPatientsPage() {
           <select
             value={selectedPayment}
             onChange={(e) => setSelectedPayment(e.target.value)}
-            style={{ padding: '9px 12px', border: '1px solid #E2E8ED', borderRadius: '8px', fontSize: '13px', background: '#FFFFFF' }}
+            style={{ flex: '1 1 180px', minWidth: 0, padding: '9px 12px', border: '1px solid #E2E8ED', borderRadius: '8px', fontSize: '13px', background: '#FFFFFF' }}
           >
             <option value="all">All Payment Statuses</option>
             <option value="paid">Paid</option>
@@ -86,8 +86,8 @@ export function MyPatientsPage() {
       </div>
 
       {/* 13.3 Patient Table */}
-      <div className="card-section" style={{ padding: 0, overflow: 'hidden' }}>
-        <table className="enterprise-table">
+      <div className="card-section" style={{ padding: 0, overflowX: 'auto', overflowY: 'hidden' }}>
+        <table className="enterprise-table" style={{ minWidth: '920px' }}>
           <thead>
             <tr>
               <th>Patient</th>
@@ -151,9 +151,9 @@ export function MyPatientsPage() {
       {/* 13.4 Patient Detail Drawer */}
       {selectedPatient && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', justifyContent: 'flex-end' }}>
-          <div style={{ width: '100%', maxWidth: '480px', background: '#FFFFFF', height: '100%', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #E2E8ED', paddingBottom: '1rem' }}>
-              <div>
+          <div style={{ width: 'min(100vw, 480px)', maxWidth: '100%', background: '#FFFFFF', height: '100%', padding: 'clamp(1rem, 4vw, 2rem)', display: 'flex', flexDirection: 'column', gap: '1.5rem', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', borderBottom: '1px solid #E2E8ED', paddingBottom: '1rem' }}>
+              <div style={{ minWidth: 0 }}>
                 <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#17212B' }}>{selectedPatient.name}</h3>
                 <span style={{ fontSize: '12px', color: '#5D6975' }}>Referral ID: {selectedPatient.id}</span>
               </div>
@@ -164,19 +164,19 @@ export function MyPatientsPage() {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', fontSize: '13.5px' }}>
               <div style={{ background: '#F6F8FA', padding: '1rem', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#5D6975' }}>Mobile:</span><strong>{selectedPatient.mobileMasked}</strong></div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#5D6975' }}>Registration Date:</span><strong>{formatDate(selectedPatient.registrationDate)}</strong></div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#5D6975' }}>Pain Category:</span><strong>{selectedPatient.painCategory}</strong></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}><span style={{ color: '#5D6975' }}>Mobile:</span><strong>{selectedPatient.mobileMasked}</strong></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}><span style={{ color: '#5D6975' }}>Registration Date:</span><strong>{formatDate(selectedPatient.registrationDate)}</strong></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}><span style={{ color: '#5D6975' }}>Pain Category:</span><strong>{selectedPatient.painCategory}</strong></div>
               </div>
 
               <div style={{ background: '#F6F8FA', padding: '1rem', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <h4 style={{ fontSize: '13px', fontWeight: 700, color: '#0F5F5A' }}>Assigned Rehabilitation Program</h4>
                 <div><strong>{selectedPatient.programName}</strong></div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', marginTop: '4px' }}>
                   <span style={{ color: '#5D6975' }}>Status:</span>
                   <span className={`badge-status ${selectedPatient.programStatus}`}>{selectedPatient.programStatus.toUpperCase()}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
                   <span style={{ color: '#5D6975' }}>Progress:</span>
                   <strong>{selectedPatient.programProgress}% Completed</strong>
                 </div>
@@ -184,11 +184,11 @@ export function MyPatientsPage() {
 
               <div style={{ background: '#F1FAF8', border: '1px solid #DDF3F0', padding: '1rem', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <h4 style={{ fontSize: '13px', fontWeight: 700, color: '#0F5F5A' }}>Financial & Commission Summary</h4>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#5D6975' }}>Patient Paid:</span><strong>{formatCurrency(selectedPatient.paymentAmount)}</strong></div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#5D6975' }}>Doctor Commission (60%):</span><strong style={{ color: '#0F5F5A', fontSize: '15px' }}>{formatCurrency(selectedPatient.commissionAmount)}</strong></div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#5D6975' }}>Commission Status:</span><span className={`badge-status ${selectedPatient.commissionStatus}`}>{selectedPatient.commissionStatus.toUpperCase()}</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}><span style={{ color: '#5D6975' }}>Patient Paid:</span><strong>{formatCurrency(selectedPatient.paymentAmount)}</strong></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}><span style={{ color: '#5D6975' }}>Doctor Commission (60%):</span><strong style={{ color: '#0F5F5A', fontSize: '15px' }}>{formatCurrency(selectedPatient.commissionAmount)}</strong></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}><span style={{ color: '#5D6975' }}>Commission Status:</span><span className={`badge-status ${selectedPatient.commissionStatus}`}>{selectedPatient.commissionStatus.toUpperCase()}</span></div>
                 {selectedPatient.releaseDate && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#5D6975' }}>Holding Period Release:</span><strong>{formatDate(selectedPatient.releaseDate)}</strong></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}><span style={{ color: '#5D6975' }}>Holding Period Release:</span><strong>{formatDate(selectedPatient.releaseDate)}</strong></div>
                 )}
               </div>
             </div>

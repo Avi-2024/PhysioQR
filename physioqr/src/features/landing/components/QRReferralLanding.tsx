@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { QrCode, Stethoscope, CheckCircle2, ShieldCheck, ArrowRight, HeartPulse } from 'lucide-react';
+import { Logo } from '../../../components/brand/Logo';
 import { MOCK_DOCTOR_PROFILE } from '../../../mocks/mockDoctorData';
 
 interface QRReferralLandingProps {
@@ -52,8 +53,7 @@ export function QRReferralLanding({ doctorCode = 'DR001', onCompleteLogin, onBac
         {/* Top Branding */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-default)', paddingBottom: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'var(--teal-600)', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>+</div>
-            <span style={{ fontSize: '18px', fontWeight: 800, color: 'var(--teal-950)' }}>PhysioQR</span>
+            <Logo width={210} height={56} withText={false} imageScale={2.8} />
           </div>
 
           <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--success-text)', background: 'var(--success-bg)', padding: '4px 10px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>

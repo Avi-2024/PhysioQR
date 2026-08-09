@@ -92,7 +92,7 @@ export default function PatientRegistrationPage() {
 
   // Step indicator component
   const StepIndicator = () => (
-    <div className="flex items-center justify-between mb-8 overflow-x-auto scrollbar-hide pb-2">
+    <div className="flex items-center justify-between gap-2 mb-8 overflow-x-auto scrollbar-hide pb-2">
       {STEPS.map((s, idx) => (
         <div key={s.id} className="flex items-center flex-shrink-0">
           <div className={cn(
@@ -119,7 +119,7 @@ export default function PatientRegistrationPage() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-blue-50 py-8 px-4">
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-blue-50 py-6 sm:py-8 px-4">
       <div className="max-w-2xl mx-auto">
         {/* Header */}
         <div className="text-center mb-6">
@@ -128,7 +128,7 @@ export default function PatientRegistrationPage() {
           <p className="text-sm text-neutral-500">Referred by Doctor Code: <span className="font-semibold text-primary-600">{doctorCode}</span></p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-modal p-6 sm:p-8">
+        <div className="bg-white rounded-2xl shadow-modal p-4 sm:p-6 md:p-8 min-w-0">
           <StepIndicator />
 
           {/* Step 1: Basic Details */}
@@ -153,7 +153,7 @@ export default function PatientRegistrationPage() {
                 </div>
                 <div className="sm:col-span-2">
                   <label className="block text-sm font-medium text-neutral-700 mb-2">Gender *</label>
-                  <div className="flex gap-4">
+                  <div className="flex flex-wrap gap-4">
                     {['male', 'female', 'other'].map((g) => (
                       <label key={g} className="flex items-center gap-2 cursor-pointer">
                         <input {...basicForm.register('gender')} type="radio" value={g} className="w-4 h-4 text-primary-600" />
@@ -175,9 +175,9 @@ export default function PatientRegistrationPage() {
               <div><h2 className="text-lg font-bold text-neutral-900">Verify Mobile Number</h2><p className="text-sm text-neutral-500">We'll send a 6-digit OTP to verify your number</p></div>
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">Mobile Number *</label>
-                <div className="flex gap-2">
-                  <input {...otpForm.register('mobile')} type="tel" placeholder="10-digit mobile number" className="flex-1 px-3 py-2.5 rounded-lg border border-neutral-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
-                  <button onClick={handleSendOtp} type="button" className="px-4 py-2.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 font-medium text-sm rounded-lg transition-colors whitespace-nowrap">
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input {...otpForm.register('mobile')} type="tel" placeholder="10-digit mobile number" className="min-w-0 flex-1 px-3 py-2.5 rounded-lg border border-neutral-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                  <button onClick={handleSendOtp} type="button" className="min-h-11 px-4 py-2.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 font-medium text-sm rounded-lg transition-colors whitespace-nowrap">
                     {otpSent ? 'Resend' : 'Send OTP'}
                   </button>
                 </div>
@@ -186,9 +186,9 @@ export default function PatientRegistrationPage() {
               {otpSent && !otpVerified && (
                 <div>
                   <label className="block text-sm font-medium text-neutral-700 mb-1">Enter OTP <span className="text-neutral-400">(Demo: 123456)</span></label>
-                  <div className="flex gap-2">
-                    <input {...otpForm.register('otp')} maxLength={6} placeholder="6-digit OTP" className="flex-1 px-3 py-2.5 rounded-lg border border-neutral-300 text-sm tracking-widest focus:outline-none focus:ring-2 focus:ring-primary-500" />
-                    <button onClick={handleVerifyOtp} type="button" className="px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-medium text-sm rounded-lg transition-colors">
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input {...otpForm.register('otp')} maxLength={6} placeholder="6-digit OTP" className="min-w-0 flex-1 px-3 py-2.5 rounded-lg border border-neutral-300 text-sm tracking-widest focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                    <button onClick={handleVerifyOtp} type="button" className="min-h-11 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-medium text-sm rounded-lg transition-colors">
                       Verify
                     </button>
                   </div>
@@ -200,11 +200,11 @@ export default function PatientRegistrationPage() {
                   <Check className="w-4 h-4" /> Mobile number verified successfully!
                 </div>
               )}
-              <div className="flex gap-3 mt-4">
-                <button onClick={prevStep} type="button" className="flex items-center gap-1 px-4 py-3 border border-neutral-300 text-neutral-700 font-medium rounded-lg hover:bg-neutral-50 transition-colors">
+              <div className="flex flex-col sm:flex-row gap-3 mt-4">
+                <button onClick={prevStep} type="button" className="flex min-h-11 items-center justify-center gap-1 px-4 py-3 border border-neutral-300 text-neutral-700 font-medium rounded-lg hover:bg-neutral-50 transition-colors">
                   <ChevronLeft className="w-4 h-4" /> Back
                 </button>
-                <button onClick={nextStep} disabled={!otpVerified} type="button" className="flex-1 px-4 py-3 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-2">
+                <button onClick={nextStep} disabled={!otpVerified} type="button" className="flex-1 min-h-11 px-4 py-3 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-2">
                   Continue <ChevronRight className="w-4 h-4" />
                 </button>
               </div>
@@ -227,8 +227,8 @@ export default function PatientRegistrationPage() {
                 <input type="checkbox" checked={consentAccepted} onChange={(e) => setConsentAccepted(e.target.checked)} className="mt-0.5 w-4 h-4 text-primary-600 rounded" />
                 <span className="text-sm text-neutral-700">I have read and agree to the <span className="text-primary-600 underline cursor-pointer">Terms & Conditions</span>, <span className="text-primary-600 underline cursor-pointer">Privacy Policy</span>, <span className="text-primary-600 underline cursor-pointer">Medical Disclaimer</span>, and Exercise Programme Consent.</span>
               </label>
-              <div className="flex gap-3">
-                <button onClick={prevStep} type="button" className="flex items-center gap-1 px-4 py-3 border border-neutral-300 text-neutral-700 font-medium rounded-lg hover:bg-neutral-50 transition-colors"><ChevronLeft className="w-4 h-4" /> Back</button>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button onClick={prevStep} type="button" className="flex min-h-11 items-center justify-center gap-1 px-4 py-3 border border-neutral-300 text-neutral-700 font-medium rounded-lg hover:bg-neutral-50 transition-colors"><ChevronLeft className="w-4 h-4" /> Back</button>
                 <button onClick={nextStep} disabled={!consentAccepted} type="button" className="flex-1 px-4 py-3 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-2">Accept & Continue <ChevronRight className="w-4 h-4" /></button>
               </div>
             </div>
@@ -238,15 +238,15 @@ export default function PatientRegistrationPage() {
           {step === 4 && (
             <div className="space-y-4">
               <div><h2 className="text-lg font-bold text-neutral-900">Select Your Primary Concern</h2><p className="text-sm text-neutral-500">This helps us assign the most appropriate programme</p></div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {PAIN_CATEGORIES.map((cat) => (
                   <button key={cat} onClick={() => handleCategorySelect(cat)} type="button" className={cn('px-3 py-3 rounded-lg border-2 text-sm font-medium text-left transition-all', selectedCategory === cat ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-neutral-200 bg-white text-neutral-700 hover:border-primary-200 hover:bg-primary-50/50')}>
                     {cat}
                   </button>
                 ))}
               </div>
-              <div className="flex gap-3 mt-4">
-                <button onClick={prevStep} type="button" className="flex items-center gap-1 px-4 py-3 border border-neutral-300 text-neutral-700 font-medium rounded-lg hover:bg-neutral-50 transition-colors"><ChevronLeft className="w-4 h-4" /> Back</button>
+              <div className="flex flex-col sm:flex-row gap-3 mt-4">
+                <button onClick={prevStep} type="button" className="flex min-h-11 items-center justify-center gap-1 px-4 py-3 border border-neutral-300 text-neutral-700 font-medium rounded-lg hover:bg-neutral-50 transition-colors"><ChevronLeft className="w-4 h-4" /> Back</button>
                 <button onClick={nextStep} disabled={!selectedCategory} type="button" className="flex-1 px-4 py-3 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-2">Continue <ChevronRight className="w-4 h-4" /></button>
               </div>
             </div>
@@ -276,7 +276,7 @@ export default function PatientRegistrationPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-neutral-700 mb-2">Recent surgery in last 30 days?</label>
-                  <div className="flex gap-4">
+                  <div className="flex flex-wrap gap-4">
                     {['No', 'Yes'].map((opt) => (
                       <label key={opt} className="flex items-center gap-2 cursor-pointer">
                         <input type="radio" name="surgery" value={opt} checked={assessment.recentSurgery === opt} onChange={() => setAssessment((a) => ({ ...a, recentSurgery: opt }))} className="w-4 h-4 text-primary-600" />
@@ -286,8 +286,8 @@ export default function PatientRegistrationPage() {
                   </div>
                 </div>
               </div>
-              <div className="flex gap-3 mt-4">
-                <button onClick={prevStep} type="button" className="flex items-center gap-1 px-4 py-3 border border-neutral-300 text-neutral-700 font-medium rounded-lg hover:bg-neutral-50 transition-colors"><ChevronLeft className="w-4 h-4" /> Back</button>
+              <div className="flex flex-col sm:flex-row gap-3 mt-4">
+                <button onClick={prevStep} type="button" className="flex min-h-11 items-center justify-center gap-1 px-4 py-3 border border-neutral-300 text-neutral-700 font-medium rounded-lg hover:bg-neutral-50 transition-colors"><ChevronLeft className="w-4 h-4" /> Back</button>
                 <button onClick={handleAssessmentSubmit} type="button" className="flex-1 px-4 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-2">Submit Assessment <ChevronRight className="w-4 h-4" /></button>
               </div>
             </div>
@@ -310,8 +310,8 @@ export default function PatientRegistrationPage() {
                 <>
                   <div><h2 className="text-lg font-bold text-neutral-900">Your Assigned Programme</h2><p className="text-sm text-neutral-500">Based on your assessment</p></div>
                   <div className="border-2 border-primary-200 bg-primary-50 rounded-xl p-5 space-y-3">
-                    <div className="flex items-start justify-between">
-                      <div>
+                    <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
+                      <div className="min-w-0">
                         <h3 className="font-bold text-neutral-900">14-Day {selectedCategory} Recovery Programme</h3>
                         <p className="text-sm text-neutral-600 mt-1">Designed by Senior Physiotherapists</p>
                         <div className="flex flex-wrap gap-2 mt-2">
@@ -320,14 +320,14 @@ export default function PatientRegistrationPage() {
                           <span className="px-2 py-1 bg-white border border-primary-200 rounded-full text-xs font-medium text-primary-700">Day-wise Videos</span>
                         </div>
                       </div>
-                      <div className="text-right flex-shrink-0 ml-4">
+                      <div className="text-left sm:text-right flex-shrink-0 sm:ml-4">
                         <p className="text-2xl font-bold text-primary-600">₹500</p>
                         <p className="text-xs text-neutral-500">Programme Fee</p>
                       </div>
                     </div>
                   </div>
-                  <div className="flex gap-3">
-                    <button onClick={prevStep} type="button" className="flex items-center gap-1 px-4 py-3 border border-neutral-300 text-neutral-700 font-medium rounded-lg hover:bg-neutral-50 transition-colors"><ChevronLeft className="w-4 h-4" /> Back</button>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <button onClick={prevStep} type="button" className="flex min-h-11 items-center justify-center gap-1 px-4 py-3 border border-neutral-300 text-neutral-700 font-medium rounded-lg hover:bg-neutral-50 transition-colors"><ChevronLeft className="w-4 h-4" /> Back</button>
                     <button onClick={nextStep} type="button" className="flex-1 px-4 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-2">Proceed to Payment <ChevronRight className="w-4 h-4" /></button>
                   </div>
                 </>
@@ -355,8 +355,8 @@ export default function PatientRegistrationPage() {
                   </label>
                 ))}
               </div>
-              <div className="flex gap-3 mt-4">
-                <button onClick={prevStep} type="button" className="flex items-center gap-1 px-4 py-3 border border-neutral-300 text-neutral-700 font-medium rounded-lg hover:bg-neutral-50 transition-colors"><ChevronLeft className="w-4 h-4" /> Back</button>
+              <div className="flex flex-col sm:flex-row gap-3 mt-4">
+                <button onClick={prevStep} type="button" className="flex min-h-11 items-center justify-center gap-1 px-4 py-3 border border-neutral-300 text-neutral-700 font-medium rounded-lg hover:bg-neutral-50 transition-colors"><ChevronLeft className="w-4 h-4" /> Back</button>
                 <button onClick={() => navigate('/payment-success')} type="button" className="flex-1 px-4 py-3 bg-success-600 hover:bg-success-700 text-white font-bold rounded-lg transition-colors flex items-center justify-center gap-2">
                   Pay ₹590 & Activate Programme 🔒
                 </button>

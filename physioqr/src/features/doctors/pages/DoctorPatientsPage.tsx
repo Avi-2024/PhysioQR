@@ -10,21 +10,21 @@ const PATIENTS = [
 
 export default function DoctorPatientsPage() {
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-neutral-900">Referred Patients</h1>
+    <div className="space-y-6 min-w-0">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl font-bold text-neutral-900">Referred Patients</h1>
           <p className="text-sm text-neutral-500">Patients who scanned your unique QR code or link</p>
         </div>
       </div>
 
-      <div className="bg-white border border-neutral-200 rounded-xl p-4 flex items-center gap-3">
-        <Search className="w-5 h-5 text-neutral-400" />
-        <input placeholder="Search patients by name or mobile..." className="flex-1 border-none text-sm focus:outline-none" />
+      <div className="bg-white border border-neutral-200 rounded-xl p-4 flex items-center gap-3 min-w-0">
+        <Search className="w-5 h-5 text-neutral-400 flex-shrink-0" />
+        <input placeholder="Search patients by name or mobile..." className="min-w-0 flex-1 border-none text-sm focus:outline-none" />
       </div>
 
-      <div className="bg-white border border-neutral-200 rounded-xl overflow-hidden shadow-sm">
-        <table className="w-full text-left text-sm">
+      <div className="hidden md:block bg-white border border-neutral-200 rounded-xl overflow-x-auto shadow-sm">
+        <table className="w-full min-w-[720px] text-left text-sm">
           <thead className="bg-neutral-50 text-neutral-600 font-semibold border-b border-neutral-200">
             <tr>
               <th className="p-4">Patient Name</th>
@@ -50,6 +50,37 @@ export default function DoctorPatientsPage() {
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div className="md:hidden space-y-3">
+        {PATIENTS.map((p) => (
+          <div key={p.id} className="bg-white border border-neutral-200 rounded-xl p-4 shadow-sm space-y-3">
+            <div>
+              <p className="font-semibold text-neutral-900">{p.name}</p>
+              <p className="text-xs text-neutral-500">{p.mobile} · {p.date}</p>
+            </div>
+            <div className="grid grid-cols-1 gap-2 text-sm">
+              <div className="flex items-start justify-between gap-3">
+                <span className="text-neutral-500">Pain</span>
+                <span className="text-right font-medium text-neutral-800">{p.painCategory}</span>
+              </div>
+              <div className="flex items-start justify-between gap-3">
+                <span className="text-neutral-500">Programme</span>
+                <span className="text-right font-medium text-neutral-800">{p.programme}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-neutral-500">Payment</span>
+                <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${p.paymentStatus === 'Paid' ? 'bg-success-100 text-success-700' : 'bg-warning-100 text-warning-700'}`}>
+                  {p.paymentStatus}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-neutral-500">Fee Share</span>
+                <span className="font-bold text-neutral-900">{formatCurrency(p.feeShare)}</span>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

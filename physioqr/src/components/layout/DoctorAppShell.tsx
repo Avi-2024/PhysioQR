@@ -39,9 +39,8 @@ export function DoctorAppShell({ activeScreen, onNavigate, children }: DoctorApp
       {/* Sidebar */}
       <aside className="app-sidebar">
         <div className="sidebar-header">
-          <div className="sidebar-logo-icon">+</div>
+          <Logo width={210} height={44} withText={false} imageScale={2.8} />
           <div>
-            <div className="sidebar-brand-title">PhysioQR</div>
             <div className="sidebar-brand-sub">Doctor Panel</div>
           </div>
         </div>

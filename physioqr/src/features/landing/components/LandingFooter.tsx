@@ -1,7 +1,8 @@
 import React from 'react';
 import { APP_CONFIG } from '../../../config/app.config';
+import { Logo } from '../../../components/brand/Logo';
 import { UserRole } from '../types/landing.types';
-import { Stethoscope, HeartPulse, ArrowRight, Globe } from 'lucide-react';
+import { Globe } from 'lucide-react';
 
 interface LandingFooterProps {
   onOpenPortal: (role?: UserRole) => void;
@@ -25,14 +26,11 @@ export function LandingFooter({ onOpenPortal }: LandingFooterProps) {
        
 
         {/* Minimal 4-Column Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: '36px', marginBottom: '40px' }} className="grid-cols-1 md:grid-cols-4">
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: '36px', marginBottom: '40px' }} className="rc-responsive-grid-4 grid-cols-1 md:grid-cols-4">
           
           {/* Brand Info */}
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-              <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'var(--teal-600)', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '18px' }}>+</div>
-              <span style={{ fontSize: '20px', fontWeight: 800, color: '#F8FFFE', letterSpacing: '-0.3px' }}>{APP_CONFIG.name}</span>
-            </div>
+            <Logo width={210} height={64} withText={false} imageScale={2.8} className="mb-3" />
 
             <p style={{ fontSize: '13.5px', color: '#A9C5C1', lineHeight: '1.6', margin: 0, maxWidth: '280px' }}>
               Doctor-connected digital rehabilitation, guiding patients from referral to structured day-wise recovery.
@@ -87,11 +85,11 @@ export function LandingFooter({ onOpenPortal }: LandingFooterProps) {
             color: '#789E99'
           }}
         >
-          <div>© {APP_CONFIG.copyrightYear} {APP_CONFIG.name}. All rights reserved.</div>
+          <div>(c) {APP_CONFIG.copyrightYear} {APP_CONFIG.name}. All rights reserved.</div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#A9C5C1' }}>
             <Globe className="w-3.5 h-3.5 text-teal-400" />
-            <span>India · English</span>
+            <span>India - English</span>
           </div>
         </div>
 

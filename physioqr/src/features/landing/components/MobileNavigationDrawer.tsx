@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { X, ArrowRight, ShieldCheck } from 'lucide-react';
 import { APP_CONFIG } from '../../../config/app.config';
+import { Logo } from '../../../components/brand/Logo';
 import { UserRole } from '../types/landing.types';
 
 interface MobileNavigationDrawerProps {
@@ -27,28 +28,27 @@ export function MobileNavigationDrawer({ isOpen, onClose, onOpenPortal }: Mobile
   if (!isOpen) return null;
 
   return (
-    <div className="rc-modal-overlay" onClick={onClose} style={{ justifyContent: 'flex-end', padding: 0 }}>
+    <div className="rc-modal-overlay" onClick={onClose} style={{ justifyContent: 'flex-end', alignItems: 'stretch', padding: 0 }}>
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%',
-          maxWidth: '320px',
+          maxWidth: 'min(320px, 100vw)',
           height: '100%',
           background: '#FFFFFF',
-          padding: '24px',
+          padding: '20px',
           display: 'flex',
           flexDirection: 'column',
           boxShadow: 'var(--shadow-elevated)',
           animation: 'slideLeft 200ms ease-out'
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '16px', borderBottom: '1px solid var(--border-default)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'var(--teal-600)', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>+</div>
-            <span style={{ fontSize: '18px', fontWeight: 800, color: 'var(--text-primary)' }}>{APP_CONFIG.name}</span>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', paddingBottom: '16px', borderBottom: '1px solid var(--border-default)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+            <Logo width={210} height={56} withText={false} imageScale={2.8} />
           </div>
 
-          <button onClick={onClose} style={{ border: 'none', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer' }}>
+          <button onClick={onClose} style={{ border: 'none', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', minWidth: '44px', minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -59,7 +59,7 @@ export function MobileNavigationDrawer({ isOpen, onClose, onOpenPortal }: Mobile
               <a
                 href={link.href}
                 onClick={onClose}
-                style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)', textDecoration: 'none', display: 'block' }}
+                style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)', textDecoration: 'none', display: 'flex', alignItems: 'center', minHeight: '44px' }}
               >
                 {link.label}
               </a>

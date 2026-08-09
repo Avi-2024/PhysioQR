@@ -8,7 +8,14 @@ interface ExperienceSelectorProps {
 
 export function ExperienceSelector({ onOpenPortal }: ExperienceSelectorProps) {
   return (
-    <section id="platform" className="rc-section" style={{ background: 'var(--bg-page)', borderBottom: '1px solid var(--border-default)' }}>
+    <section
+      id="platform"
+      className="rc-section"
+      style={{
+        background: 'linear-gradient(180deg, #FFFFFF 0%, #F2FAF8 100%)',
+        borderBottom: '1px solid var(--border-default)'
+      }}
+    >
       <div className="rc-container">
         {/* Header */}
         <div style={{ textAlign: 'center', maxWidth: '680px', margin: '0 auto 48px auto' }}>
@@ -21,27 +28,27 @@ export function ExperienceSelector({ onOpenPortal }: ExperienceSelectorProps) {
           </p>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }} className="grid-cols-1 md:grid-cols-2">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px', maxWidth: '980px', margin: '0 auto' }} className="rc-responsive-grid-2 grid-cols-1 md:grid-cols-2">
           {/* Patient Card (Section 37) */}
           <div
-            className="rc-card"
+            className="rc-card rc-experience-card"
             style={{
               background: 'linear-gradient(180deg, #FFFFFF 0%, #F2FAF8 100%)',
               border: '1.5px solid var(--teal-200)',
-              padding: '36px',
+              padding: 'clamp(18px, 3vw, 36px)',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between'
             }}
           >
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-                <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'var(--teal-600)', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div className="rc-experience-card-header" style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                <div className="rc-experience-icon" style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'var(--teal-600)', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <HeartPulse className="w-6 h-6" />
                 </div>
-                <div>
+                <div style={{ minWidth: 0 }}>
                   <span style={{ fontSize: '12px', fontWeight: 800, color: 'var(--teal-700)', textTransform: 'uppercase' }}>FOR PATIENTS</span>
-                  <h3 style={{ fontSize: '22px', fontWeight: 800, color: 'var(--teal-950)' }}>Follow your recovery with clarity.</h3>
+                  <h3 style={{ fontSize: 'clamp(18px, 2vw, 22px)', fontWeight: 800, color: 'var(--teal-950)' }}>Follow your recovery with clarity.</h3>
                 </div>
               </div>
 
@@ -75,24 +82,24 @@ export function ExperienceSelector({ onOpenPortal }: ExperienceSelectorProps) {
 
           {/* Doctor Card (Section 38) */}
           <div
-            className="rc-card"
+            className="rc-card rc-experience-card"
             style={{
               background: '#FFFFFF',
               border: '1.5px solid var(--border-default)',
-              padding: '36px',
+              padding: 'clamp(18px, 3vw, 36px)',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between'
             }}
           >
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-                <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'var(--teal-950)', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div className="rc-experience-card-header" style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                <div className="rc-experience-icon" style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'var(--teal-950)', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <Stethoscope className="w-6 h-6" />
                 </div>
-                <div>
+                <div style={{ minWidth: 0 }}>
                   <span style={{ fontSize: '12px', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>FOR DOCTORS</span>
-                  <h3 style={{ fontSize: '22px', fontWeight: 800, color: 'var(--text-primary)' }}>Extend rehabilitation beyond the clinic.</h3>
+                  <h3 style={{ fontSize: 'clamp(18px, 2vw, 22px)', fontWeight: 800, color: 'var(--text-primary)' }}>Extend rehabilitation beyond the clinic.</h3>
                 </div>
               </div>
 

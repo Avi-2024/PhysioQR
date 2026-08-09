@@ -29,10 +29,10 @@ export function PortalAccessModal({ isOpen, onClose, onSelectRole }: PortalAcces
     <div className="rc-modal-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-labelledby="portal-modal-title">
       <div className="rc-modal-container" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
-          <div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', marginBottom: '24px' }}>
+          <div style={{ minWidth: 0 }}>
             <span className="rc-eyebrow">PORTAL ACCESS SELECTOR</span>
-            <h2 id="portal-modal-title" style={{ fontSize: '24px', fontWeight: 800, color: 'var(--text-primary)', marginTop: '2px' }}>
+            <h2 id="portal-modal-title" style={{ fontSize: 'clamp(20px, 4vw, 24px)', fontWeight: 800, color: 'var(--text-primary)', marginTop: '2px' }}>
               Welcome to PhysioQR
             </h2>
             <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginTop: '4px' }}>
@@ -42,7 +42,7 @@ export function PortalAccessModal({ isOpen, onClose, onSelectRole }: PortalAcces
 
           <button
             onClick={onClose}
-            style={{ border: 'none', background: 'var(--bg-surface-soft)', padding: '8px', borderRadius: '50%', cursor: 'pointer', color: 'var(--text-muted)' }}
+            style={{ border: 'none', background: 'var(--bg-surface-soft)', padding: '8px', borderRadius: '50%', cursor: 'pointer', color: 'var(--text-muted)', flexShrink: 0 }}
             aria-label="Close portal access selector"
           >
             <X className="w-5 h-5" />
@@ -60,8 +60,8 @@ export function PortalAccessModal({ isOpen, onClose, onSelectRole }: PortalAcces
               <HeartPulse className="w-6 h-6" />
             </div>
 
-            <div style={{ flex: 1 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="rc-modal-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
                 <h3 style={{ fontSize: '18px', fontWeight: 800, color: 'var(--teal-900)' }}>Continue as Patient</h3>
                 <span style={{ fontSize: '11px', fontWeight: 700, background: 'var(--teal-100)', color: 'var(--teal-800)', padding: '2px 8px', borderRadius: '12px' }}>
                   Mobile OTP
@@ -89,8 +89,8 @@ export function PortalAccessModal({ isOpen, onClose, onSelectRole }: PortalAcces
               <Stethoscope className="w-6 h-6" />
             </div>
 
-            <div style={{ flex: 1 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="rc-modal-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
                 <h3 style={{ fontSize: '18px', fontWeight: 800, color: 'var(--text-primary)' }}>Continue as Doctor</h3>
                 <span style={{ fontSize: '11px', fontWeight: 700, background: 'var(--bg-surface-soft)', color: 'var(--text-secondary)', padding: '2px 8px', borderRadius: '12px' }}>
                   Registered Account
@@ -108,7 +108,7 @@ export function PortalAccessModal({ isOpen, onClose, onSelectRole }: PortalAcces
         </div>
 
         {/* 22. Staff Access Footer */}
-        <div style={{ paddingTop: '16px', borderTop: '1px solid var(--border-default)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ paddingTop: '16px', borderTop: '1px solid var(--border-default)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
           <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Admin or Field Agent?</span>
           <button
             onClick={() => onSelectRole('staff')}

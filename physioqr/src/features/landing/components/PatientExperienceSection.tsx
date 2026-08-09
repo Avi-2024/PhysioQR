@@ -10,7 +10,7 @@ export function PatientExperienceSection({ onOpenPortal }: PatientExperienceProp
   return (
     <section id="patients" className="rc-section" style={{ background: '#FFFFFF', borderBottom: '1px solid var(--border-default)' }}>
       <div className="rc-container">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '64px', alignItems: 'center' }} className="grid-cols-1 lg:grid-cols-2">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '64px', alignItems: 'center', maxWidth: '1120px', margin: '0 auto' }} className="rc-dashboard-grid-2 grid-cols-1 lg:grid-cols-2">
           {/* Left Column (Copy) */}
           <div>
             <span className="rc-eyebrow">PATIENT-FIRST EXPERIENCE</span>

@@ -15,7 +15,7 @@ export function SafetySection() {
       id="safety"
       className="rc-section"
       style={{
-        background: 'linear-gradient(180deg, #F2FAF8 0%, #FFFFFF 100%)',
+        background: 'linear-gradient(180deg, #FFFFFF 0%, #F2FAF8 100%)',
         borderBottom: '1px solid var(--border-default)'
       }}
     >
@@ -37,7 +37,7 @@ export function SafetySection() {
         </div>
 
         {/* 4 Safety Rule Cards Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '24px' }} className="grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '24px' }} className="rc-responsive-grid-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
           {SAFETY_RULES.map((rule, idx) => (
             <div
               key={idx}

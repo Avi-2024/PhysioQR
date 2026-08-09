@@ -8,9 +8,16 @@ interface DoctorExperienceProps {
 
 export function DoctorExperienceSection({ onOpenPortal }: DoctorExperienceProps) {
   return (
-    <section id="doctors" className="rc-section" style={{ background: 'var(--bg-page)', borderBottom: '1px solid var(--border-default)' }}>
+    <section
+      id="doctors"
+      className="rc-section"
+      style={{
+        background: 'linear-gradient(180deg, #FFFFFF 0%, #F2FAF8 100%)',
+        borderBottom: '1px solid var(--border-default)'
+      }}
+    >
       <div className="rc-container">
-        <div style={{ display: 'grid', gridTemplateColumns: '0.9fr 1.1fr', gap: '64px', alignItems: 'center' }} className="grid-cols-1 lg:grid-cols-2">
+        <div style={{ display: 'grid', gridTemplateColumns: '0.9fr 1.1fr', gap: '64px', alignItems: 'center', maxWidth: '1120px', margin: '0 auto' }} className="rc-dashboard-grid-2 grid-cols-1 lg:grid-cols-2">
           {/* Left Column: Realistic Dashboard Preview (Section 41) */}
           <div
             className="rc-card"
@@ -39,7 +46,7 @@ export function DoctorExperienceSection({ onOpenPortal }: DoctorExperienceProps)
             </div>
 
             {/* 3 Metric Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }} className="rc-responsive-grid-3">
               <div style={{ background: 'var(--bg-surface-soft)', padding: '10px 12px', borderRadius: '10px', border: '1px solid var(--border-soft)' }}>
                 <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 700 }}>REGISTERED</span>
                 <div style={{ fontSize: '20px', fontWeight: 800, color: 'var(--text-primary)' }}>58</div>
