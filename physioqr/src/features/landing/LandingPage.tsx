@@ -7,7 +7,7 @@ import { ExperienceSelector } from './components/ExperienceSelector';
 import { PatientExperienceSection } from './components/PatientExperienceSection';
 import { DoctorExperienceSection } from './components/DoctorExperienceSection';
 import { CapabilitiesSection } from './components/CapabilitiesSection';
-import { RevenueModelsSection } from './components/RevenueModelsSection';
+// import { RevenueModelsSection } from './components/RevenueModelsSection';
 import { ProgrammeExperienceSection } from './components/ProgrammeExperienceSection';
 import { SafetySection } from './components/SafetySection';
 import { FAQSection } from './components/FAQSection';
@@ -66,7 +66,7 @@ export function LandingPage({ onNavigateToPortal }: LandingPageProps) {
         <CapabilitiesSection />
 
         {/* 09 Revenue Models */}
-        <RevenueModelsSection />
+        {/* <RevenueModelsSection /> */}
 
         {/* 10 Rehabilitation Programme Experience */}
         <ProgrammeExperienceSection />

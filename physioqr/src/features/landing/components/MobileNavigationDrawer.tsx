@@ -82,7 +82,7 @@ export function MobileNavigationDrawer({ isOpen, onClose, onOpenPortal }: Mobile
           <button
             onClick={() => {
               onClose();
-              onOpenPortal('staff');
+              onOpenPortal('admin');
             }}
             style={{ border: 'none', background: 'transparent', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', cursor: 'pointer' }}
           >

@@ -1,4 +1,4 @@
-export type UserRole = 'patient' | 'doctor' | 'staff';
+export type UserRole = 'patient' | 'doctor' | 'admin' | 'agent';
 
 export interface JourneyStepItem {
   stepNumber: number;

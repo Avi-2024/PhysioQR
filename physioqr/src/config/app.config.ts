@@ -6,7 +6,6 @@ export const APP_CONFIG = {
   contactPhone: '+91 1800 200 4882',
   copyrightYear: 2026,
   navLinks: [
-    { label: 'Platform', href: '#platform' },
     { label: 'For Patients', href: '#patients' },
     { label: 'For Doctors', href: '#doctors' },
     { label: 'How It Works', href: '#how-it-works' },
