@@ -111,7 +111,7 @@ export function PortalAccessModal({ isOpen, onClose, onSelectRole }: PortalAcces
         <div style={{ paddingTop: '16px', borderTop: '1px solid var(--border-default)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
           <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Admin or Field Agent?</span>
           <button
-            onClick={() => onSelectRole('staff')}
+            onClick={() => onSelectRole('admin')}
             style={{ border: 'none', background: 'transparent', color: 'var(--teal-700)', fontWeight: 700, fontSize: '13.5px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
           >
             <span>Staff Login</span>
