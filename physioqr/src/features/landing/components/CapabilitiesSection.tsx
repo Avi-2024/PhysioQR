@@ -53,14 +53,14 @@ export function CapabilitiesSection() {
               </p>
             </div>
 
-            <div style={{ background: '#FFFFFF', border: '1px solid var(--teal-200)', borderRadius: '14px', padding: '16px', display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', alignItems: 'center', gap: '16px' }} className="rc-capability-preview">
+            <div style={{ background: '#FFFFFF', border: '1px solid var(--teal-200)', borderRadius: '14px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }} className="rc-capability-preview">
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
                 <div style={{ width: '48px', height: '48px', borderRadius: '10px', border: '1px solid var(--teal-200)', background: 'var(--teal-50)', color: 'var(--teal-700)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <QrCode className="w-6 h-6" />
                 </div>
                 <div style={{ minWidth: 0 }}>
                   <strong style={{ fontSize: '14px', color: 'var(--text-primary)' }}>{doctor.name}</strong>
-                  <div style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>Ref Code: {doctor.referralCode} - QR Standee Active</div>
+                  <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Ref Code: {doctor.referralCode} - QR Standee Active</div>
                 </div>
               </div>
 
