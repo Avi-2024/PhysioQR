@@ -10,7 +10,7 @@ const asyncHandler = require('../utils/asyncHandler');
 // POST /api/patients/register
 // Patient registers after scanning a doctor's QR code
 const registerPatient = asyncHandler(async (req, res) => {
-  const { doctorCode, fullName, mobile, ...rest } = req.body;
+  const { doctorCode, scanId, fullName, mobile, ...rest } = req.body;
 
   if (!fullName || !mobile) {
     return res.status(400).json({ message: 'fullName and mobile are required' });
@@ -46,6 +46,12 @@ const registerPatient = asyncHandler(async (req, res) => {
         reason: 'Unpaid patient scanned a different doctor QR code',
       });
     }
+    if (referringDoctor && scanId) {
+      await QrScan.findOneAndUpdate(
+        { _id: scanId, doctor: referringDoctor._id },
+        { patient: existing._id, registrationDate: new Date() }
+      );
+    }
     return res.json({ message: 'Patient already registered, referral updated', patientId: existing._id });
   }
 
@@ -59,14 +65,21 @@ const registerPatient = asyncHandler(async (req, res) => {
 
   // Record the QR scan
   if (referringDoctor) {
-    await QrScan.create({
-      doctor: referringDoctor._id,
-      agent: referringDoctor.agent || null,
-      patient: patient._id,
-      referralSource: 'qr_code',
-      registrationDate: new Date(),
-      ipAddress: req.ip,
-    });
+    if (scanId) {
+      await QrScan.findOneAndUpdate(
+        { _id: scanId, doctor: referringDoctor._id },
+        { patient: patient._id, registrationDate: new Date() }
+      );
+    } else {
+      await QrScan.create({
+        doctor: referringDoctor._id,
+        agent: referringDoctor.agent || null,
+        patient: patient._id,
+        referralSource: 'qr_code',
+        registrationDate: new Date(),
+        ipAddress: req.ip,
+      });
+    }
   }
 
   res.status(201).json({ message: 'Registration successful', patientId: patient._id });
@@ -78,6 +91,26 @@ const verifyPatientMobile = asyncHandler(async (req, res) => {
   const patient = await Patient.findOneAndUpdate({ mobile }, { mobileVerified: true }, { new: true });
   if (!patient) return res.status(404).json({ message: 'Patient not found' });
   res.json({ message: 'Mobile verified' });
+});
+
+const recordConsent = asyncHandler(async (req, res) => {
+  const PatientConsent = require('../models/PatientConsent.model');
+  const SystemSettings = require('../models/SystemSettings.model');
+
+  const settings = await SystemSettings.findOne();
+  const consent = await PatientConsent.create({
+    ...req.body,
+    consentVersion: settings?.consentVersion || 'v1.0',
+    ipAddress: req.ip,
+    deviceInfo: req.headers['user-agent'],
+  });
+
+  await Patient.findByIdAndUpdate(
+    req.body.patient,
+    { consentAccepted: true, consentVersion: consent.consentVersion, consentDate: new Date() }
+  );
+
+  res.status(201).json({ message: 'Consent recorded', consent });
 });
 
 // GET /api/patients/me/program
@@ -100,4 +133,4 @@ const getMyPayments = asyncHandler(async (req, res) => {
   res.json(payments);
 });
 
-module.exports = { registerPatient, verifyPatientMobile, getMyProgram, getMyProgress, getMyPayments };
+module.exports = { registerPatient, verifyPatientMobile, recordConsent, getMyProgram, getMyProgress, getMyPayments };

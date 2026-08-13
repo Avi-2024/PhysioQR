@@ -1,5 +1,5 @@
 import React, { Suspense, lazy } from 'react';
-import { createBrowserRouter } from 'react-router-dom';
+import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { PublicRoute, ProtectedRoute, RoleProtectedRoute } from './route-guards';
 
 // Layouts
@@ -19,17 +19,39 @@ const PaymentFailedPage = lazy(() => import('@/features/payments/pages/PaymentRe
 // Admin Pages
 const AdminDashboardPage = lazy(() => import('@/features/admin/pages/AdminDashboardPage'));
 const AdminAgentsPage = lazy(() => import('@/features/admin/pages/AdminStubPages').then(m => ({ default: m.AdminAgentsPage })));
-const AdminAgentDetailPage = lazy(() => import('@/features/admin/pages/AdminStubPages').then(m => ({ default: m.AdminAgentDetailPage })));
+const AdminAgentDetailPage = lazy(() => import('@/features/admin/pages/AdminDetailPages').then(m => ({ default: m.AdminAgentDetailWorkspacePage })));
 const AdminDoctorsPage = lazy(() => import('@/features/admin/pages/AdminStubPages').then(m => ({ default: m.AdminDoctorsPage })));
-const AdminDoctorNewPage = lazy(() => import('@/features/admin/pages/AdminStubPages').then(m => ({ default: m.AdminDoctorNewPage })));
-const AdminDoctorDetailPage = lazy(() => import('@/features/admin/pages/AdminStubPages').then(m => ({ default: m.AdminDoctorDetailPage })));
+const AdminDoctorNewPage = lazy(() => import('@/features/admin/pages/AdminDetailPages').then(m => ({ default: m.AdminDoctorCreatePage })));
+const AdminDoctorDetailPage = lazy(() => import('@/features/admin/pages/AdminDetailPages').then(m => ({ default: m.AdminDoctorDetailWorkspacePage })));
 const AdminPatientsPage = lazy(() => import('@/features/admin/pages/AdminStubPages').then(m => ({ default: m.AdminPatientsPage })));
+const AdminPatientDetailPage = lazy(() => import('@/features/admin/pages/AdminDetailPages').then(m => ({ default: m.AdminPatientDetailWorkspacePage })));
+const AdminClinicsPage = lazy(() => import('@/features/admin/pages/AdminOperationsPages').then(m => ({ default: m.AdminClinicsPage })));
+const AdminReferralsPage = lazy(() => import('@/features/admin/pages/AdminOperationsPages').then(m => ({ default: m.AdminReferralsPage })));
+const AdminAssessmentsPage = lazy(() => import('@/features/admin/pages/AdminOperationsPages').then(m => ({ default: m.AdminAssessmentsPage })));
+const AdminRiskReviewsPage = lazy(() => import('@/features/admin/pages/AdminOperationsPages').then(m => ({ default: m.AdminRiskReviewsPage })));
+const AdminPainCategoriesPage = lazy(() => import('@/features/admin/pages/AdminOperationsPages').then(m => ({ default: m.AdminPainCategoriesPage })));
+const AdminProgramsPage = lazy(() => import('@/features/admin/pages/AdminOperationsPages').then(m => ({ default: m.AdminProgramsPage })));
+const AdminExercisesPage = lazy(() => import('@/features/admin/pages/AdminOperationsPages').then(m => ({ default: m.AdminExercisesPage })));
+const AdminVideosPage = lazy(() => import('@/features/admin/pages/AdminOperationsPages').then(m => ({ default: m.AdminVideosPage })));
+const AdminOrdersPage = lazy(() => import('@/features/admin/pages/AdminOperationsPages').then(m => ({ default: m.AdminOrdersPage })));
 const AdminPaymentsPage = lazy(() => import('@/features/admin/pages/AdminStubPages').then(m => ({ default: m.AdminPaymentsPage })));
-const AdminFeeSharesPage = lazy(() => import('@/features/admin/pages/AdminStubPages').then(m => ({ default: m.AdminFeeSharesPage })));
-const AdminWalletsPage = lazy(() => import('@/features/admin/pages/AdminStubPages').then(m => ({ default: m.AdminWalletsPage })));
+const AdminPaymentDetailPage = lazy(() => import('@/features/admin/pages/AdminDetailPages').then(m => ({ default: m.AdminPaymentDetailWorkspacePage })));
+const AdminRefundsPage = lazy(() => import('@/features/admin/pages/AdminOperationsPages').then(m => ({ default: m.AdminRefundsPage })));
+const AdminCouponsPage = lazy(() => import('@/features/admin/pages/AdminOperationsPages').then(m => ({ default: m.AdminCouponsPage })));
+const AdminRevenueModelsPage = lazy(() => import('@/features/admin/pages/AdminOperationsPages').then(m => ({ default: m.AdminRevenueModelsPage })));
+const AdminFeeSharesPage = lazy(() => import('@/features/admin/pages/AdminOperationsPages').then(m => ({ default: m.AdminFeeSharesPage })));
+const AdminWalletsPage = lazy(() => import('@/features/admin/pages/AdminOperationsPages').then(m => ({ default: m.AdminWalletsPage })));
 const AdminWithdrawalsPage = lazy(() => import('@/features/admin/pages/AdminStubPages').then(m => ({ default: m.AdminWithdrawalsPage })));
-const AdminReportsPage = lazy(() => import('@/features/admin/pages/AdminStubPages').then(m => ({ default: m.AdminReportsPage })));
-const AdminSettingsPage = lazy(() => import('@/features/admin/pages/AdminStubPages').then(m => ({ default: m.AdminSettingsPage })));
+const AdminWithdrawalDetailPage = lazy(() => import('@/features/admin/pages/AdminDetailPages').then(m => ({ default: m.AdminWithdrawalDetailWorkspacePage })));
+const AdminPayoutsPage = lazy(() => import('@/features/admin/pages/AdminOperationsPages').then(m => ({ default: m.AdminPayoutsPage })));
+const AdminReconciliationPage = lazy(() => import('@/features/admin/pages/AdminOperationsPages').then(m => ({ default: m.AdminReconciliationPage })));
+const AdminNotificationsPage = lazy(() => import('@/features/admin/pages/AdminOperationsPages').then(m => ({ default: m.AdminNotificationsPage })));
+const AdminSupportPage = lazy(() => import('@/features/admin/pages/AdminOperationsPages').then(m => ({ default: m.AdminSupportPage })));
+const AdminSupportTicketDetailPage = lazy(() => import('@/features/admin/pages/AdminDetailPages').then(m => ({ default: m.AdminSupportTicketDetailPage })));
+const AdminReportsPage = lazy(() => import('@/features/admin/pages/AdminOperationsPages').then(m => ({ default: m.AdminReportsPage })));
+const AdminFraudRiskPage = lazy(() => import('@/features/admin/pages/AdminOperationsPages').then(m => ({ default: m.AdminFraudRiskPage })));
+const AdminAuditLogsPage = lazy(() => import('@/features/admin/pages/AdminOperationsPages').then(m => ({ default: m.AdminAuditLogsPage })));
+const AdminSettingsPage = lazy(() => import('@/features/admin/pages/AdminOperationsPages').then(m => ({ default: m.AdminSettingsPage })));
 
 // Agent Pages
 const AgentDashboardPage = lazy(() => import('@/features/agents/pages/AgentDashboardPage'));
@@ -152,18 +174,41 @@ export const router = createBrowserRouter([
       </ProtectedRoute>
     ),
     children: [
+      { index: true, element: <Navigate to="/admin/dashboard" replace /> },
       { path: 'dashboard', element: <Suspense fallback={<PageLoader />}><AdminDashboardPage /></Suspense> },
       { path: 'agents', element: <Suspense fallback={<PageLoader />}><AdminAgentsPage /></Suspense> },
       { path: 'agents/:agentId', element: <Suspense fallback={<PageLoader />}><AdminAgentDetailPage /></Suspense> },
       { path: 'doctors', element: <Suspense fallback={<PageLoader />}><AdminDoctorsPage /></Suspense> },
       { path: 'doctors/new', element: <Suspense fallback={<PageLoader />}><AdminDoctorNewPage /></Suspense> },
       { path: 'doctors/:doctorId', element: <Suspense fallback={<PageLoader />}><AdminDoctorDetailPage /></Suspense> },
+      { path: 'clinics', element: <Suspense fallback={<PageLoader />}><AdminClinicsPage /></Suspense> },
+      { path: 'referrals', element: <Suspense fallback={<PageLoader />}><AdminReferralsPage /></Suspense> },
       { path: 'patients', element: <Suspense fallback={<PageLoader />}><AdminPatientsPage /></Suspense> },
+      { path: 'patients/:patientId', element: <Suspense fallback={<PageLoader />}><AdminPatientDetailPage /></Suspense> },
+      { path: 'assessments', element: <Suspense fallback={<PageLoader />}><AdminAssessmentsPage /></Suspense> },
+      { path: 'risk-reviews', element: <Suspense fallback={<PageLoader />}><AdminRiskReviewsPage /></Suspense> },
+      { path: 'pain-categories', element: <Suspense fallback={<PageLoader />}><AdminPainCategoriesPage /></Suspense> },
+      { path: 'programs', element: <Suspense fallback={<PageLoader />}><AdminProgramsPage /></Suspense> },
+      { path: 'exercises', element: <Suspense fallback={<PageLoader />}><AdminExercisesPage /></Suspense> },
+      { path: 'videos', element: <Suspense fallback={<PageLoader />}><AdminVideosPage /></Suspense> },
+      { path: 'orders', element: <Suspense fallback={<PageLoader />}><AdminOrdersPage /></Suspense> },
       { path: 'payments', element: <Suspense fallback={<PageLoader />}><AdminPaymentsPage /></Suspense> },
+      { path: 'payments/:paymentId', element: <Suspense fallback={<PageLoader />}><AdminPaymentDetailPage /></Suspense> },
+      { path: 'refunds', element: <Suspense fallback={<PageLoader />}><AdminRefundsPage /></Suspense> },
+      { path: 'coupons', element: <Suspense fallback={<PageLoader />}><AdminCouponsPage /></Suspense> },
+      { path: 'revenue-models', element: <Suspense fallback={<PageLoader />}><AdminRevenueModelsPage /></Suspense> },
       { path: 'fee-shares', element: <Suspense fallback={<PageLoader />}><AdminFeeSharesPage /></Suspense> },
       { path: 'wallets', element: <Suspense fallback={<PageLoader />}><AdminWalletsPage /></Suspense> },
       { path: 'withdrawals', element: <Suspense fallback={<PageLoader />}><AdminWithdrawalsPage /></Suspense> },
+      { path: 'withdrawals/:withdrawalId', element: <Suspense fallback={<PageLoader />}><AdminWithdrawalDetailPage /></Suspense> },
+      { path: 'payouts', element: <Suspense fallback={<PageLoader />}><AdminPayoutsPage /></Suspense> },
+      { path: 'reconciliation', element: <Suspense fallback={<PageLoader />}><AdminReconciliationPage /></Suspense> },
+      { path: 'notifications', element: <Suspense fallback={<PageLoader />}><AdminNotificationsPage /></Suspense> },
+      { path: 'support', element: <Suspense fallback={<PageLoader />}><AdminSupportPage /></Suspense> },
+      { path: 'support/:ticketId', element: <Suspense fallback={<PageLoader />}><AdminSupportTicketDetailPage /></Suspense> },
       { path: 'reports', element: <Suspense fallback={<PageLoader />}><AdminReportsPage /></Suspense> },
+      { path: 'fraud-risk', element: <Suspense fallback={<PageLoader />}><AdminFraudRiskPage /></Suspense> },
+      { path: 'audit-logs', element: <Suspense fallback={<PageLoader />}><AdminAuditLogsPage /></Suspense> },
       { path: 'settings', element: <Suspense fallback={<PageLoader />}><AdminSettingsPage /></Suspense> },
     ],
   },

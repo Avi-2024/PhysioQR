@@ -1,19 +1,32 @@
 const express = require('express');
 const router = express.Router();
 const { protect, authorize } = require('../middlewares/auth.middleware');
-const Program = require('../models/Program.model');
-const { Exercise, ProgramDay } = require('../models/Exercise.model');
-const asyncHandler = require('../utils/asyncHandler');
+const { requireFields, validateNumberRange } = require('../middlewares/validate.middleware');
+const {
+  getPrograms,
+  createProgram,
+  updateProgram,
+  getProgramDays,
+  createProgramDay,
+  updateProgramDay,
+} = require('../controllers/program.controller');
 
 router.use(protect);
 
-// Programs
-router.get('/',     asyncHandler(async (req, res) => { res.json(await Program.find({ isActive: true })); }));
-router.post('/',    authorize('admin'), asyncHandler(async (req, res) => { res.status(201).json(await Program.create(req.body)); }));
-router.put('/:id',  authorize('admin'), asyncHandler(async (req, res) => { res.json(await Program.findByIdAndUpdate(req.params.id, req.body, { new: true })); }));
+router.get('/', getPrograms);
+router.post(
+  '/',
+  authorize('admin'),
+  requireFields('name', 'durationDays'),
+  validateNumberRange('durationDays', { min: 1 }),
+  validateNumberRange('sessionsPerDay', { min: 1 }),
+  validateNumberRange('defaultPrice', { min: 0 }),
+  createProgram
+);
+router.put('/:id', authorize('admin'), updateProgram);
 
-// Program Days
-router.get('/:id/days',   asyncHandler(async (req, res) => { res.json(await ProgramDay.find({ program: req.params.id }).populate('exercises.exercise')); }));
-router.post('/:id/days',  authorize('admin'), asyncHandler(async (req, res) => { res.status(201).json(await ProgramDay.create({ program: req.params.id, ...req.body })); }));
+router.get('/:id/days', getProgramDays);
+router.post('/:id/days', authorize('admin'), requireFields('dayNumber'), validateNumberRange('dayNumber', { min: 1 }), createProgramDay);
+router.put('/:id/days/:dayId', authorize('admin'), updateProgramDay);
 
 module.exports = router;

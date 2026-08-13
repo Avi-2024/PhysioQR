@@ -2,34 +2,138 @@ import React, { useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, Stethoscope, HeartPulse, CreditCard,
-  PieChart, Wallet, ArrowUpRight, BarChart2, Settings, Bell, LogOut, Menu, X, ShieldCheck
+  PieChart, Wallet, ArrowUpRight, BarChart2, Settings, Bell, LogOut, Menu, X, ShieldCheck,
+  Building2, QrCode, ClipboardList, Dumbbell, Video, ReceiptText, RefreshCw,
+  MessageSquare, FileSearch, AlertTriangle
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth.store';
 import { Logo } from '@/components/brand/Logo';
 import { cn } from '@/lib/cn';
 
-const NAV_ITEMS = [
-  { label: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
-  { label: 'Agents', path: '/admin/agents', icon: Users },
-  { label: 'Doctors', path: '/admin/doctors', icon: Stethoscope },
-  { label: 'Patients', path: '/admin/patients', icon: HeartPulse },
-  { label: 'Payments', path: '/admin/payments', icon: CreditCard },
-  { label: 'Fee Shares', path: '/admin/fee-shares', icon: PieChart },
-  { label: 'Wallets', path: '/admin/wallets', icon: Wallet },
-  { label: 'Withdrawals', path: '/admin/withdrawals', icon: ArrowUpRight },
-  { label: 'Reports', path: '/admin/reports', icon: BarChart2 },
-  { label: 'Settings', path: '/admin/settings', icon: Settings },
+const NAV_GROUPS = [
+  {
+    title: 'Overview',
+    items: [{ label: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard }],
+  },
+  {
+    title: 'Network',
+    items: [
+      { label: 'Agents', path: '/admin/agents', icon: Users },
+      { label: 'Doctors', path: '/admin/doctors', icon: Stethoscope },
+      { label: 'Clinics', path: '/admin/clinics', icon: Building2 },
+      { label: 'Referrals', path: '/admin/referrals', icon: QrCode },
+    ],
+  },
+  {
+    title: 'Patients',
+    items: [
+      { label: 'Patients', path: '/admin/patients', icon: HeartPulse },
+      { label: 'Assessments', path: '/admin/assessments', icon: ClipboardList },
+      { label: 'Risk Reviews', path: '/admin/risk-reviews', icon: AlertTriangle },
+    ],
+  },
+  {
+    title: 'Content',
+    items: [
+      { label: 'Pain Categories', path: '/admin/pain-categories', icon: HeartPulse },
+      { label: 'Programs', path: '/admin/programs', icon: Dumbbell },
+      { label: 'Exercises', path: '/admin/exercises', icon: ClipboardList },
+      { label: 'Videos', path: '/admin/videos', icon: Video },
+    ],
+  },
+  {
+    title: 'Commerce',
+    items: [
+      { label: 'Orders', path: '/admin/orders', icon: ReceiptText },
+      { label: 'Payments', path: '/admin/payments', icon: CreditCard },
+      { label: 'Refunds', path: '/admin/refunds', icon: RefreshCw },
+      { label: 'Coupons', path: '/admin/coupons', icon: ReceiptText },
+    ],
+  },
+  {
+    title: 'Finance',
+    items: [
+      { label: 'Revenue Models', path: '/admin/revenue-models', icon: PieChart },
+      { label: 'Fee Shares', path: '/admin/fee-shares', icon: PieChart },
+      { label: 'Wallets', path: '/admin/wallets', icon: Wallet },
+      { label: 'Withdrawals', path: '/admin/withdrawals', icon: ArrowUpRight },
+      { label: 'Payouts', path: '/admin/payouts', icon: CreditCard },
+      { label: 'Reconciliation', path: '/admin/reconciliation', icon: FileSearch },
+    ],
+  },
+  {
+    title: 'Operations',
+    items: [
+      { label: 'Notifications', path: '/admin/notifications', icon: Bell },
+      { label: 'Support', path: '/admin/support', icon: MessageSquare },
+      { label: 'Reports', path: '/admin/reports', icon: BarChart2 },
+      { label: 'Fraud & Risk', path: '/admin/fraud-risk', icon: AlertTriangle },
+    ],
+  },
+  {
+    title: 'System',
+    items: [
+      { label: 'Audit Logs', path: '/admin/audit-logs', icon: FileSearch },
+      { label: 'Settings', path: '/admin/settings', icon: Settings },
+    ],
+  },
 ];
+
+function AdminNavigation({ onNavigate }: { onNavigate?: () => void }) {
+  return (
+    <nav className="flex-1 px-3 py-4 space-y-5 overflow-y-auto">
+      {NAV_GROUPS.map((group) => (
+        <div key={group.title}>
+          <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-neutral-500">
+            {group.title}
+          </div>
+          <div className="space-y-1">
+            {group.items.map((item) => (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                onClick={onNavigate}
+                className={({ isActive }) =>
+                  cn(
+                    'flex min-h-10 items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+                    isActive
+                      ? 'bg-primary-600 text-white font-semibold shadow-sm'
+                      : 'text-neutral-300 hover:text-white hover:bg-neutral-800'
+                  )
+                }
+              >
+                <item.icon className="w-4 h-4 flex-shrink-0" />
+                <span className="min-w-0 truncate">{item.label}</span>
+              </NavLink>
+            ))}
+          </div>
+        </div>
+      ))}
+    </nav>
+  );
+}
 
 export function AdminLayout() {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
+
+  const searchResults = [
+    { label: 'Dr. Rajesh Sharma', meta: 'Doctor DR-001', path: '/admin/doctors/DR-001' },
+    { label: 'Payment PAY-008812', meta: 'Successful payment', path: '/admin/payments/PAY-008812' },
+    { label: 'Ramesh Gupta', meta: 'Patient PAT-101', path: '/admin/patients/PAT-101' },
+    { label: 'Withdrawal WD-901', meta: 'Requested payout', path: '/admin/withdrawals/WD-901' },
+    { label: 'Ticket TKT-201', meta: 'Video access problem', path: '/admin/support/TKT-201' },
+  ].filter((item) => {
+    const query = searchQuery.trim().toLowerCase();
+    return query && `${item.label} ${item.meta}`.toLowerCase().includes(query);
+  });
 
   return (
     <div className="min-h-screen bg-neutral-50 flex overflow-x-clip">
@@ -42,25 +146,7 @@ export function AdminLayout() {
           </div>
         </div>
 
-        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          {NAV_ITEMS.map((item) => (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
-                  isActive
-                    ? 'bg-primary-600 text-white font-semibold'
-                    : 'text-neutral-400 hover:text-white hover:bg-neutral-800'
-                )
-              }
-            >
-              <item.icon className="w-4 h-4" />
-              {item.label}
-            </NavLink>
-          ))}
-        </nav>
+        <AdminNavigation />
 
         <div className="p-4 border-t border-neutral-800">
           <div className="flex items-center justify-between text-neutral-400">
@@ -96,26 +182,7 @@ export function AdminLayout() {
               </button>
             </div>
 
-            <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-              {NAV_ITEMS.map((item) => (
-                <NavLink
-                  key={item.path}
-                  to={item.path}
-                  onClick={() => setMobileOpen(false)}
-                  className={({ isActive }) =>
-                    cn(
-                      'flex min-h-11 items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
-                      isActive
-                        ? 'bg-primary-600 text-white font-semibold'
-                        : 'text-neutral-300 hover:text-white hover:bg-neutral-800'
-                    )
-                  }
-                >
-                  <item.icon className="w-4 h-4 flex-shrink-0" />
-                  <span className="min-w-0 truncate">{item.label}</span>
-                </NavLink>
-              ))}
-            </nav>
+            <AdminNavigation onNavigate={() => setMobileOpen(false)} />
           </aside>
         </div>
       )}
@@ -129,6 +196,34 @@ export function AdminLayout() {
               {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
             <h2 className="font-bold text-neutral-900 text-base sm:text-lg truncate">Central Administration</h2>
+          </div>
+
+          <div className="relative hidden min-w-[280px] max-w-md flex-1 md:block">
+            <FileSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
+            <input
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Search doctor, patient, payment, ticket"
+              className="h-10 w-full rounded-lg border border-neutral-200 bg-neutral-50 pl-9 pr-3 text-sm focus:border-primary-500 focus:bg-white focus:ring-primary-500"
+            />
+            {searchResults.length > 0 && (
+              <div className="absolute left-0 right-0 top-12 z-30 overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-modal">
+                {searchResults.map((result) => (
+                  <button
+                    key={result.path}
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery('');
+                      navigate(result.path);
+                    }}
+                    className="block w-full px-4 py-3 text-left hover:bg-primary-50"
+                  >
+                    <div className="text-sm font-semibold text-neutral-900">{result.label}</div>
+                    <div className="text-xs text-neutral-500">{result.meta}</div>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">

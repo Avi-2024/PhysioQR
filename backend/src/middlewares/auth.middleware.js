@@ -15,15 +15,24 @@ const protect = async (req, res, next) => {
     const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Try User first (admin/agent/doctor), then Patient
-    let user = await User.findById(decoded.id).select('-password');
+    if (decoded.tokenType === 'patient' || decoded.role === 'patient') {
+      const patient = await Patient.findById(decoded.id);
+      if (!patient) return res.status(401).json({ message: 'Patient not found' });
+      if (patient.status !== 'active') return res.status(403).json({ message: `Account is ${patient.status}` });
+      req.user = { _id: patient._id, role: 'patient', status: patient.status };
+      return next();
+    }
+
+    const user = await User.findById(decoded.id).select('-password');
     if (user) {
+      if (user.status !== 'active') return res.status(403).json({ message: `Account is ${user.status}` });
       req.user = user;
       return next();
     }
 
     const patient = await Patient.findById(decoded.id);
     if (patient) {
+      if (patient.status !== 'active') return res.status(403).json({ message: `Account is ${patient.status}` });
       req.user = { _id: patient._id, role: 'patient', status: patient.status };
       return next();
     }

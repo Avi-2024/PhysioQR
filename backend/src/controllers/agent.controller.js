@@ -1,4 +1,5 @@
 const Agent = require('../models/Agent.model');
+const User = require('../models/User.model');
 const Doctor = require('../models/Doctor.model');
 const ClinicVisit = require('../models/ClinicVisit.model');
 const Patient = require('../models/Patient.model');
@@ -8,9 +9,46 @@ const asyncHandler = require('../utils/asyncHandler');
 
 // POST /api/agents — Admin creates an agent
 const createAgent = asyncHandler(async (req, res) => {
-  const agent = await Agent.create(req.body);
-  await writeAuditLog({ req, action: 'agent_created', module: 'Agent', recordId: agent._id, newValue: { fullName: agent.fullName } });
-  res.status(201).json(agent);
+  const { email, mobile, password, user, ...agentPayload } = req.body;
+
+  let loginUser = user ? await User.findById(user) : null;
+  const generatedPassword = password || `Agent@${Math.floor(100000 + Math.random() * 900000)}`;
+
+  if (!loginUser) {
+    const existing = await User.findOne({
+      $or: [
+        ...(email ? [{ email: email.trim().toLowerCase() }] : []),
+        ...(mobile ? [{ mobile: mobile.trim() }] : []),
+      ],
+    });
+    if (existing) return res.status(409).json({ message: 'A user with this email or mobile already exists' });
+
+    loginUser = await User.create({
+      role: 'agent',
+      email: email?.trim().toLowerCase(),
+      mobile: mobile?.trim(),
+      password: generatedPassword,
+      status: 'active',
+    });
+  }
+
+  const agent = await Agent.create({
+    ...agentPayload,
+    user: loginUser._id,
+    email: email || loginUser.email,
+    mobile: mobile || loginUser.mobile,
+  });
+
+  loginUser.profileRef = agent._id;
+  loginUser.profileModel = 'Agent';
+  await loginUser.save();
+
+  await writeAuditLog({ req, action: 'agent_created', module: 'Agent', recordId: agent._id, newValue: { fullName: agent.fullName, user: loginUser._id } });
+  res.status(201).json({
+    agent,
+    user: { id: loginUser._id, email: loginUser.email, mobile: loginUser.mobile, role: loginUser.role },
+    temporaryPassword: password ? undefined : generatedPassword,
+  });
 });
 
 // GET /api/agents — Admin gets all agents
@@ -30,6 +68,13 @@ const getAgentById = asyncHandler(async (req, res) => {
 const updateAgent = asyncHandler(async (req, res) => {
   const agent = await Agent.findByIdAndUpdate(req.params.id, req.body, { new: true });
   if (!agent) return res.status(404).json({ message: 'Agent not found' });
+  if (agent.user && (req.body.status || req.body.email || req.body.mobile)) {
+    await User.findByIdAndUpdate(agent.user, {
+      ...(req.body.status ? { status: req.body.status === 'suspended' ? 'suspended' : req.body.status === 'inactive' ? 'inactive' : 'active' } : {}),
+      ...(req.body.email ? { email: req.body.email.trim().toLowerCase() } : {}),
+      ...(req.body.mobile ? { mobile: req.body.mobile.trim() } : {}),
+    });
+  }
   res.json(agent);
 });
 

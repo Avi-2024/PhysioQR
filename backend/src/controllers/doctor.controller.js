@@ -1,12 +1,23 @@
 const QRCode = require('qrcode');
 const Doctor = require('../models/Doctor.model');
+const User = require('../models/User.model');
 const Patient = require('../models/Patient.model');
+const { DoctorWallet } = require('../models/Wallet.model');
 const { writeAuditLog } = require('../utils/auditLogger');
 const asyncHandler = require('../utils/asyncHandler');
 
 // POST /api/doctors — Register a new doctor (by agent or admin)
 const registerDoctor = asyncHandler(async (req, res) => {
-  const doctor = await Doctor.create({ ...req.body, status: 'submitted' });
+  const payload = { ...req.body, status: 'submitted' };
+
+  if (req.user?.role === 'agent' && !payload.agent) {
+    const Agent = require('../models/Agent.model');
+    const agent = await Agent.findOne({ user: req.user._id });
+    if (!agent) return res.status(404).json({ message: 'Agent profile not found' });
+    payload.agent = agent._id;
+  }
+
+  const doctor = await Doctor.create(payload);
 
   await writeAuditLog({ req, action: 'doctor_registered', module: 'Doctor', recordId: doctor._id, newValue: { fullName: doctor.fullName, status: 'submitted' } });
 
@@ -37,7 +48,7 @@ const getDoctorById = asyncHandler(async (req, res) => {
 // POST /api/doctors/:id/approve
 // SRS §6 — Admin sets fee, fee share %, holding period, then QR is auto-generated
 const approveDoctor = asyncHandler(async (req, res) => {
-  const { approvedPatientFee, feeSharePercentage, feeShareHoldingDays, revenueModel, feeShareType, fixedFeeShareAmount } = req.body;
+  const { approvedPatientFee, feeSharePercentage, feeShareHoldingDays, revenueModel, feeShareType, fixedFeeShareAmount, password } = req.body;
 
   const doctor = await Doctor.findById(req.params.id);
   if (!doctor) return res.status(404).json({ message: 'Doctor not found' });
@@ -60,7 +71,45 @@ const approveDoctor = asyncHandler(async (req, res) => {
   doctor.qrCodeUrl = qrCodeDataUrl;
   doctor.qrCodeActive = true;
 
+  let loginUser = doctor.user ? await User.findById(doctor.user) : null;
+  const generatedPassword = password || `Doctor@${Math.floor(100000 + Math.random() * 900000)}`;
+
+  if (!loginUser) {
+    const existing = await User.findOne({
+      $or: [
+        ...(doctor.email ? [{ email: doctor.email.trim().toLowerCase() }] : []),
+        ...(doctor.mobile ? [{ mobile: doctor.mobile.trim() }] : []),
+      ],
+    });
+    if (existing) {
+      loginUser = existing;
+      if (loginUser.role !== 'doctor') return res.status(409).json({ message: 'Email/mobile already belongs to another role' });
+    } else {
+      loginUser = await User.create({
+        role: 'doctor',
+        email: doctor.email?.trim().toLowerCase(),
+        mobile: doctor.mobile?.trim(),
+        password: generatedPassword,
+        status: 'active',
+      });
+    }
+
+    doctor.user = loginUser._id;
+  } else {
+    loginUser.status = 'active';
+  }
+
   await doctor.save();
+
+  loginUser.profileRef = doctor._id;
+  loginUser.profileModel = 'Doctor';
+  await loginUser.save();
+
+  await DoctorWallet.findOneAndUpdate(
+    { doctor: doctor._id },
+    { $setOnInsert: { doctor: doctor._id } },
+    { upsert: true, new: true }
+  );
 
   await writeAuditLog({
     req,
@@ -71,7 +120,11 @@ const approveDoctor = asyncHandler(async (req, res) => {
     newValue: { status: 'approved', approvedPatientFee, feeSharePercentage },
   });
 
-  res.json({ message: 'Doctor approved and QR code generated', doctor });
+  res.json({
+    message: 'Doctor approved, login enabled, wallet created, and QR code generated',
+    doctor,
+    temporaryPassword: doctor.user && password ? undefined : generatedPassword,
+  });
 });
 
 // POST /api/doctors/:id/reject
@@ -100,6 +153,8 @@ const suspendDoctor = asyncHandler(async (req, res) => {
   doctor.suspensionReason = req.body.reason;
   doctor.qrCodeActive = false;
   await doctor.save();
+
+  if (doctor.user) await User.findByIdAndUpdate(doctor.user, { status: 'suspended' });
 
   await writeAuditLog({ req, action: 'doctor_suspended', module: 'Doctor', recordId: doctor._id, previousValue: prev, newValue: { status: 'suspended', reason: req.body.reason } });
 
@@ -133,6 +188,56 @@ const disableQrCode = asyncHandler(async (req, res) => {
   await writeAuditLog({ req, action: 'qr_code_disabled', module: 'Doctor', recordId: doctor._id });
 
   res.json({ message: 'QR code disabled' });
+});
+
+const reactivateQrCode = asyncHandler(async (req, res) => {
+  const doctor = await Doctor.findById(req.params.id);
+  if (!doctor) return res.status(404).json({ message: 'Doctor not found' });
+  if (doctor.status !== 'approved') return res.status(400).json({ message: 'Doctor must be approved to activate QR' });
+
+  doctor.qrCodeActive = true;
+  if (!doctor.qrCodeUrl) {
+    const referralUrl = `${process.env.APP_URL}/register?doctor=${doctor.doctorId}`;
+    doctor.referralCode = doctor.doctorId;
+    doctor.qrCodeUrl = await QRCode.toDataURL(referralUrl);
+  }
+  await doctor.save();
+
+  await writeAuditLog({ req, action: 'qr_code_reactivated', module: 'Doctor', recordId: doctor._id });
+  res.json({ message: 'QR code reactivated', doctor });
+});
+
+const updateKycAndBank = asyncHandler(async (req, res) => {
+  const doctor = await Doctor.findById(req.params.id);
+  if (!doctor) return res.status(404).json({ message: 'Doctor not found' });
+
+  const allowed = [
+    'kycStatus', 'panNumber', 'identityProof', 'addressProof', 'medicalRegDoc',
+    'cancelledCheque', 'bankAccountHolder', 'bankAccountNumber', 'bankName',
+    'branchName', 'ifscCode', 'upiId', 'bankVerified',
+  ];
+  const updates = {};
+  allowed.forEach((key) => {
+    if (req.body[key] !== undefined) updates[key] = req.body[key];
+  });
+
+  const previousValue = {};
+  Object.keys(updates).forEach((key) => {
+    previousValue[key] = key === 'bankAccountNumber' && doctor[key] ? `XXXXXX${doctor[key].slice(-4)}` : doctor[key];
+    doctor[key] = updates[key];
+  });
+  await doctor.save();
+
+  await writeAuditLog({
+    req,
+    action: 'doctor_kyc_bank_updated',
+    module: 'Doctor',
+    recordId: doctor._id,
+    previousValue,
+    newValue: { ...updates, bankAccountNumber: updates.bankAccountNumber ? `XXXXXX${updates.bankAccountNumber.slice(-4)}` : undefined },
+  });
+
+  res.json({ message: 'Doctor KYC/bank details updated', doctor });
 });
 
 // GET /api/doctors/me/profile — Doctor views their own profile
@@ -186,6 +291,6 @@ const getMyQrStats = asyncHandler(async (req, res) => {
 module.exports = {
   registerDoctor, getAllDoctors, getDoctorById,
   approveDoctor, rejectDoctor, suspendDoctor,
-  generateQrCode, disableQrCode,
+  generateQrCode, disableQrCode, reactivateQrCode, updateKycAndBank,
   getMyProfile, updateMyProfile, getMyPatients, getMyQrStats,
 };

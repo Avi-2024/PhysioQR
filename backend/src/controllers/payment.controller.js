@@ -11,18 +11,40 @@ const { generateInvoiceNumber } = require('../utils/idGenerator');
 const { writeAuditLog } = require('../utils/auditLogger');
 const asyncHandler = require('../utils/asyncHandler');
 
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID,
-  key_secret: process.env.RAZORPAY_KEY_SECRET,
-});
+let razorpayClient;
+
+const getRazorpayClient = () => {
+  if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+    const error = new Error('Razorpay credentials are not configured');
+    error.status = 503;
+    throw error;
+  }
+
+  if (!razorpayClient) {
+    razorpayClient = new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET,
+    });
+  }
+
+  return razorpayClient;
+};
 
 // POST /api/payments/create-order
 // SRS §24.2 — System creates an order, gateway checkout opens
 const createOrder = asyncHandler(async (req, res) => {
   const { patientId, programId, doctorId, couponCode } = req.body;
 
+  if (req.user.role !== 'patient') {
+    return res.status(403).json({ message: 'Only patients can create payment orders' });
+  }
+
   if (!patientId || !programId || !doctorId) {
     return res.status(400).json({ message: 'patientId, programId, and doctorId are required' });
+  }
+
+  if (req.user._id.toString() !== patientId) {
+    return res.status(403).json({ message: 'Cannot create an order for another patient' });
   }
 
   // SRS §47 — Patient must verify mobile before payment
@@ -54,7 +76,7 @@ const createOrder = asyncHandler(async (req, res) => {
   const finalAmount = Math.max(amount - discountAmount, 0);
 
   // Create Razorpay order
-  const razorpayOrder = await razorpay.orders.create({
+  const razorpayOrder = await getRazorpayClient().orders.create({
     amount: Math.round(finalAmount * 100), // paise
     currency: 'INR',
     receipt: `rcpt_${Date.now()}`,
@@ -88,6 +110,9 @@ const createOrder = asyncHandler(async (req, res) => {
 // SRS §24.2 — Backend verifies payment, activates program, creates fee share
 const verifyPayment = asyncHandler(async (req, res) => {
   const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+  if (!process.env.RAZORPAY_KEY_SECRET) {
+    return res.status(503).json({ message: 'Razorpay credentials are not configured' });
+  }
 
   // Verify Razorpay signature (SRS §43 — Secure payment verification)
   const expectedSignature = crypto
@@ -101,6 +126,10 @@ const verifyPayment = asyncHandler(async (req, res) => {
 
   const order = await Order.findOne({ gatewayOrderId: razorpay_order_id });
   if (!order) return res.status(404).json({ message: 'Order not found' });
+
+  if (req.user.role !== 'patient' || req.user._id.toString() !== order.patient.toString()) {
+    return res.status(403).json({ message: 'Cannot verify payment for another patient order' });
+  }
 
   // SRS §25.2 — Detect duplicate payment
   const duplicate = await Payment.findOne({ gatewayTransactionId: razorpay_payment_id });
@@ -152,6 +181,12 @@ const verifyPayment = asyncHandler(async (req, res) => {
 
   // SRS §47 — Lock patient referral after payment
   await Patient.findByIdAndUpdate(order.patient, { referralLocked: true });
+  const QrScan = require('../models/QrScan.model');
+  await QrScan.findOneAndUpdate(
+    { doctor: doctor._id, patient: order.patient },
+    { paymentStatus: 'paid' },
+    { sort: { createdAt: -1 } }
+  );
 
   // SRS §21 — Activate patient program and set expiry date
   const holdingDays = doctor.feeShareHoldingDays || 15;
@@ -229,7 +264,62 @@ const verifyPayment = asyncHandler(async (req, res) => {
 const getPaymentById = asyncHandler(async (req, res) => {
   const payment = await Payment.findById(req.params.id).populate('patient', 'fullName mobile').populate('doctor', 'fullName').populate('program', 'name');
   if (!payment) return res.status(404).json({ message: 'Payment not found' });
+
+  if (req.user.role === 'patient' && payment.patient?._id?.toString() !== req.user._id.toString()) {
+    return res.status(403).json({ message: 'Cannot access another patient payment' });
+  }
+
+  if (req.user.role === 'doctor') {
+    const doctor = await Doctor.findOne({ user: req.user._id }).select('_id');
+    if (!doctor || payment.doctor?._id?.toString() !== doctor._id.toString()) {
+      return res.status(403).json({ message: 'Cannot access payment outside your referrals' });
+    }
+  }
+
+  if (!['admin', 'doctor', 'patient'].includes(req.user.role)) {
+    return res.status(403).json({ message: 'Access denied' });
+  }
+
   res.json(payment);
 });
 
-module.exports = { createOrder, verifyPayment, getPaymentById };
+const getReceipt = asyncHandler(async (req, res) => {
+  const payment = await Payment.findById(req.params.id)
+    .populate('patient', 'patientId fullName mobile email')
+    .populate('doctor', 'doctorId fullName clinicName')
+    .populate('program', 'programCode name')
+    .populate('order');
+  if (!payment) return res.status(404).json({ message: 'Payment not found' });
+
+  if (req.user.role === 'patient' && payment.patient?._id?.toString() !== req.user._id.toString()) {
+    return res.status(403).json({ message: 'Cannot access another patient receipt' });
+  }
+
+  if (req.user.role === 'doctor') {
+    const doctor = await Doctor.findOne({ user: req.user._id }).select('_id');
+    if (!doctor || payment.doctor?._id?.toString() !== doctor._id.toString()) {
+      return res.status(403).json({ message: 'Cannot access receipt outside your referrals' });
+    }
+  }
+
+  res.json({
+    invoiceNumber: payment.invoiceNumber,
+    paymentStatus: payment.status,
+    paymentDate: payment.createdAt,
+    patient: payment.patient,
+    doctor: payment.doctor,
+    program: payment.program,
+    amounts: {
+      originalAmount: payment.order?.originalAmount,
+      discountAmount: payment.discountAmount,
+      taxAmount: payment.taxAmount,
+      gatewayCharges: payment.gatewayCharges,
+      paidAmount: payment.paidAmount,
+      refundAmount: payment.refundAmount,
+    },
+    gatewayTransactionId: payment.gatewayTransactionId,
+    paymentMethod: payment.paymentMethod,
+  });
+});
+
+module.exports = { createOrder, verifyPayment, getPaymentById, getReceipt };

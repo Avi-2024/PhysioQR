@@ -1,38 +1,36 @@
 const express = require('express');
 const router = express.Router();
 const { protect, authorize } = require('../middlewares/auth.middleware');
-const PainCategory = require('../models/PainCategory.model');
-const AssessmentQuestion = require('../models/AssessmentQuestion.model');
-const PatientAssessment = require('../models/PatientAssessment.model');
-const asyncHandler = require('../utils/asyncHandler');
+const { requireFields, validateEnum } = require('../middlewares/validate.middleware');
+const {
+  getPainCategories,
+  createPainCategory,
+  updatePainCategory,
+  deletePainCategory,
+  getQuestions,
+  createQuestion,
+  updateQuestion,
+  deleteQuestion,
+  submitAssessment,
+} = require('../controllers/assessment.controller');
 
-// Pain Categories
-router.get('/categories',       asyncHandler(async (req, res) => { res.json(await PainCategory.find({ isActive: true })); }));
-router.post('/categories',      protect, authorize('admin'), asyncHandler(async (req, res) => { res.status(201).json(await PainCategory.create(req.body)); }));
+router.get('/categories', getPainCategories);
+router.post('/categories', protect, authorize('admin'), requireFields('name'), createPainCategory);
+router.put('/categories/:id', protect, authorize('admin'), updatePainCategory);
+router.delete('/categories/:id', protect, authorize('admin'), deletePainCategory);
 
-// Assessment Questions
-router.get('/questions',        asyncHandler(async (req, res) => {
-  const { categoryId } = req.query;
-  const filter = { isActive: true };
-  if (categoryId) filter.painCategory = categoryId;
-  res.json(await AssessmentQuestion.find(filter).sort({ displayOrder: 1 }));
-}));
-router.post('/questions',       protect, authorize('admin'), asyncHandler(async (req, res) => { res.status(201).json(await AssessmentQuestion.create(req.body)); }));
+router.get('/questions', getQuestions);
+router.post(
+  '/questions',
+  protect,
+  authorize('admin'),
+  requireFields('questionText', 'questionType'),
+  validateEnum('questionType', ['single_choice', 'multiple_choice', 'yes_no', 'pain_scale', 'number', 'text', 'date', 'image']),
+  createQuestion
+);
+router.put('/questions/:id', protect, authorize('admin'), updateQuestion);
+router.delete('/questions/:id', protect, authorize('admin'), deleteQuestion);
 
-// Patient submits assessment
-router.post('/submit',          protect, asyncHandler(async (req, res) => {
-  const { patientId, painCategoryId, answers } = req.body;
-  // Check for red flags
-  const questions = await AssessmentQuestion.find({ _id: { $in: answers.map(a => a.question) }, isRedFlag: true });
-  const hasRedFlag = questions.length > 0;
-  const assessment = await PatientAssessment.create({
-    patient: patientId,
-    painCategory: painCategoryId,
-    answers,
-    hasRedFlag,
-    status: hasRedFlag ? 'pending_review' : 'cleared',
-  });
-  res.status(201).json({ assessment, hasRedFlag });
-}));
+router.post('/submit', protect, requireFields('patientId', 'painCategoryId', 'answers'), submitAssessment);
 
 module.exports = router;
