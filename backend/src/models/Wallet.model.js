@@ -21,6 +21,7 @@ const walletTransactionSchema = new mongoose.Schema({
     enum: [
       'fee_share_pending', 'fee_share_released', 'fee_share_credit',
       'withdrawal_request', 'withdrawal_approved', 'payout_completed',
+      'payout_failed',
       'refund_reversal', 'manual_credit', 'manual_debit',
       'tax_deduction', 'promotional_bonus', 'penalty_adjustment',
     ],

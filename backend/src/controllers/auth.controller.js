@@ -1,27 +1,54 @@
-const jwt = require('jsonwebtoken');
 const User = require('../models/User.model');
 const Patient = require('../models/Patient.model');
-const Otp = require('../models/Otp.model');
+const otpService = require('../services/otp.service');
+const authSessionService = require('../services/authSession.service');
 const { writeAuditLog } = require('../utils/auditLogger');
 const asyncHandler = require('../utils/asyncHandler');
 
 const normalizeEmail = (email) => email?.trim().toLowerCase();
 const normalizeMobile = (mobile) => mobile?.trim();
 
-const generateToken = ({ id, role, tokenType = 'user' }) => {
-  if (!process.env.JWT_SECRET) {
-    const error = new Error('JWT_SECRET is not configured');
-    error.status = 503;
-    throw error;
-  }
+// Parses duration strings like 30d into milliseconds for cookie maxAge.
+const parseDurationMs = (value, fallbackMs) => {
+  if (!value) return fallbackMs;
+  const match = String(value).trim().match(/^(\d+)(ms|s|m|h|d)?$/);
+  if (!match) return fallbackMs;
+  const amount = Number(match[1]);
+  const unit = match[2] || 'ms';
+  const multipliers = { ms: 1, s: 1000, m: 60 * 1000, h: 60 * 60 * 1000, d: 24 * 60 * 60 * 1000 };
+  return amount * multipliers[unit];
+};
 
-  return jwt.sign(
-    { id, role, tokenType },
-    process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+// Returns secure cookie options for auth tokens.
+const getCookieOptions = (maxAge) => ({
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+  maxAge,
+  path: '/',
+});
+
+// Writes access and refresh cookies for browser clients.
+const setAuthCookies = (res, { accessToken, refreshToken }) => {
+  res.cookie(
+    authSessionService.ACCESS_COOKIE_NAME,
+    accessToken,
+    getCookieOptions(parseDurationMs(process.env.JWT_ACCESS_EXPIRES_IN || process.env.JWT_EXPIRES_IN || '15m', 15 * 60 * 1000))
+  );
+  res.cookie(
+    authSessionService.REFRESH_COOKIE_NAME,
+    refreshToken,
+    getCookieOptions(parseDurationMs(process.env.JWT_REFRESH_EXPIRES_IN || '30d', 30 * 24 * 60 * 60 * 1000))
   );
 };
 
+// Clears auth cookies on logout or failed session usage.
+const clearAuthCookies = (res) => {
+  res.clearCookie(authSessionService.ACCESS_COOKIE_NAME, { path: '/' });
+  res.clearCookie(authSessionService.REFRESH_COOKIE_NAME, { path: '/' });
+};
+
+// Builds a sanitized staff auth payload.
 const sanitizeUser = (user) => ({
   id: user._id,
   role: user.role,
@@ -32,6 +59,7 @@ const sanitizeUser = (user) => ({
   profileModel: user.profileModel,
 });
 
+// Builds a sanitized patient auth payload.
 const sanitizePatient = (patient) => ({
   id: patient._id,
   patientId: patient.patientId,
@@ -44,18 +72,45 @@ const sanitizePatient = (patient) => ({
   consentAccepted: patient.consentAccepted,
 });
 
-const buildUserAuthResponse = (user) => ({
-  token: generateToken({ id: user._id, role: user.role, tokenType: 'user' }),
-  role: user.role,
-  user: sanitizeUser(user),
-});
+// Creates session-backed response for Admin, Agent, and Doctor.
+const buildUserAuthResponse = async ({ user, req, res }) => {
+  const auth = await authSessionService.createAuthSession({
+    owner: user,
+    role: user.role,
+    tokenType: 'user',
+    req,
+  });
+  setAuthCookies(res, auth);
+  return {
+    token: auth.accessToken,
+    accessToken: auth.accessToken,
+    refreshToken: auth.refreshToken,
+    sessionId: auth.session._id,
+    role: user.role,
+    user: sanitizeUser(user),
+  };
+};
 
-const buildPatientAuthResponse = (patient) => ({
-  token: generateToken({ id: patient._id, role: 'patient', tokenType: 'patient' }),
-  role: 'patient',
-  patient: sanitizePatient(patient),
-});
+// Creates session-backed response for Patient OTP auth.
+const buildPatientAuthResponse = async ({ patient, req, res }) => {
+  const auth = await authSessionService.createAuthSession({
+    owner: patient,
+    role: 'patient',
+    tokenType: 'patient',
+    req,
+  });
+  setAuthCookies(res, auth);
+  return {
+    token: auth.accessToken,
+    accessToken: auth.accessToken,
+    refreshToken: auth.refreshToken,
+    sessionId: auth.session._id,
+    role: 'patient',
+    patient: sanitizePatient(patient),
+  };
+};
 
+// Finds staff user by email or mobile.
 const findUserByIdentifier = ({ email, mobile }) => {
   const normalizedEmail = normalizeEmail(email);
   const normalizedMobile = normalizeMobile(mobile);
@@ -63,8 +118,10 @@ const findUserByIdentifier = ({ email, mobile }) => {
   return User.findOne(normalizedEmail ? { email: normalizedEmail } : { mobile: normalizedMobile });
 };
 
+// Gets refresh token from body or HTTP-only cookie.
+const getRefreshToken = (req) => req.body?.refreshToken || req.cookies?.[authSessionService.REFRESH_COOKIE_NAME];
+
 // POST /api/auth/bootstrap-admin
-// Creates the first Admin only. After one admin exists, require ADMIN_SETUP_SECRET.
 const bootstrapAdmin = asyncHandler(async (req, res) => {
   const { email, mobile, password, setupSecret } = req.body;
   const adminCount = await User.countDocuments({ role: 'admin' });
@@ -96,7 +153,7 @@ const bootstrapAdmin = asyncHandler(async (req, res) => {
     newValue: { email: admin.email, mobile: admin.mobile, role: admin.role },
   });
 
-  res.status(201).json(buildUserAuthResponse(admin));
+  res.status(201).json(await buildUserAuthResponse({ user: admin, req, res }));
 });
 
 // POST /api/auth/login
@@ -113,7 +170,20 @@ const login = asyncHandler(async (req, res) => {
     return res.status(403).json({ message: `Account is ${user.status}` });
   }
 
-  res.json(buildUserAuthResponse(user));
+  res.json(await buildUserAuthResponse({ user, req, res }));
+});
+
+// POST /api/auth/refresh
+const refresh = asyncHandler(async (req, res) => {
+  const auth = await authSessionService.rotateRefreshSession({ refreshToken: getRefreshToken(req), req });
+  setAuthCookies(res, auth);
+  res.json({
+    token: auth.accessToken,
+    accessToken: auth.accessToken,
+    refreshToken: auth.refreshToken,
+    sessionId: auth.session._id,
+    role: auth.session.role,
+  });
 });
 
 // GET /api/auth/me
@@ -130,9 +200,28 @@ const getMe = asyncHandler(async (req, res) => {
 });
 
 // POST /api/auth/logout
-// JWT is stateless. Frontend should remove the token.
 const logout = asyncHandler(async (req, res) => {
+  await authSessionService.revokeRefreshSession(getRefreshToken(req), 'logout');
+  clearAuthCookies(res);
   res.json({ message: 'Logged out' });
+});
+
+// GET /api/auth/sessions
+const getSessions = asyncHandler(async (req, res) => {
+  const sessions = await authSessionService.listActiveSessions(req);
+  res.json({ sessions });
+});
+
+// DELETE /api/auth/sessions/:id
+const revokeSession = asyncHandler(async (req, res) => {
+  const sessions = await authSessionService.listActiveSessions(req);
+  const session = sessions.find((item) => item._id.toString() === req.params.id);
+  if (!session) return res.status(404).json({ message: 'Session not found' });
+
+  session.revokedAt = new Date();
+  session.revokedReason = 'manual_revoke';
+  await session.save();
+  res.json({ message: 'Session revoked' });
 });
 
 // POST /api/auth/change-password
@@ -151,7 +240,10 @@ const changePassword = asyncHandler(async (req, res) => {
   }
 
   user.password = newPassword;
+  user.tokenVersion = (user.tokenVersion || 0) + 1;
   await user.save();
+  await authSessionService.revokeOwnerSessions({ ownerType: 'user', ownerId: user._id, reason: 'password_changed' });
+  clearAuthCookies(res);
 
   await writeAuditLog({
     req,
@@ -160,63 +252,21 @@ const changePassword = asyncHandler(async (req, res) => {
     recordId: user._id,
   });
 
-  res.json({ message: 'Password changed successfully' });
+  res.json({ message: 'Password changed successfully. Please sign in again.' });
 });
 
 // POST /api/auth/send-otp
 const sendOtp = asyncHandler(async (req, res) => {
   const { mobile, purpose } = req.body;
-  const normalizedMobile = normalizeMobile(mobile);
-
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-
-  const dailyCount = await Otp.countDocuments({ mobile: normalizedMobile, createdAt: { $gte: todayStart } });
-  if (dailyCount >= Number(process.env.OTP_DAILY_LIMIT || 5)) {
-    return res.status(429).json({ message: 'Daily OTP limit reached. Try again tomorrow.' });
-  }
-
-  const blockedOtp = await Otp.findOne({
-    mobile: normalizedMobile,
-    purpose,
-    verified: false,
-    attempts: { $gte: Number(process.env.OTP_MAX_ATTEMPTS || 5) },
-    expiresAt: { $gt: new Date() },
-  });
-  if (blockedOtp) {
-    return res.status(429).json({ message: 'Too many failed attempts. Please wait before retrying.' });
-  }
-
-  const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-  const expiryMinutes = Number(process.env.OTP_EXPIRY_MINUTES || 10);
-  const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000);
-
-  await Otp.deleteMany({ mobile: normalizedMobile, purpose, verified: false });
-  await Otp.create({ mobile: normalizedMobile, otp: otpCode, purpose, expiresAt });
-
-  // TODO: wire Twilio/WhatsApp provider. Never expose OTP outside non-production environments.
-  const response = { message: 'OTP sent successfully', expiresInMinutes: expiryMinutes };
-  if (['development', 'test'].includes(process.env.NODE_ENV)) response.otp = otpCode;
-  res.json(response);
+  const result = await otpService.sendOtp({ mobile, purpose });
+  res.json({ message: 'OTP sent successfully', ...result });
 });
 
 // POST /api/auth/verify-otp
 const verifyOtp = asyncHandler(async (req, res) => {
   const { mobile, otp, purpose } = req.body;
-  const normalizedMobile = normalizeMobile(mobile);
-
-  const record = await Otp.findOne({ mobile: normalizedMobile, purpose, verified: false }).sort({ createdAt: -1 });
-  if (!record) return res.status(400).json({ message: 'OTP not found or already used' });
-  if (record.expiresAt < new Date()) return res.status(400).json({ message: 'OTP expired' });
-
-  if (record.otp !== otp) {
-    record.attempts += 1;
-    await record.save();
-    return res.status(400).json({ message: 'Incorrect OTP' });
-  }
-
-  record.verified = true;
-  await record.save();
+  const verification = await otpService.verifyOtp({ mobile, otp, purpose });
+  const normalizedMobile = verification.mobile;
 
   const patient = await Patient.findOneAndUpdate(
     { mobile: normalizedMobile },
@@ -231,52 +281,25 @@ const verifyOtp = asyncHandler(async (req, res) => {
   res.json({
     message: 'OTP verified',
     registered: true,
-    ...buildPatientAuthResponse(patient),
+    ...(await buildPatientAuthResponse({ patient, req, res })),
   });
 });
 
 // POST /api/auth/reset-password
 const resetPassword = asyncHandler(async (req, res) => {
-  const { email, mobile, otp, newPassword } = req.body;
-  if ((!email && !mobile) || !otp || !newPassword) {
-    return res.status(400).json({ message: 'email or mobile, otp, and newPassword are required' });
-  }
-
-  const normalizedMobile = normalizeMobile(mobile);
-  if (normalizedMobile) {
-    const record = await Otp.findOne({
-      mobile: normalizedMobile,
-      purpose: 'password_reset',
-      otp,
-      verified: false,
-      expiresAt: { $gt: new Date() },
-    }).sort({ createdAt: -1 });
-    if (!record) return res.status(400).json({ message: 'Invalid or expired OTP' });
-    record.verified = true;
-    await record.save();
-  }
-
-  const user = await findUserByIdentifier({ email, mobile });
-  if (!user) return res.status(404).json({ message: 'User not found' });
-
-  user.password = newPassword;
-  await user.save();
-
-  await writeAuditLog({
-    req,
-    action: 'password_reset',
-    module: 'User',
-    recordId: user._id,
+  res.status(400).json({
+    message: 'OTP password reset is disabled for Admin, Agent, and Doctor accounts. Use authenticated change-password or Admin-managed credential reset.',
   });
-
-  res.json({ message: 'Password reset successfully' });
 });
 
 module.exports = {
   bootstrapAdmin,
   login,
+  refresh,
   getMe,
   logout,
+  getSessions,
+  revokeSession,
   changePassword,
   sendOtp,
   verifyOtp,

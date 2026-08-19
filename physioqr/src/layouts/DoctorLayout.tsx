@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, QrCode, TrendingUp, Wallet,
-  ArrowUpRight, ShieldCheck, User, LogOut, Bell, Menu, X
+  ArrowUpRight, ShieldCheck, User, LogOut, Bell, Menu, X, MessageSquare
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth.store';
 import { Logo } from '@/components/brand/Logo';
@@ -27,6 +27,7 @@ export function DoctorLayout() {
         ]
       : []),
     { label: 'Bank & KYC', path: '/doctor/bank-kyc', icon: ShieldCheck },
+    { label: 'Support', path: '/doctor/support', icon: MessageSquare },
     { label: 'Profile', path: '/doctor/profile', icon: User },
   ];
 
@@ -69,7 +70,7 @@ export function DoctorLayout() {
         <div className="p-4 border-t border-neutral-800">
           <div className="flex items-center justify-between text-neutral-400">
             <div>
-              <p className="text-xs font-semibold text-neutral-200">{user?.name || 'Dr. Rajesh Sharma'}</p>
+              <p className="text-xs font-semibold text-neutral-200">{user?.name || 'Doctor'}</p>
               <span className="text-2xs text-neutral-500">{isSplitModel ? 'Split Model (60%)' : 'Platform Fee Model'}</span>
             </div>
             <button onClick={handleLogout} title="Logout" className="hover:text-white transition-colors">

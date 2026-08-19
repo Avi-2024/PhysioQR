@@ -10,19 +10,6 @@ function StubPage({ title }: { title: string }) {
   );
 }
 
-export const AgentDoctorsPage = () => <StubPage title="My Doctors" />;
-export const AgentClinicVisitsPage = () => <StubPage title="Clinic Visits" />;
-export const AgentPerformancePage = () => <StubPage title="Performance Reports" />;
-
-export const DoctorEarningsPage = () => <StubPage title="Earnings Overview" />;
-export const DoctorWithdrawalsPage = () => <StubPage title="Withdrawal History" />;
-export const DoctorBankKYCPage = () => <StubPage title="Bank & KYC Verification" />;
-export const DoctorProfilePage = () => <StubPage title="My Profile" />;
-
-export const PatientProgrammePage = () => <StubPage title="My Programme" />;
-export const PatientProgressPage = () => <StubPage title="Progress Tracker" />;
-export const PatientPaymentsPage = () => <StubPage title="Payment History" />;
-
 export const ForgotPasswordPage = () => (
   <div className="flex flex-col items-center justify-center min-h-screen p-8 bg-gradient-to-br from-primary-50 to-white">
     <div className="bg-white rounded-2xl shadow-modal p-8 max-w-md w-full text-center space-y-4">

@@ -8,6 +8,7 @@ const {
   getWithdrawals,
   approveWithdrawal,
   markWithdrawalPaid,
+  markWithdrawalFailed,
   rejectWithdrawal,
 } = require('../controllers/withdrawal.controller');
 
@@ -19,6 +20,7 @@ router.post('/request', authorize('doctor'), requireFields('requestedAmount'), v
 router.get('/', authorize('admin'), getWithdrawals);
 router.post('/:id/approve', authorize('admin'), approveWithdrawal);
 router.post('/:id/paid', authorize('admin'), requireFields('transactionReference'), markWithdrawalPaid);
+router.post('/:id/failed', authorize('admin'), requireFields('reason'), markWithdrawalFailed);
 router.post('/:id/reject', authorize('admin'), requireFields('reason'), rejectWithdrawal);
 
 module.exports = router;

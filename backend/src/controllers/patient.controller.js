@@ -4,6 +4,7 @@ const QrScan = require('../models/QrScan.model');
 const PatientProgram = require('../models/PatientProgram.model');
 const ProgramProgress = require('../models/ProgramProgress.model');
 const { Order, Payment } = require('../models/Payment.model');
+const Program = require('../models/Program.model');
 const { writeAuditLog } = require('../utils/auditLogger');
 const asyncHandler = require('../utils/asyncHandler');
 
@@ -52,7 +53,17 @@ const registerPatient = asyncHandler(async (req, res) => {
         { patient: existing._id, registrationDate: new Date() }
       );
     }
-    return res.json({ message: 'Patient already registered, referral updated', patientId: existing._id });
+    return res.json({
+      message: 'Patient already registered, referral updated',
+      patientId: existing._id,
+      patient: existing,
+      doctor: referringDoctor ? {
+        id: referringDoctor._id,
+        doctorId: referringDoctor.doctorId,
+        fullName: referringDoctor.fullName,
+        clinicName: referringDoctor.clinicName,
+      } : null,
+    });
   }
 
   const patient = await Patient.create({
@@ -82,35 +93,101 @@ const registerPatient = asyncHandler(async (req, res) => {
     }
   }
 
-  res.status(201).json({ message: 'Registration successful', patientId: patient._id });
+  res.status(201).json({
+    message: 'Registration successful',
+    patientId: patient._id,
+    patient,
+    doctor: referringDoctor ? {
+      id: referringDoctor._id,
+      doctorId: referringDoctor.doctorId,
+      fullName: referringDoctor.fullName,
+      clinicName: referringDoctor.clinicName,
+    } : null,
+  });
 });
 
 // POST /api/patients/verify-mobile
 const verifyPatientMobile = asyncHandler(async (req, res) => {
-  const { mobile } = req.body;
-  const patient = await Patient.findOneAndUpdate({ mobile }, { mobileVerified: true }, { new: true });
-  if (!patient) return res.status(404).json({ message: 'Patient not found' });
-  res.json({ message: 'Mobile verified' });
+  res.status(410).json({ message: 'Legacy mobile verification is disabled. Use /api/auth/send-otp and /api/auth/verify-otp.' });
 });
 
 const recordConsent = asyncHandler(async (req, res) => {
   const PatientConsent = require('../models/PatientConsent.model');
   const SystemSettings = require('../models/SystemSettings.model');
+  const patientId = req.user._id;
 
   const settings = await SystemSettings.findOne();
   const consent = await PatientConsent.create({
     ...req.body,
+    patient: patientId,
     consentVersion: settings?.consentVersion || 'v1.0',
     ipAddress: req.ip,
     deviceInfo: req.headers['user-agent'],
   });
 
   await Patient.findByIdAndUpdate(
-    req.body.patient,
+    patientId,
     { consentAccepted: true, consentVersion: consent.consentVersion, consentDate: new Date() }
   );
 
   res.status(201).json({ message: 'Consent recorded', consent });
+});
+
+// GET /api/patients/me/onboarding-quote resolves program, doctor, and payable price before payment.
+const getOnboardingQuote = asyncHandler(async (req, res) => {
+  const { painCategoryId } = req.query;
+  const patient = await Patient.findById(req.user._id).populate('referringDoctor', 'doctorId fullName clinicName status qrCodeActive approvedPatientFee revenueModel');
+  if (!patient) return res.status(404).json({ message: 'Patient not found' });
+  if (!patient.referringDoctor) return res.status(400).json({ message: 'Patient is not linked to a referring doctor' });
+  if (patient.referringDoctor.status !== 'approved' || !patient.referringDoctor.qrCodeActive) {
+    return res.status(400).json({ message: 'Referring doctor is not active for new program payments' });
+  }
+
+  const programFilter = { isActive: true };
+  if (painCategoryId) programFilter.painCategory = painCategoryId;
+  let program = await Program.findOne(programFilter).populate('painCategory', 'name').sort({ createdAt: -1 });
+  if (!program && painCategoryId) {
+    program = await Program.findOne({ isActive: true }).populate('painCategory', 'name').sort({ createdAt: -1 });
+  }
+  if (!program) return res.status(404).json({ message: 'No active rehabilitation program is available' });
+
+  const amount = patient.referringDoctor.approvedPatientFee || program.defaultPrice || 0;
+  if (amount <= 0) return res.status(400).json({ message: 'Program price is not configured for this doctor' });
+
+  res.json({
+    patient: {
+      id: patient._id,
+      patientId: patient.patientId,
+      fullName: patient.fullName,
+      mobile: patient.mobile,
+      mobileVerified: patient.mobileVerified,
+      consentAccepted: patient.consentAccepted,
+    },
+    doctor: {
+      id: patient.referringDoctor._id,
+      doctorId: patient.referringDoctor.doctorId,
+      fullName: patient.referringDoctor.fullName,
+      clinicName: patient.referringDoctor.clinicName,
+      revenueModel: patient.referringDoctor.revenueModel,
+    },
+    program: {
+      id: program._id,
+      programCode: program.programCode,
+      name: program.name,
+      description: program.description,
+      difficultyLevel: program.difficultyLevel,
+      durationDays: program.durationDays,
+      sessionsPerDay: program.sessionsPerDay,
+      painCategory: program.painCategory,
+    },
+    pricing: {
+      originalAmount: amount,
+      discountAmount: 0,
+      taxAmount: 0,
+      finalAmount: amount,
+      currency: 'INR',
+    },
+  });
 });
 
 // GET /api/patients/me/program
@@ -133,4 +210,4 @@ const getMyPayments = asyncHandler(async (req, res) => {
   res.json(payments);
 });
 
-module.exports = { registerPatient, verifyPatientMobile, recordConsent, getMyProgram, getMyProgress, getMyPayments };
+module.exports = { registerPatient, verifyPatientMobile, recordConsent, getOnboardingQuote, getMyProgram, getMyProgress, getMyPayments };

@@ -18,4 +18,7 @@ const payoutSchema = new mongoose.Schema({
   notes: String,
 }, { timestamps: true });
 
+payoutSchema.index({ transactionReference: 1 }, { unique: true, sparse: true });
+payoutSchema.index({ withdrawalRequest: 1 }, { unique: true });
+
 module.exports = mongoose.model('Payout', payoutSchema);

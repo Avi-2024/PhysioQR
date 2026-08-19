@@ -1,10 +1,7 @@
 import React from 'react';
 import { Activity, ClipboardCheck, QrCode, ShieldCheck, Users } from 'lucide-react';
-import { MOCK_DOCTOR_PROFILE } from '../../../mocks/mockDoctorData';
 
 export function CapabilitiesSection() {
-  const doctor = MOCK_DOCTOR_PROFILE;
-
   const dayPills = [
     { label: 'Day 1', tone: 'success' },
     { label: 'Day 2', tone: 'success' },
@@ -59,8 +56,8 @@ export function CapabilitiesSection() {
                   <QrCode className="w-6 h-6" />
                 </div>
                 <div style={{ minWidth: 0 }}>
-                  <strong style={{ fontSize: '14px', color: 'var(--text-primary)' }}>{doctor.name}</strong>
-                  <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Ref Code: {doctor.referralCode} - QR Standee Active</div>
+                  <strong style={{ fontSize: '14px', color: 'var(--text-primary)' }}>Approved PhysioQR Doctor</strong>
+                  <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Unique referral QR - QR Standee Active</div>
                 </div>
               </div>
 

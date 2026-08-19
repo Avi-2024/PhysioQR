@@ -19,6 +19,7 @@ const NAV_GROUPS = [
     title: 'Network',
     items: [
       { label: 'Agents', path: '/admin/agents', icon: Users },
+      { label: 'Clinic Visits', path: '/admin/clinic-visits', icon: ClipboardList },
       { label: 'Doctors', path: '/admin/doctors', icon: Stethoscope },
       { label: 'Clinics', path: '/admin/clinics', icon: Building2 },
       { label: 'Referrals', path: '/admin/referrals', icon: QrCode },
@@ -124,17 +125,6 @@ export function AdminLayout() {
     navigate('/login');
   };
 
-  const searchResults = [
-    { label: 'Dr. Rajesh Sharma', meta: 'Doctor DR-001', path: '/admin/doctors/DR-001' },
-    { label: 'Payment PAY-008812', meta: 'Successful payment', path: '/admin/payments/PAY-008812' },
-    { label: 'Ramesh Gupta', meta: 'Patient PAT-101', path: '/admin/patients/PAT-101' },
-    { label: 'Withdrawal WD-901', meta: 'Requested payout', path: '/admin/withdrawals/WD-901' },
-    { label: 'Ticket TKT-201', meta: 'Video access problem', path: '/admin/support/TKT-201' },
-  ].filter((item) => {
-    const query = searchQuery.trim().toLowerCase();
-    return query && `${item.label} ${item.meta}`.toLowerCase().includes(query);
-  });
-
   return (
     <div className="min-h-screen bg-neutral-50 flex overflow-x-clip">
       {/* Sidebar Desktop */}
@@ -206,22 +196,11 @@ export function AdminLayout() {
               placeholder="Search doctor, patient, payment, ticket"
               className="h-10 w-full rounded-lg border border-neutral-200 bg-neutral-50 pl-9 pr-3 text-sm focus:border-primary-500 focus:bg-white focus:ring-primary-500"
             />
-            {searchResults.length > 0 && (
+            {searchQuery.trim() && (
               <div className="absolute left-0 right-0 top-12 z-30 overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-modal">
-                {searchResults.map((result) => (
-                  <button
-                    key={result.path}
-                    type="button"
-                    onClick={() => {
-                      setSearchQuery('');
-                      navigate(result.path);
-                    }}
-                    className="block w-full px-4 py-3 text-left hover:bg-primary-50"
-                  >
-                    <div className="text-sm font-semibold text-neutral-900">{result.label}</div>
-                    <div className="text-xs text-neutral-500">{result.meta}</div>
-                  </button>
-                ))}
+                <div className="px-4 py-3 text-sm text-neutral-600">
+                  Use the search and filters inside each Admin module for live backend records.
+                </div>
               </div>
             )}
           </div>

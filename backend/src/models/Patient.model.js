@@ -23,6 +23,7 @@ const patientSchema = new mongoose.Schema({
 
   // Auth
   mobileVerified: { type: Boolean, default: false },
+  tokenVersion: { type: Number, default: 0 },
   consentAccepted: { type: Boolean, default: false },
   consentVersion: String,
   consentDate: Date,

@@ -2,8 +2,13 @@ const QRCode = require('qrcode');
 const Doctor = require('../models/Doctor.model');
 const User = require('../models/User.model');
 const Patient = require('../models/Patient.model');
+const PatientProgram = require('../models/PatientProgram.model');
+const { Payment } = require('../models/Payment.model');
+const { FeeShare, WithdrawalRequest } = require('../models/FeeShare.model');
 const { DoctorWallet } = require('../models/Wallet.model');
 const { writeAuditLog } = require('../utils/auditLogger');
+const { uploadDoctorKycDocument, createSignedDocumentUrl } = require('../services/storage.service');
+const fraudService = require('../services/fraud.service');
 const asyncHandler = require('../utils/asyncHandler');
 
 // POST /api/doctors — Register a new doctor (by agent or admin)
@@ -43,6 +48,104 @@ const getDoctorById = asyncHandler(async (req, res) => {
     doctor.bankAccountNumber = 'XXXXXX' + doctor.bankAccountNumber.slice(-4);
   }
   res.json(doctor);
+});
+
+// POST /api/doctors/:id/kyc-documents uploads one doctor KYC document.
+const uploadKycDocument = asyncHandler(async (req, res) => {
+  const { documentType } = req.body;
+  if (!documentType) return res.status(400).json({ message: 'documentType is required' });
+
+  const doctor = await Doctor.findById(req.params.id);
+  if (!doctor) return res.status(404).json({ message: 'Doctor not found' });
+
+  const metadata = await uploadDoctorKycDocument({ doctor, documentType, file: req.file });
+  metadata.uploadedBy = req.user._id;
+
+  doctor.kycDocuments.push(metadata);
+  doctor.kycStatus = doctor.kycStatus === 'approved' ? 'approved' : 'submitted';
+
+  if (documentType === 'identity_proof') doctor.identityProof = metadata.key;
+  if (documentType === 'address_proof') doctor.addressProof = metadata.key;
+  if (documentType === 'medical_registration') doctor.medicalRegDoc = metadata.key;
+  if (documentType === 'cancelled_cheque') doctor.cancelledCheque = metadata.key;
+  if (documentType === 'profile_photo') doctor.profilePhoto = metadata.key;
+
+  await doctor.save();
+
+  await writeAuditLog({
+    req,
+    action: 'doctor_kyc_document_uploaded',
+    module: 'Doctor',
+    recordId: doctor._id,
+    newValue: { documentType, key: metadata.key, storageProvider: metadata.storageProvider },
+  });
+
+  res.status(201).json({ message: 'KYC document uploaded', document: metadata });
+});
+
+// GET /api/doctors/:id/kyc-documents/:documentId/access returns a short-lived document URL.
+const getKycDocumentAccess = asyncHandler(async (req, res) => {
+  const doctor = await Doctor.findById(req.params.id).select('kycDocuments');
+  if (!doctor) return res.status(404).json({ message: 'Doctor not found' });
+
+  const document = doctor.kycDocuments.id(req.params.documentId);
+  if (!document) return res.status(404).json({ message: 'KYC document not found' });
+
+  const access = await createSignedDocumentUrl({ document });
+  await writeAuditLog({
+    req,
+    action: 'doctor_kyc_document_accessed',
+    module: 'Doctor',
+    recordId: doctor._id,
+    newValue: { documentId: document._id, storageProvider: document.storageProvider },
+  });
+
+  res.json(access);
+});
+
+// POST /api/doctors/me/kyc-documents lets a doctor upload their own KYC document.
+const uploadMyKycDocument = asyncHandler(async (req, res) => {
+  const { documentType } = req.body;
+  if (!documentType) return res.status(400).json({ message: 'documentType is required' });
+
+  const doctor = await Doctor.findOne({ user: req.user._id });
+  if (!doctor) return res.status(404).json({ message: 'Doctor profile not found' });
+
+  const metadata = await uploadDoctorKycDocument({ doctor, documentType, file: req.file });
+  metadata.uploadedBy = req.user._id;
+
+  doctor.kycDocuments.push(metadata);
+  doctor.kycStatus = doctor.kycStatus === 'approved' ? 'approved' : 'submitted';
+
+  if (documentType === 'identity_proof') doctor.identityProof = metadata.key;
+  if (documentType === 'address_proof') doctor.addressProof = metadata.key;
+  if (documentType === 'medical_registration') doctor.medicalRegDoc = metadata.key;
+  if (documentType === 'cancelled_cheque') doctor.cancelledCheque = metadata.key;
+  if (documentType === 'profile_photo') doctor.profilePhoto = metadata.key;
+
+  await doctor.save();
+
+  await writeAuditLog({
+    req,
+    action: 'doctor_kyc_document_uploaded',
+    module: 'Doctor',
+    recordId: doctor._id,
+    newValue: { documentType, key: metadata.key, storageProvider: metadata.storageProvider, uploadedBy: 'doctor' },
+  });
+
+  res.status(201).json({ message: 'KYC document uploaded', document: metadata });
+});
+
+// GET /api/doctors/me/kyc-documents/:documentId/access returns a doctor's own short-lived document URL.
+const getMyKycDocumentAccess = asyncHandler(async (req, res) => {
+  const doctor = await Doctor.findOne({ user: req.user._id }).select('kycDocuments');
+  if (!doctor) return res.status(404).json({ message: 'Doctor profile not found' });
+
+  const document = doctor.kycDocuments.id(req.params.documentId);
+  if (!document) return res.status(404).json({ message: 'KYC document not found' });
+
+  const access = await createSignedDocumentUrl({ document });
+  res.json(access);
 });
 
 // POST /api/doctors/:id/approve
@@ -144,6 +247,27 @@ const rejectDoctor = asyncHandler(async (req, res) => {
 
 // POST /api/doctors/:id/suspend
 // SRS §7 — QR disabled, new fee shares on hold, withdrawal disabled
+const requestDoctorDocuments = asyncHandler(async (req, res) => {
+  const doctor = await Doctor.findById(req.params.id);
+  if (!doctor) return res.status(404).json({ message: 'Doctor not found' });
+
+  const prev = { status: doctor.status, kycStatus: doctor.kycStatus };
+  doctor.status = 'documents_required';
+  doctor.rejectionReason = req.body.reason;
+  await doctor.save();
+
+  await writeAuditLog({
+    req,
+    action: 'doctor_documents_requested',
+    module: 'Doctor',
+    recordId: doctor._id,
+    previousValue: prev,
+    newValue: { status: 'documents_required', reason: req.body.reason },
+  });
+
+  res.json({ message: 'Additional doctor documents requested', doctor });
+});
+
 const suspendDoctor = asyncHandler(async (req, res) => {
   const doctor = await Doctor.findById(req.params.id);
   if (!doctor) return res.status(404).json({ message: 'Doctor not found' });
@@ -227,6 +351,7 @@ const updateKycAndBank = asyncHandler(async (req, res) => {
     doctor[key] = updates[key];
   });
   await doctor.save();
+  await fraudService.evaluateDoctorBankRisk({ doctor });
 
   await writeAuditLog({
     req,
@@ -260,12 +385,159 @@ const updateMyProfile = asyncHandler(async (req, res) => {
   res.json(doctor);
 });
 
+// GET /api/doctors/me/summary returns the SRS doctor dashboard financial and referral summary.
+const getMySummary = asyncHandler(async (req, res) => {
+  const doctor = await Doctor.findOne({ user: req.user._id }).lean();
+  if (!doctor) return res.status(404).json({ message: 'Doctor profile not found' });
+
+  const [
+    wallet,
+    totalPatients,
+    activePatients,
+    paidPatients,
+    revenueResult,
+  ] = await Promise.all([
+    DoctorWallet.findOne({ doctor: doctor._id }).lean(),
+    Patient.countDocuments({ referringDoctor: doctor._id }),
+    PatientProgram.countDocuments({ doctor: doctor._id, status: 'active' }),
+    Payment.distinct('patient', { doctor: doctor._id, status: { $in: ['successful', 'manually_verified'] } }),
+    Payment.aggregate([
+      { $match: { doctor: doctor._id, status: { $in: ['successful', 'manually_verified'] } } },
+      { $group: { _id: null, totalRevenue: { $sum: { $ifNull: ['$paidAmount', 0] } } } },
+    ]),
+  ]);
+
+  const activeWithdrawal = await WithdrawalRequest.findOne({
+    doctor: doctor._id,
+    status: { $in: ['requested', 'under_review', 'approved', 'processing'] },
+  }).lean();
+
+  res.json({
+    doctor: {
+      doctorId: doctor.doctorId,
+      fullName: doctor.fullName,
+      clinicName: doctor.clinicName,
+      approvedPatientFee: doctor.approvedPatientFee || 0,
+      revenueModel: doctor.revenueModel || 'split',
+      feeSharePercentage: doctor.feeSharePercentage || 0,
+      feeShareType: doctor.feeShareType || 'percentage',
+      fixedFeeShareAmount: doctor.fixedFeeShareAmount || 0,
+      feeShareCalculationBasis: doctor.feeShareCalculationBasis || 'gross_payment',
+      feeShareHoldingDays: doctor.feeShareHoldingDays || 0,
+      minWithdrawal: doctor.minWithdrawal || 1000,
+      maxWithdrawal: doctor.maxWithdrawal || 50000,
+      payoutCycle: doctor.payoutCycle || 'monthly',
+    },
+    totals: {
+      referredPatients: totalPatients,
+      activePatients,
+      paidPatients: paidPatients.length,
+      totalRevenue: revenueResult[0]?.totalRevenue || 0,
+      pendingFeeShare: wallet?.pendingBalance || 0,
+      availableFeeShare: wallet?.availableBalance || 0,
+      withdrawalRequested: wallet?.withdrawalRequestedAmount || 0,
+      paidFeeShare: wallet?.paidBalance || 0,
+      reversedFeeShare: wallet?.reversedBalance || 0,
+      lifetimeFeeShare: wallet?.lifetimeEarnings || 0,
+    },
+    wallet: wallet || null,
+    activeWithdrawal: activeWithdrawal || null,
+  });
+});
+
 // GET /api/doctors/me/patients — Doctor sees only their referred patients (SRS §3.3)
 const getMyPatients = asyncHandler(async (req, res) => {
   const doctor = await Doctor.findOne({ user: req.user._id });
   if (!doctor) return res.status(404).json({ message: 'Doctor profile not found' });
-  const patients = await Patient.find({ referringDoctor: doctor._id }).select('-consentVersion -consentDate');
-  res.json(patients);
+
+  const patients = await Patient.find({ referringDoctor: doctor._id })
+    .select('-consentVersion -consentDate')
+    .sort({ createdAt: -1 })
+    .lean();
+  const patientIds = patients.map((patient) => patient._id);
+
+  const [patientPrograms, payments, feeShares] = await Promise.all([
+    PatientProgram.find({ doctor: doctor._id, patient: { $in: patientIds } })
+      .populate({
+        path: 'program',
+        select: 'name programCode painCategory',
+        populate: { path: 'painCategory', select: 'name' },
+      })
+      .populate('payment', 'invoiceNumber paidAmount status doctorFeeShare feeShareBasis verifiedAt')
+      .sort({ createdAt: -1 })
+      .lean(),
+    Payment.find({ doctor: doctor._id, patient: { $in: patientIds } })
+      .select('patient program paidAmount status doctorFeeShare feeShareBasis invoiceNumber verifiedAt createdAt')
+      .populate('program', 'name programCode painCategory')
+      .sort({ createdAt: -1 })
+      .lean(),
+    FeeShare.find({ doctor: doctor._id, patient: { $in: patientIds } })
+      .select('patient payment amount percentage calculationBasis status availableDate createdAt')
+      .populate('payment', 'invoiceNumber paidAmount status')
+      .sort({ createdAt: -1 })
+      .lean(),
+  ]);
+
+  const latestProgramByPatient = new Map();
+  patientPrograms.forEach((program) => {
+    const key = program.patient?.toString();
+    if (key && !latestProgramByPatient.has(key)) latestProgramByPatient.set(key, program);
+  });
+
+  const latestPaymentByPatient = new Map();
+  payments.forEach((payment) => {
+    const key = payment.patient?.toString();
+    if (key && !latestPaymentByPatient.has(key)) latestPaymentByPatient.set(key, payment);
+  });
+
+  const latestFeeShareByPatient = new Map();
+  feeShares.forEach((feeShare) => {
+    const key = feeShare.patient?.toString();
+    if (key && !latestFeeShareByPatient.has(key)) latestFeeShareByPatient.set(key, feeShare);
+  });
+
+  const enrichedPatients = patients.map((patient) => {
+    const patientKey = patient._id.toString();
+    const patientProgram = latestProgramByPatient.get(patientKey);
+    const payment = patientProgram?.payment || latestPaymentByPatient.get(patientKey);
+    const feeShare = latestFeeShareByPatient.get(patientKey);
+    const program = patientProgram?.program || payment?.program;
+
+    return {
+      ...patient,
+      painCategory: program?.painCategory?.name || null,
+      program: program ? {
+        id: program._id,
+        name: program.name,
+        programCode: program.programCode,
+      } : null,
+      patientProgram: patientProgram ? {
+        id: patientProgram._id,
+        status: patientProgram.status,
+        currentDay: patientProgram.currentDay,
+        completionPercentage: patientProgram.completionPercentage,
+        startDate: patientProgram.startDate,
+        expiryDate: patientProgram.expiryDate,
+      } : null,
+      payment: payment ? {
+        id: payment._id,
+        invoiceNumber: payment.invoiceNumber,
+        amount: payment.paidAmount || 0,
+        status: payment.status,
+        verifiedAt: payment.verifiedAt,
+      } : null,
+      feeShare: feeShare ? {
+        id: feeShare._id,
+        amount: feeShare.amount || 0,
+        percentage: feeShare.percentage,
+        calculationBasis: feeShare.calculationBasis,
+        status: feeShare.status,
+        availableDate: feeShare.availableDate,
+      } : null,
+    };
+  });
+
+  res.json(enrichedPatients);
 });
 
 // GET /api/doctors/me/qr-stats — QR scan count, registration count, conversion (SRS §8.2)
@@ -290,7 +562,8 @@ const getMyQrStats = asyncHandler(async (req, res) => {
 
 module.exports = {
   registerDoctor, getAllDoctors, getDoctorById,
-  approveDoctor, rejectDoctor, suspendDoctor,
+  approveDoctor, rejectDoctor, requestDoctorDocuments, suspendDoctor,
   generateQrCode, disableQrCode, reactivateQrCode, updateKycAndBank,
-  getMyProfile, updateMyProfile, getMyPatients, getMyQrStats,
+  uploadKycDocument, getKycDocumentAccess, uploadMyKycDocument, getMyKycDocumentAccess,
+  getMyProfile, updateMyProfile, getMySummary, getMyPatients, getMyQrStats,
 };

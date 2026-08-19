@@ -8,49 +8,36 @@ import { useAuthStore } from '@/stores/auth.store';
 import { Logo } from '@/components/brand/Logo';
 import { UserRole } from '@/types';
 import { getRedirectPathForRole } from '@/lib/permissions';
+import apiClient from '@/lib/api-client';
 
 const loginSchema = z.object({
-  email: z.string().min(1, 'Email is required').email('Enter a valid email'),
-  password: z.string().min(4, 'Password must be at least 4 characters'),
+  identifier: z.string().optional(),
+  password: z.string().optional(),
   role: z.enum(['admin', 'agent', 'doctor', 'patient'] as const),
+}).superRefine((value, context) => {
+  if (value.role === 'patient') return;
+  if (!value.identifier?.trim()) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ['identifier'], message: 'Email or mobile is required' });
+  }
+  if (!value.password || value.password.length < 4) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ['password'], message: 'Password must be at least 4 characters' });
+  }
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
-
-const DEMO_ACCOUNTS: Record<UserRole, { email: string; name: string; role: UserRole; revenueModel?: 'split_model' | 'platform_fee_model' }> = {
-  admin: {
-    email: 'admin@physioqr.in',
-    name: 'Central Admin',
-    role: 'admin',
-  },
-  agent: {
-    email: 'agent@physioqr.in',
-    name: 'Amit Kumar (Agent)',
-    role: 'agent',
-  },
-  doctor: {
-    email: 'doctor@physioqr.in',
-    name: 'Dr. Rajesh Sharma',
-    role: 'doctor',
-    revenueModel: 'split_model',
-  },
-  patient: {
-    email: 'patient@physioqr.in',
-    name: 'Ramesh Gupta',
-    role: 'patient',
-  },
-};
+type ApiRecord = Record<string, unknown>;
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const { login } = useAuthStore();
   const [selectedRole, setSelectedRole] = useState<UserRole>('admin');
+  const [submitError, setSubmitError] = useState('');
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: DEMO_ACCOUNTS.admin.email,
-      password: 'password123',
+      identifier: '',
+      password: '',
       role: 'admin',
     },
   });
@@ -58,22 +45,48 @@ export default function LoginPage() {
   const handleRoleChange = (role: UserRole) => {
     setSelectedRole(role);
     form.setValue('role', role);
-    form.setValue('email', DEMO_ACCOUNTS[role].email);
+    setSubmitError('');
   };
 
-  const onSubmit = (data: LoginFormValues) => {
-    const demoUser = DEMO_ACCOUNTS[data.role];
-    const user = {
-      id: `USR-${Date.now()}`,
-      name: demoUser.name,
-      email: data.email,
-      mobile: '9876543210',
-      role: data.role,
-      revenueModel: demoUser.revenueModel,
-    };
+  const onSubmit = async (data: LoginFormValues) => {
+    setSubmitError('');
+    if (data.role === 'patient') {
+      navigate('/register');
+      return;
+    }
 
-    login(user, 'mock-jwt-token-xyz');
-    navigate(getRedirectPathForRole(data.role));
+    try {
+      const identifier = (data.identifier || '').trim();
+      const payload = identifier.includes('@')
+        ? { email: identifier, password: data.password || '' }
+        : { mobile: identifier, password: data.password || '' };
+      const response = await apiClient.post('/auth/login', payload);
+      const auth = asRecord(response.data);
+      const apiUser = asRecord(auth.user);
+      const role = text(auth.role || apiUser.role) as UserRole;
+
+      if (role !== data.role) {
+        setSubmitError(`This account is ${role}. Please select the correct portal.`);
+        return;
+      }
+
+      const token = text(auth.token || auth.accessToken);
+      if (!token) {
+        setSubmitError('Login succeeded but access token was not returned.');
+        return;
+      }
+
+      login({
+        id: text(apiUser.id || apiUser._id),
+        name: text(apiUser.name || apiUser.fullName || apiUser.email || apiUser.mobile, roleLabel(role)),
+        email: text(apiUser.email),
+        mobile: text(apiUser.mobile),
+        role,
+      }, token);
+      navigate(getRedirectPathForRole(role));
+    } catch (error) {
+      setSubmitError(errorMessage(error));
+    }
   };
 
   return (
@@ -118,7 +131,7 @@ export default function LoginPage() {
         <div className="p-8 sm:p-10 flex flex-col justify-center">
           <div className="mb-6">
             <h2 className="text-xl font-bold text-neutral-900">Sign in to physioqr</h2>
-            <p className="text-xs text-neutral-500 mt-1">Select your role portal to access your dashboard</p>
+            <p className="text-xs text-neutral-500 mt-1">Use your registered email/mobile and password</p>
           </div>
 
           {/* Role selector pill tabs */}
@@ -142,16 +155,30 @@ export default function LoginPage() {
             </div>
           </div>
 
+          {submitError && (
+            <div className="mb-4 rounded-lg border border-danger-200 bg-danger-50 px-4 py-3 text-sm font-semibold text-danger-700">
+              {submitError}
+            </div>
+          )}
+
+          {selectedRole === 'patient' && (
+            <div className="mb-4 rounded-lg border border-primary-100 bg-primary-50 px-4 py-3 text-sm text-primary-800">
+              Patients use mobile OTP from the doctor QR/referral flow. Continue to patient registration instead of password login.
+            </div>
+          )}
+
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-neutral-700 mb-1">Email Address</label>
+              <label className="block text-xs font-semibold text-neutral-700 mb-1">Email or Mobile</label>
               <input
-                {...form.register('email')}
-                type="email"
+                {...form.register('identifier')}
+                type="text"
+                disabled={selectedRole === 'patient'}
+                placeholder="admin@physioqr.in or 9876543210"
                 className="w-full px-3.5 py-2.5 rounded-lg border border-neutral-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
-              {form.formState.errors.email && (
-                <p className="mt-1 text-xs text-danger-600">{form.formState.errors.email.message}</p>
+              {form.formState.errors.identifier && (
+                <p className="mt-1 text-xs text-danger-600">{form.formState.errors.identifier.message}</p>
               )}
             </div>
 
@@ -160,6 +187,7 @@ export default function LoginPage() {
               <input
                 {...form.register('password')}
                 type="password"
+                disabled={selectedRole === 'patient'}
                 className="w-full px-3.5 py-2.5 rounded-lg border border-neutral-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
               {form.formState.errors.password && (
@@ -169,19 +197,45 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              className="w-full mt-2 py-3 px-4 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-all flex items-center justify-center gap-2 shadow-sm text-sm"
+              disabled={form.formState.isSubmitting}
+              className="w-full mt-2 py-3 px-4 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-all flex items-center justify-center gap-2 shadow-sm text-sm disabled:opacity-60"
             >
               <Lock className="w-4 h-4" />
-              Access {selectedRole.toUpperCase()} Portal
+              {form.formState.isSubmitting ? 'Signing in...' : selectedRole === 'patient' ? 'Continue with Patient OTP' : `Access ${selectedRole.toUpperCase()} Portal`}
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
 
           <div className="mt-6 pt-4 border-t border-neutral-100 text-center text-xs text-neutral-400">
-            Simulating authentication for demo. Password can be any value.
+            Admin, Agent, and Doctor use password login. Patients use OTP only.
           </div>
         </div>
       </div>
     </div>
   );
+}
+
+function asRecord(value: unknown): ApiRecord {
+  return value && typeof value === 'object' ? value as ApiRecord : {};
+}
+
+function text(value: unknown, fallback = '') {
+  if (value === undefined || value === null || value === '') return fallback;
+  return String(value);
+}
+
+function roleLabel(role: UserRole) {
+  const labels: Record<UserRole, string> = {
+    admin: 'Admin',
+    agent: 'Agent',
+    doctor: 'Doctor',
+    patient: 'Patient',
+  };
+  return labels[role];
+}
+
+function errorMessage(error: unknown) {
+  const response = asRecord(asRecord(error).response);
+  const data = asRecord(response.data);
+  return text(data.message || asRecord(error).message, 'Login failed. Check your credentials and backend connection.');
 }

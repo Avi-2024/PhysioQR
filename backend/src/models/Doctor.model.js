@@ -1,5 +1,21 @@
 const mongoose = require('mongoose');
 
+const kycDocumentSchema = new mongoose.Schema({
+  documentType: {
+    type: String,
+    enum: ['identity_proof', 'address_proof', 'medical_registration', 'cancelled_cheque', 'pan', 'profile_photo', 'other'],
+    required: true,
+  },
+  storageProvider: { type: String, enum: ['s3', 'local'], default: 'local' },
+  bucket: String,
+  key: String,
+  originalName: String,
+  mimeType: String,
+  size: Number,
+  uploadedAt: Date,
+  uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+}, { _id: true });
+
 const doctorSchema = new mongoose.Schema({
   doctorId: { type: String, unique: true },  // e.g. DR001
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
@@ -83,6 +99,7 @@ const doctorSchema = new mongoose.Schema({
   addressProof: String,
   medicalRegDoc: String,
   cancelledCheque: String,
+  kycDocuments: [kycDocumentSchema],
 
   // Bank Details (sensitive — masked on display)
   bankAccountHolder: String,

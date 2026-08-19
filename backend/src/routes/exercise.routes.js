@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { protect, authorize } = require('../middlewares/auth.middleware');
-const { requireFields, validateNumberRange } = require('../middlewares/validate.middleware');
+const { validateSchema } = require('../middlewares/validate.middleware');
 const {
   getExercises,
   createExercise,
@@ -16,13 +16,32 @@ router.get('/', getExercises);
 router.post(
   '/',
   authorize('admin'),
-  requireFields('name'),
-  validateNumberRange('sets', { min: 0 }),
-  validateNumberRange('repetitions', { min: 0 }),
+  validateSchema({
+    body: {
+      name: { type: 'string', min: 2, max: 150, required: true },
+      description: { type: 'string', max: 2000 },
+      videoUrl: { type: 'youtubeUrl' },
+      sets: { type: 'number', min: 0, max: 100 },
+      repetitions: { type: 'number', min: 0, max: 1000 },
+      painCategory: { type: 'objectId' },
+      language: { type: 'string', min: 2, max: 20 },
+    },
+  }),
   createExercise
 );
-router.get('/:id', getExerciseById);
-router.put('/:id', authorize('admin'), updateExercise);
-router.delete('/:id', authorize('admin'), deleteExercise);
+router.get('/:id', validateSchema({ params: { id: { type: 'objectId', required: true } } }), getExerciseById);
+router.put('/:id', authorize('admin'), validateSchema({
+  params: { id: { type: 'objectId', required: true } },
+  body: {
+    name: { type: 'string', min: 2, max: 150 },
+    description: { type: 'string', max: 2000 },
+    videoUrl: { type: 'youtubeUrl' },
+    sets: { type: 'number', min: 0, max: 100 },
+    repetitions: { type: 'number', min: 0, max: 1000 },
+    painCategory: { type: 'objectId' },
+    language: { type: 'string', min: 2, max: 20 },
+  },
+}), updateExercise);
+router.delete('/:id', authorize('admin'), validateSchema({ params: { id: { type: 'objectId', required: true } } }), deleteExercise);
 
 module.exports = router;

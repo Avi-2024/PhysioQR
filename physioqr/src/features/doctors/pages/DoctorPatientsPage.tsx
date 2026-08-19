@@ -1,87 +1,103 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Search } from 'lucide-react';
-import { formatCurrency } from '@/lib/formatters';
+import apiClient from '@/lib/api-client';
+import { DataTable, type DataTableColumn } from '@/components/data-display/DataTable';
+import ErrorState from '@/components/feedback/ErrorState';
+import { formatCurrency, maskMobile } from '@/lib/formatters';
 
-const PATIENTS = [
-  { id: 'PAT-101', name: 'Ramesh Gupta', mobile: '99XXXX6655', painCategory: 'Lower Back Pain', programme: '14-Day Lower Back Recovery', paymentStatus: 'Paid', feeShare: 300, date: '2026-08-01' },
-  { id: 'PAT-102', name: 'Sunita Kapoor', mobile: '98XXXX3344', painCategory: 'Knee Pain', programme: '14-Day Knee Mobility', paymentStatus: 'Paid', feeShare: 300, date: '2026-08-03' },
-  { id: 'PAT-103', name: 'Vikram Malhotra', mobile: '97XXXX5443', painCategory: 'Lower Back Pain', programme: 'Under Assessment', paymentStatus: 'Pending', feeShare: 0, date: '2026-08-06' },
-];
+type ApiRecord = Record<string, unknown>;
+type PatientRow = {
+  id: string;
+  fullName: string;
+  mobile: string;
+  painCategory: string;
+  programName: string;
+  paymentAmount: number;
+  paymentStatus: string;
+  programStatus: string;
+  feeShareAmount: number;
+  feeShareStatus: string;
+  createdAt: string;
+};
 
+// Renders doctor-owned referred patients from the backend scoped endpoint.
 export default function DoctorPatientsPage() {
+  const [search, setSearch] = useState('');
+  const query = useQuery({ queryKey: ['doctor-patients'], queryFn: async () => (await apiClient.get('/doctors/me/patients')).data });
+  const rows = useMemo(() => (Array.isArray(query.data) ? query.data as ApiRecord[] : []).map(mapPatient), [query.data]);
+  const filteredRows = rows.filter((row) => !search.trim() || [row.fullName, row.mobile, row.painCategory, row.programName, row.paymentStatus, row.programStatus, row.feeShareStatus].some((value) => value.toLowerCase().includes(search.toLowerCase())));
+
+  const columns: DataTableColumn<PatientRow>[] = [
+    { key: 'fullName', header: 'Patient', render: (row) => <div><div className="font-semibold text-neutral-900">{row.fullName}</div><div className="text-xs text-neutral-500">{row.id}</div></div> },
+    { key: 'mobile', header: 'Mobile', render: (row) => <span className="text-sm text-neutral-700">{maskMobile(row.mobile)}</span> },
+    { key: 'painCategory', header: 'Pain Category', render: (row) => <span className="text-sm text-neutral-700">{row.painCategory || '-'}</span> },
+    { key: 'programName', header: 'Program', render: (row) => <span className="text-sm font-semibold text-neutral-900">{row.programName || '-'}</span> },
+    { key: 'paymentAmount', header: 'Payment', render: (row) => <div><div className="font-semibold text-neutral-900">{formatCurrency(row.paymentAmount)}</div><Pill value={row.paymentStatus || 'unpaid'} /></div> },
+    { key: 'programStatus', header: 'Program Status', render: (row) => <Pill value={row.programStatus || 'not assigned'} /> },
+    { key: 'feeShareAmount', header: 'Fee Share', render: (row) => <div><div className="font-semibold text-neutral-900">{formatCurrency(row.feeShareAmount)}</div><Pill value={row.feeShareStatus || 'not created'} /></div> },
+    { key: 'createdAt', header: 'Registered', render: (row) => <span className="text-sm text-neutral-600">{dateText(row.createdAt)}</span> },
+  ];
+
+  if (query.isError) return <ErrorState title="Patients could not load" message="Check doctor login and backend availability." onRetry={() => query.refetch()} />;
+
   return (
     <div className="space-y-6 min-w-0">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h1 className="text-xl sm:text-2xl font-bold text-neutral-900">Referred Patients</h1>
-          <p className="text-sm text-neutral-500">Patients who scanned your unique QR code or link</p>
+          <p className="text-sm text-neutral-500">Referral, payment, program, and fee-share status for patients attributed to your QR code.</p>
         </div>
       </div>
 
       <div className="bg-white border border-neutral-200 rounded-xl p-4 flex items-center gap-3 min-w-0">
         <Search className="w-5 h-5 text-neutral-400 flex-shrink-0" />
-        <input placeholder="Search patients by name or mobile..." className="min-w-0 flex-1 border-none text-sm focus:outline-none" />
+        <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search patients, pain category, program, payment, or fee-share status..." className="min-w-0 flex-1 border-none text-sm focus:outline-none" />
       </div>
 
-      <div className="hidden md:block bg-white border border-neutral-200 rounded-xl overflow-x-auto shadow-sm">
-        <table className="w-full min-w-[720px] text-left text-sm">
-          <thead className="bg-neutral-50 text-neutral-600 font-semibold border-b border-neutral-200">
-            <tr>
-              <th className="p-4">Patient Name</th>
-              <th className="p-4">Mobile</th>
-              <th className="p-4">Pain Category</th>
-              <th className="p-4">Payment</th>
-              <th className="p-4">Your Fee Share</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-neutral-100">
-            {PATIENTS.map((p) => (
-              <tr key={p.id} className="hover:bg-neutral-50">
-                <td className="p-4 font-semibold text-neutral-900">{p.name}</td>
-                <td className="p-4 text-neutral-600">{p.mobile}</td>
-                <td className="p-4 text-neutral-600">{p.painCategory}</td>
-                <td className="p-4">
-                  <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${p.paymentStatus === 'Paid' ? 'bg-success-100 text-success-700' : 'bg-warning-100 text-warning-700'}`}>
-                    {p.paymentStatus}
-                  </span>
-                </td>
-                <td className="p-4 font-bold text-neutral-900">{formatCurrency(p.feeShare)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="md:hidden space-y-3">
-        {PATIENTS.map((p) => (
-          <div key={p.id} className="bg-white border border-neutral-200 rounded-xl p-4 shadow-sm space-y-3">
-            <div>
-              <p className="font-semibold text-neutral-900">{p.name}</p>
-              <p className="text-xs text-neutral-500">{p.mobile} · {p.date}</p>
-            </div>
-            <div className="grid grid-cols-1 gap-2 text-sm">
-              <div className="flex items-start justify-between gap-3">
-                <span className="text-neutral-500">Pain</span>
-                <span className="text-right font-medium text-neutral-800">{p.painCategory}</span>
-              </div>
-              <div className="flex items-start justify-between gap-3">
-                <span className="text-neutral-500">Programme</span>
-                <span className="text-right font-medium text-neutral-800">{p.programme}</span>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-neutral-500">Payment</span>
-                <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${p.paymentStatus === 'Paid' ? 'bg-success-100 text-success-700' : 'bg-warning-100 text-warning-700'}`}>
-                  {p.paymentStatus}
-                </span>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-neutral-500">Fee Share</span>
-                <span className="font-bold text-neutral-900">{formatCurrency(p.feeShare)}</span>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+      <DataTable columns={columns} data={filteredRows} loading={query.isLoading} emptyMessage="No referred patients found." />
     </div>
   );
+}
+
+function mapPatient(record: ApiRecord): PatientRow {
+  const program = asRecord(record.program);
+  const patientProgram = asRecord(record.patientProgram);
+  const payment = asRecord(record.payment);
+  const feeShare = asRecord(record.feeShare);
+  return {
+    id: text(record.patientId || record._id || record.id),
+    fullName: text(record.fullName, 'Unnamed patient'),
+    mobile: text(record.mobile),
+    painCategory: text(record.painCategory),
+    programName: text(program.name),
+    paymentAmount: Number(payment.amount || 0),
+    paymentStatus: text(payment.status, 'unpaid'),
+    programStatus: text(patientProgram.status, 'not assigned'),
+    feeShareAmount: Number(feeShare.amount || 0),
+    feeShareStatus: text(feeShare.status, 'not created'),
+    createdAt: text(record.createdAt),
+  };
+}
+
+function Pill({ value }: { value: string }) {
+  const good = ['yes', 'paid', 'active', 'registered', 'completed', 'successful', 'available'].some((item) => value.toLowerCase().includes(item));
+  return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${good ? 'bg-emerald-50 text-emerald-700' : 'bg-neutral-100 text-neutral-700'}`}>{value}</span>;
+}
+
+function text(value: unknown, fallback = '') {
+  if (value === undefined || value === null || value === '') return fallback;
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  return String(value);
+}
+
+function asRecord(value: unknown): ApiRecord {
+  return value && typeof value === 'object' ? value as ApiRecord : {};
+}
+
+function dateText(value: unknown) {
+  if (!value) return '-';
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 }

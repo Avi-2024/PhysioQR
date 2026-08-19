@@ -13,10 +13,16 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const USER_STORAGE_KEY = 'rc_user';
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUserState] = useState<AuthUser | null>(() => {
-    const stored = sessionStorage.getItem('rc_user');
+    if (!getAccessToken()) {
+      localStorage.removeItem(USER_STORAGE_KEY);
+      sessionStorage.removeItem(USER_STORAGE_KEY);
+      return null;
+    }
+    const stored = localStorage.getItem(USER_STORAGE_KEY) || sessionStorage.getItem(USER_STORAGE_KEY);
     if (stored) {
       try {
         return JSON.parse(stored);
@@ -30,22 +36,26 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const login = (userData: AuthUser, token: string) => {
     setAccessToken(token);
-    sessionStorage.setItem('rc_user', JSON.stringify(userData));
+    localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(userData));
+    sessionStorage.setItem(USER_STORAGE_KEY, JSON.stringify(userData));
     setUserState(userData);
   };
 
   const logout = () => {
     clearTokens();
-    sessionStorage.removeItem('rc_user');
+    localStorage.removeItem(USER_STORAGE_KEY);
+    sessionStorage.removeItem(USER_STORAGE_KEY);
     queryClient.clear();
     setUserState(null);
   };
 
   const setUser = (userData: AuthUser | null) => {
     if (userData) {
-      sessionStorage.setItem('rc_user', JSON.stringify(userData));
+      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(userData));
+      sessionStorage.setItem(USER_STORAGE_KEY, JSON.stringify(userData));
     } else {
-      sessionStorage.removeItem('rc_user');
+      localStorage.removeItem(USER_STORAGE_KEY);
+      sessionStorage.removeItem(USER_STORAGE_KEY);
     }
     setUserState(userData);
   };

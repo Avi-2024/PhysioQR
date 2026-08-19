@@ -12,6 +12,8 @@ const {
   updateQuestion,
   deleteQuestion,
   submitAssessment,
+  listRedFlagAssessments,
+  reviewAssessment,
 } = require('../controllers/assessment.controller');
 
 router.get('/categories', getPainCategories);
@@ -32,5 +34,14 @@ router.put('/questions/:id', protect, authorize('admin'), updateQuestion);
 router.delete('/questions/:id', protect, authorize('admin'), deleteQuestion);
 
 router.post('/submit', protect, requireFields('patientId', 'painCategoryId', 'answers'), submitAssessment);
+router.get('/red-flags', protect, authorize('admin'), listRedFlagAssessments);
+router.patch(
+  '/:id/review',
+  protect,
+  authorize('admin'),
+  requireFields('status'),
+  validateEnum('status', ['cleared', 'blocked']),
+  reviewAssessment
+);
 
 module.exports = router;

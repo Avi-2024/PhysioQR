@@ -1,5 +1,6 @@
 const QrScan = require('../models/QrScan.model');
 const Doctor = require('../models/Doctor.model');
+const fraudService = require('../services/fraud.service');
 const asyncHandler = require('../utils/asyncHandler');
 
 const recordScan = asyncHandler(async (req, res) => {
@@ -19,6 +20,8 @@ const recordScan = asyncHandler(async (req, res) => {
     deviceInfo: deviceInfo || req.headers['user-agent'],
     ipAddress: req.ip,
   });
+
+  await fraudService.evaluateQrScanRisk({ doctorId: doctor._id, deviceInfo: scan.deviceInfo });
 
   res.json({
     message: 'QR scan recorded',

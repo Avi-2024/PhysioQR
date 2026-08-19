@@ -1,6 +1,6 @@
 import React from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { Home, PlayCircle, BarChart, CreditCard, LogOut } from 'lucide-react';
+import { Home, PlayCircle, BarChart, CreditCard, LogOut, MessageSquare } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth.store';
 import { Logo } from '@/components/brand/Logo';
 import { cn } from '@/lib/cn';
@@ -42,6 +42,7 @@ export function PatientLayout() {
           { label: 'Programme', path: '/patient/programme', icon: PlayCircle },
           { label: 'Progress', path: '/patient/progress', icon: BarChart },
           { label: 'Payments', path: '/patient/payments', icon: CreditCard },
+          { label: 'Support', path: '/patient/support', icon: MessageSquare },
         ].map((item) => (
           <NavLink
             key={item.path}

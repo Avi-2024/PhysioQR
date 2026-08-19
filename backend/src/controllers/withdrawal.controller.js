@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const { WithdrawalRequest } = require('../models/FeeShare.model');
 const { DoctorWallet, WalletTransaction } = require('../models/Wallet.model');
 const Payout = require('../models/Payout.model');
@@ -39,30 +40,42 @@ const requestWithdrawal = asyncHandler(async (req, res) => {
   });
   if (activePending) return res.status(400).json({ message: 'You already have a pending withdrawal request' });
 
-  const request = await WithdrawalRequest.create({
-    doctor: doctor._id,
-    wallet: wallet._id,
-    requestedAmount,
-    bankAccountHolder: doctor.bankAccountHolder,
-    bankAccountNumber: doctor.bankAccountNumber,
-    ifscCode: doctor.ifscCode,
-    upiId: doctor.upiId,
-  });
+  const session = await mongoose.startSession();
+  let request;
+  try {
+    await session.withTransaction(async () => {
+      const lockedWallet = await DoctorWallet.findOne({ doctor: doctor._id }).session(session);
+      if (!lockedWallet) throw Object.assign(new Error('Wallet not found'), { status: 404 });
+      if (lockedWallet.availableBalance < requestedAmount) throw Object.assign(new Error('Insufficient available balance'), { status: 400 });
 
-  const previousBalance = wallet.availableBalance;
-  wallet.availableBalance -= requestedAmount;
-  wallet.withdrawalRequestedAmount += requestedAmount;
-  await wallet.save();
+      [request] = await WithdrawalRequest.create([{
+        doctor: doctor._id,
+        wallet: lockedWallet._id,
+        requestedAmount,
+        bankAccountHolder: doctor.bankAccountHolder,
+        bankAccountNumber: doctor.bankAccountNumber,
+        ifscCode: doctor.ifscCode,
+        upiId: doctor.upiId,
+      }], { session });
 
-  await WalletTransaction.create({
-    doctor: doctor._id,
-    wallet: wallet._id,
-    type: 'withdrawal_request',
-    amount: -requestedAmount,
-    previousBalance,
-    newBalance: wallet.availableBalance,
-    reason: `Withdrawal request submitted. Request ID: ${request._id}`,
-  });
+      const previousBalance = lockedWallet.availableBalance;
+      lockedWallet.availableBalance -= requestedAmount;
+      lockedWallet.withdrawalRequestedAmount += requestedAmount;
+      await lockedWallet.save({ session });
+
+      await WalletTransaction.create([{
+        doctor: doctor._id,
+        wallet: lockedWallet._id,
+        type: 'withdrawal_request',
+        amount: -requestedAmount,
+        previousBalance,
+        newBalance: lockedWallet.availableBalance,
+        reason: `Withdrawal request submitted. Request ID: ${request._id}`,
+      }], { session });
+    });
+  } finally {
+    await session.endSession();
+  }
 
   res.status(201).json({ message: 'Withdrawal request submitted', request });
 });
@@ -80,24 +93,43 @@ const getWithdrawals = asyncHandler(async (req, res) => {
 });
 
 const approveWithdrawal = asyncHandler(async (req, res) => {
-  const request = await WithdrawalRequest.findById(req.params.id);
-  if (!request) return res.status(404).json({ message: 'Request not found' });
-  if (!['requested', 'under_review'].includes(request.status)) {
-    return res.status(400).json({ message: `Cannot approve a request with status: ${request.status}` });
+  const session = await mongoose.startSession();
+  let request;
+  try {
+    await session.withTransaction(async () => {
+      request = await WithdrawalRequest.findById(req.params.id).session(session);
+      if (!request) throw Object.assign(new Error('Request not found'), { status: 404 });
+      if (!['requested', 'under_review'].includes(request.status)) {
+        throw Object.assign(new Error(`Cannot approve a request with status: ${request.status}`), { status: 400 });
+      }
+
+      const doctor = await Doctor.findById(request.doctor).session(session);
+      if (!doctor || doctor.status !== 'approved' || doctor.kycStatus !== 'approved' || !doctor.bankVerified) {
+        throw Object.assign(new Error('Doctor KYC, bank verification, and active status are required for payout approval'), { status: 400 });
+      }
+
+      request.status = 'approved';
+      request.processedBy = req.user._id;
+      request.processedAt = new Date();
+      await request.save({ session });
+
+      await Payout.findOneAndUpdate(
+        { withdrawalRequest: request._id },
+        {
+          $setOnInsert: {
+            withdrawalRequest: request._id,
+            doctor: request.doctor,
+            amount: request.requestedAmount,
+          },
+          status: 'processing',
+          processedBy: req.user._id,
+        },
+        { upsert: true, new: true, session }
+      );
+    });
+  } finally {
+    await session.endSession();
   }
-
-  request.status = 'approved';
-  request.processedBy = req.user._id;
-  request.processedAt = new Date();
-  await request.save();
-
-  await Payout.create({
-    withdrawalRequest: request._id,
-    doctor: request.doctor,
-    amount: request.requestedAmount,
-    status: 'processing',
-    processedBy: req.user._id,
-  });
 
   await writeAuditLog({
     req,
@@ -112,41 +144,55 @@ const approveWithdrawal = asyncHandler(async (req, res) => {
 
 const markWithdrawalPaid = asyncHandler(async (req, res) => {
   const { transactionReference } = req.body;
-  const request = await WithdrawalRequest.findById(req.params.id);
-  if (!request) return res.status(404).json({ message: 'Request not found' });
-  if (!['approved', 'processing'].includes(request.status)) {
-    return res.status(400).json({ message: `Cannot mark paid for status: ${request.status}` });
+  if (!transactionReference || String(transactionReference).trim().length < 4) {
+    return res.status(400).json({ message: 'A valid transactionReference is required' });
   }
+  const duplicateRef = await Payout.findOne({ transactionReference });
+  if (duplicateRef) return res.status(409).json({ message: 'Payout transaction reference already exists' });
 
-  request.status = 'paid';
-  request.payoutTransactionRef = transactionReference;
-  request.processedBy = req.user._id;
-  request.processedAt = new Date();
-  await request.save();
+  const session = await mongoose.startSession();
+  let request;
+  try {
+    await session.withTransaction(async () => {
+      request = await WithdrawalRequest.findById(req.params.id).session(session);
+      if (!request) throw Object.assign(new Error('Request not found'), { status: 404 });
+      if (!['approved', 'processing'].includes(request.status)) {
+        throw Object.assign(new Error(`Cannot mark paid for status: ${request.status}`), { status: 400 });
+      }
 
-  await Payout.findOneAndUpdate(
-    { withdrawalRequest: request._id },
-    { status: 'completed', transactionReference, processedAt: new Date(), processedBy: req.user._id },
-    { new: true }
-  );
+      request.status = 'paid';
+      request.payoutTransactionRef = transactionReference;
+      request.processedBy = req.user._id;
+      request.processedAt = new Date();
+      await request.save({ session });
 
-  const wallet = await DoctorWallet.findById(request.wallet);
-  if (wallet) {
-    const previousBalance = wallet.withdrawalRequestedAmount;
-    wallet.withdrawalRequestedAmount = Math.max(wallet.withdrawalRequestedAmount - request.requestedAmount, 0);
-    wallet.paidBalance += request.requestedAmount;
-    await wallet.save();
+      await Payout.findOneAndUpdate(
+        { withdrawalRequest: request._id },
+        { status: 'completed', transactionReference, processedAt: new Date(), processedBy: req.user._id },
+        { new: true, session }
+      );
 
-    await WalletTransaction.create({
-      doctor: request.doctor,
-      wallet: wallet._id,
-      type: 'payout_completed',
-      amount: -request.requestedAmount,
-      previousBalance,
-      newBalance: wallet.withdrawalRequestedAmount,
-      reason: `Payout completed. Ref: ${transactionReference}`,
-      createdBy: req.user._id,
+      const wallet = await DoctorWallet.findById(request.wallet).session(session);
+      if (!wallet) throw Object.assign(new Error('Wallet not found'), { status: 404 });
+
+      const previousBalance = wallet.withdrawalRequestedAmount;
+      wallet.withdrawalRequestedAmount = Math.max(wallet.withdrawalRequestedAmount - request.requestedAmount, 0);
+      wallet.paidBalance += request.requestedAmount;
+      await wallet.save({ session });
+
+      await WalletTransaction.create([{
+        doctor: request.doctor,
+        wallet: wallet._id,
+        type: 'payout_completed',
+        amount: -request.requestedAmount,
+        previousBalance,
+        newBalance: wallet.withdrawalRequestedAmount,
+        reason: `Payout completed. Ref: ${transactionReference}`,
+        createdBy: req.user._id,
+      }], { session });
     });
+  } finally {
+    await session.endSession();
   }
 
   await writeAuditLog({
@@ -164,34 +210,51 @@ const rejectWithdrawal = asyncHandler(async (req, res) => {
   const { reason } = req.body;
   if (!reason) return res.status(400).json({ message: 'Rejection reason is required' });
 
-  const request = await WithdrawalRequest.findById(req.params.id);
-  if (!request) return res.status(404).json({ message: 'Request not found' });
-  if (request.status === 'paid') return res.status(400).json({ message: 'Paid requests cannot be rejected' });
+  const session = await mongoose.startSession();
+  let request;
+  try {
+    await session.withTransaction(async () => {
+      request = await WithdrawalRequest.findById(req.params.id).session(session);
+      if (!request) throw Object.assign(new Error('Request not found'), { status: 404 });
+      if (request.status === 'paid') throw Object.assign(new Error('Paid requests cannot be rejected'), { status: 400 });
+      if (['rejected', 'failed', 'cancelled', 'reversed'].includes(request.status)) {
+        throw Object.assign(new Error(`Request already closed with status: ${request.status}`), { status: 400 });
+      }
 
-  request.status = 'rejected';
-  request.rejectionReason = reason;
-  request.processedBy = req.user._id;
-  request.processedAt = new Date();
-  await request.save();
+      request.status = 'rejected';
+      request.rejectionReason = reason;
+      request.processedBy = req.user._id;
+      request.processedAt = new Date();
+      await request.save({ session });
 
-  const wallet = await DoctorWallet.findById(request.wallet);
-  if (!wallet) return res.status(404).json({ message: 'Wallet not found' });
+      await Payout.findOneAndUpdate(
+        { withdrawalRequest: request._id },
+        { status: 'reversed', failureReason: reason, processedAt: new Date(), processedBy: req.user._id },
+        { session }
+      );
 
-  const previousBalance = wallet.availableBalance;
-  wallet.availableBalance += request.requestedAmount;
-  wallet.withdrawalRequestedAmount = Math.max(wallet.withdrawalRequestedAmount - request.requestedAmount, 0);
-  await wallet.save();
+      const wallet = await DoctorWallet.findById(request.wallet).session(session);
+      if (!wallet) throw Object.assign(new Error('Wallet not found'), { status: 404 });
 
-  await WalletTransaction.create({
-    doctor: request.doctor,
-    wallet: wallet._id,
-    type: 'withdrawal_request',
-    amount: request.requestedAmount,
-    previousBalance,
-    newBalance: wallet.availableBalance,
-    reason: `Withdrawal rejected: ${reason}`,
-    createdBy: req.user._id,
-  });
+      const previousBalance = wallet.availableBalance;
+      wallet.availableBalance += request.requestedAmount;
+      wallet.withdrawalRequestedAmount = Math.max(wallet.withdrawalRequestedAmount - request.requestedAmount, 0);
+      await wallet.save({ session });
+
+      await WalletTransaction.create([{
+        doctor: request.doctor,
+        wallet: wallet._id,
+        type: 'withdrawal_request',
+        amount: request.requestedAmount,
+        previousBalance,
+        newBalance: wallet.availableBalance,
+        reason: `Withdrawal rejected: ${reason}`,
+        createdBy: req.user._id,
+      }], { session });
+    });
+  } finally {
+    await session.endSession();
+  }
 
   await writeAuditLog({
     req,
@@ -204,11 +267,72 @@ const rejectWithdrawal = asyncHandler(async (req, res) => {
   res.json({ message: 'Withdrawal rejected, amount returned to wallet' });
 });
 
+const markWithdrawalFailed = asyncHandler(async (req, res) => {
+  const { reason } = req.body;
+  if (!reason) return res.status(400).json({ message: 'Failure reason is required' });
+
+  const session = await mongoose.startSession();
+  let request;
+  try {
+    await session.withTransaction(async () => {
+      request = await WithdrawalRequest.findById(req.params.id).session(session);
+      if (!request) throw Object.assign(new Error('Request not found'), { status: 404 });
+      if (!['approved', 'processing'].includes(request.status)) {
+        throw Object.assign(new Error(`Cannot fail payout for status: ${request.status}`), { status: 400 });
+      }
+
+      request.status = 'failed';
+      request.rejectionReason = reason;
+      request.processedBy = req.user._id;
+      request.processedAt = new Date();
+      await request.save({ session });
+
+      await Payout.findOneAndUpdate(
+        { withdrawalRequest: request._id },
+        { status: 'failed', failureReason: reason, processedAt: new Date(), processedBy: req.user._id },
+        { session }
+      );
+
+      const wallet = await DoctorWallet.findById(request.wallet).session(session);
+      if (!wallet) throw Object.assign(new Error('Wallet not found'), { status: 404 });
+
+      const previousBalance = wallet.availableBalance;
+      wallet.availableBalance += request.requestedAmount;
+      wallet.withdrawalRequestedAmount = Math.max(wallet.withdrawalRequestedAmount - request.requestedAmount, 0);
+      await wallet.save({ session });
+
+      await WalletTransaction.create([{
+        doctor: request.doctor,
+        wallet: wallet._id,
+        type: 'payout_failed',
+        amount: request.requestedAmount,
+        previousBalance,
+        newBalance: wallet.availableBalance,
+        reason: `Payout failed: ${reason}`,
+        createdBy: req.user._id,
+      }], { session });
+    });
+  } finally {
+    await session.endSession();
+  }
+
+  await writeAuditLog({
+    req,
+    action: 'payout_failed',
+    module: 'Withdrawal',
+    recordId: request._id,
+    newValue: { reason },
+  });
+
+  res.json({ message: 'Payout marked failed, amount returned to wallet' });
+});
+
 module.exports = {
   getMyWithdrawals,
   requestWithdrawal,
   getWithdrawals,
   approveWithdrawal,
   markWithdrawalPaid,
+  markWithdrawalFailed,
   rejectWithdrawal,
 };

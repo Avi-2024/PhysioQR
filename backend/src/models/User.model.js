@@ -19,6 +19,7 @@ const userSchema = new mongoose.Schema({
   // Links to the role-specific profile
   profileRef: { type: mongoose.Schema.Types.ObjectId, refPath: 'profileModel' },
   profileModel: { type: String, enum: ['Agent', 'Doctor'] },
+  tokenVersion: { type: Number, default: 0 },
 }, { timestamps: true });
 
 // Hash password before saving

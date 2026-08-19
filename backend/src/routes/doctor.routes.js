@@ -1,13 +1,20 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
 const { protect, authorize } = require('../middlewares/auth.middleware');
 const { requireFields, validateNumberRange } = require('../middlewares/validate.middleware');
 const {
   registerDoctor, getAllDoctors, getDoctorById,
-  approveDoctor, rejectDoctor, suspendDoctor,
+  approveDoctor, rejectDoctor, requestDoctorDocuments, suspendDoctor,
   generateQrCode, disableQrCode, reactivateQrCode, updateKycAndBank,
-  getMyProfile, updateMyProfile, getMyPatients, getMyQrStats,
+  uploadKycDocument, getKycDocumentAccess, uploadMyKycDocument, getMyKycDocumentAccess,
+  getMyProfile, updateMyProfile, getMySummary, getMyPatients, getMyQrStats,
 } = require('../controllers/doctor.controller');
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
 
 router.post('/self-register', requireFields('fullName', 'mobile'), registerDoctor);
 
@@ -16,8 +23,11 @@ router.use(protect);
 // ⚠️ Static /me routes MUST come before dynamic /:id routes
 router.get('/me/profile',   authorize('doctor'), getMyProfile);
 router.put('/me/profile',   authorize('doctor'), updateMyProfile);
+router.get('/me/summary',   authorize('doctor'), getMySummary);
 router.get('/me/patients',  authorize('doctor'), getMyPatients);
 router.get('/me/qr-stats',  authorize('doctor'), getMyQrStats);
+router.post('/me/kyc-documents', authorize('doctor'), upload.single('document'), uploadMyKycDocument);
+router.get('/me/kyc-documents/:documentId/access', authorize('doctor'), getMyKycDocumentAccess);
 
 // Agent or Admin registers a doctor
 router.post('/', authorize('admin', 'agent'), requireFields('fullName', 'mobile'), registerDoctor);
@@ -35,8 +45,11 @@ router.post(
   approveDoctor
 );
 router.post('/:id/reject',         authorize('admin'), rejectDoctor);
+router.post('/:id/request-documents', authorize('admin'), requireFields('reason'), requestDoctorDocuments);
 router.post('/:id/suspend',        authorize('admin'), suspendDoctor);
 router.patch('/:id/kyc-bank',      authorize('admin'), updateKycAndBank);
+router.post('/:id/kyc-documents',  authorize('admin'), upload.single('document'), uploadKycDocument);
+router.get('/:id/kyc-documents/:documentId/access', authorize('admin'), getKycDocumentAccess);
 router.post('/:id/qr-code',        authorize('admin'), generateQrCode);
 router.post('/:id/disable-qr',     authorize('admin'), disableQrCode);
 router.post('/:id/reactivate-qr',  authorize('admin'), reactivateQrCode);

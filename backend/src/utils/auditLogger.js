@@ -12,8 +12,9 @@ const AuditLog = require('../models/AuditLog.model');
  * @param {*}      params.previousValue - value before change
  * @param {*}      params.newValue - value after change
  * @param {string} params.reason - optional reason/notes
+ * @param {object} params.metadata - optional searchable investigation context
  */
-const writeAuditLog = async ({ req, action, module, recordId, previousValue, newValue, reason }) => {
+const writeAuditLog = async ({ req, action, module, recordId, previousValue, newValue, reason, metadata }) => {
   try {
     await AuditLog.create({
       performedBy: req?.user?._id || null,
@@ -26,6 +27,11 @@ const writeAuditLog = async ({ req, action, module, recordId, previousValue, new
       reason,
       ipAddress: req?.ip,
       deviceInfo: req?.headers?.['user-agent'],
+      requestId: req?.id || req?.headers?.['x-request-id'],
+      method: req?.method,
+      path: req?.originalUrl || req?.url,
+      statusCode: req?.res?.statusCode,
+      metadata,
     });
   } catch (err) {
     // Audit log failure should never crash the main operation

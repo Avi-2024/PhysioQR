@@ -45,45 +45,128 @@ interface AdminStats {
   recentPatients: { id: string; name: string; doctor: string; programme: string; paymentStatus: string; date: string }[];
 }
 
+type ApiRecord = Record<string, unknown>;
+
+const emptyAdminStats: AdminStats = {
+  totalAgents: 0,
+  totalDoctors: 0,
+  activeDoctors: 0,
+  pendingApprovals: 0,
+  suspendedDoctors: 0,
+  totalQrScans: 0,
+  totalPatients: 0,
+  paidPatients: 0,
+  activePrograms: 0,
+  todayRevenue: 0,
+  monthlyRevenue: 0,
+  pendingPayouts: 0,
+  completedPayouts: 0,
+  totalRefunds: 0,
+  highRiskAssessments: 0,
+  openSupportTickets: 0,
+  platformRevenue: 0,
+  doctorFeeSharePayable: 0,
+  pendingDoctors: [],
+  recentPatients: [],
+};
+
+export function normalizeAdminDashboard(input: unknown = {}): AdminStats {
+  const normalizedInput = input && typeof input === 'object' ? input as Partial<AdminStats> & Record<string, unknown> : {};
+  const pendingDoctors = Array.isArray(normalizedInput.pendingDoctors) ? normalizedInput.pendingDoctors : [];
+  const recentPatients = Array.isArray(normalizedInput.recentPatients) ? normalizedInput.recentPatients : [];
+
+  return {
+    ...emptyAdminStats,
+    ...normalizedInput,
+    totalAgents: Number(normalizedInput.totalAgents ?? 0),
+    totalDoctors: Number(normalizedInput.totalDoctors ?? 0),
+    activeDoctors: Number(normalizedInput.activeDoctors ?? 0),
+    pendingApprovals: Number(normalizedInput.pendingApprovals ?? 0),
+    suspendedDoctors: Number(normalizedInput.suspendedDoctors ?? 0),
+    totalQrScans: Number(normalizedInput.totalQrScans ?? 0),
+    totalPatients: Number(normalizedInput.totalPatients ?? 0),
+    paidPatients: Number(normalizedInput.paidPatients ?? normalizedInput.totalPaidPatients ?? 0),
+    activePrograms: Number(normalizedInput.activePrograms ?? 0),
+    todayRevenue: Number(normalizedInput.todayRevenue ?? 0),
+    monthlyRevenue: Number(normalizedInput.monthlyRevenue ?? 0),
+    pendingPayouts: Number(normalizedInput.pendingPayouts ?? normalizedInput.pendingWithdrawals ?? 0),
+    completedPayouts: Number(normalizedInput.completedPayouts ?? 0),
+    totalRefunds: Number(normalizedInput.totalRefunds ?? 0),
+    highRiskAssessments: Number(normalizedInput.highRiskAssessments ?? 0),
+    openSupportTickets: Number(normalizedInput.openSupportTickets ?? normalizedInput.openTickets ?? 0),
+    platformRevenue: Number(normalizedInput.platformRevenue ?? normalizedInput.physioQrEarnings ?? 0),
+    doctorFeeSharePayable: Number(normalizedInput.doctorFeeSharePayable ?? normalizedInput.totalDoctorFeeShare ?? 0),
+    pendingDoctors: pendingDoctors as AdminStats['pendingDoctors'],
+    recentPatients: recentPatients as AdminStats['recentPatients'],
+  };
+}
+
+function extractItems(payload: unknown): ApiRecord[] {
+  if (Array.isArray(payload)) return payload as ApiRecord[];
+  if (payload && typeof payload === 'object') {
+    const record = payload as { items?: unknown; data?: unknown; docs?: unknown };
+    if (Array.isArray(record.items)) return record.items as ApiRecord[];
+    if (Array.isArray(record.data)) return record.data as ApiRecord[];
+    if (Array.isArray(record.docs)) return record.docs as ApiRecord[];
+  }
+  return [];
+}
+
+function text(value: unknown, fallback = '') {
+  if (value === undefined || value === null || value === '') return fallback;
+  return String(value);
+}
+
+function nested(record: ApiRecord, path: string) {
+  return path.split('.').reduce<unknown>((current, key) => {
+    if (!current || typeof current !== 'object') return undefined;
+    return (current as ApiRecord)[key];
+  }, record);
+}
+
+function mapPendingDoctor(record: ApiRecord): AdminStats['pendingDoctors'][number] {
+  return {
+    id: text(record._id || record.id || record.doctorId),
+    name: text(record.fullName || record.name, 'Doctor profile'),
+    specialization: text(record.specialization || record.qualification, 'Not specified'),
+    agent: text(nested(record, 'agent.fullName') || nested(record, 'assignedAgent.fullName'), 'Direct/Admin'),
+    submittedAt: text(record.submittedAt || record.createdAt, '-').slice(0, 10),
+  };
+}
+
+function mapRecentPatient(record: ApiRecord): AdminStats['recentPatients'][number] {
+  return {
+    id: text(record._id || record.id || record.patientId),
+    name: text(record.fullName || record.name, 'Patient'),
+    doctor: text(nested(record, 'referringDoctor.fullName') || nested(record, 'doctor.fullName'), 'Unassigned doctor'),
+    programme: text(nested(record, 'activeProgram.program.name') || nested(record, 'program.name') || record.painCategory, 'Program pending'),
+    paymentStatus: text(record.paymentStatus || record.lastPaymentStatus || (record.referralLocked ? 'successful' : 'pending'), 'pending'),
+    date: text(record.createdAt || record.registrationDate, '-').slice(0, 10),
+  };
+}
+
 // This screen shows the main admin operating picture and links into the core management modules.
 export default function AdminDashboardPage() {
   const navigate = useNavigate();
 
-  const { data, isLoading, isError, refetch } = useQuery<AdminStats>({
+  const { data, isError, refetch } = useQuery<AdminStats>({
     queryKey: queryKeys.adminDashboard,
-    queryFn: () => apiClient.get('/admin/dashboard').then((r) => r.data.data),
+    queryFn: () => apiClient.get('/admin/dashboard').then((r) => r.data),
   });
 
-  const stats: AdminStats = data ?? {
-    totalAgents: 8,
-    totalDoctors: 34,
-    activeDoctors: 28,
-    pendingApprovals: 4,
-    suspendedDoctors: 2,
-    totalQrScans: 1240,
-    totalPatients: 287,
-    paidPatients: 234,
-    activePrograms: 198,
-    todayRevenue: 12500,
-    monthlyRevenue: 287400,
-    pendingPayouts: 45600,
-    completedPayouts: 312000,
-    totalRefunds: 4500,
-    highRiskAssessments: 3,
-    openSupportTickets: 7,
-    platformRevenue: 112000,
-    doctorFeeSharePayable: 175400,
-    pendingDoctors: [
-      { id: 'DR004', name: 'Dr. Ananya Sen', specialization: 'Physiotherapist', agent: 'Amit Kumar', submittedAt: '2026-08-05' },
-      { id: 'DR005', name: 'Dr. Kiran Mehta', specialization: 'Orthopedic', agent: 'Suresh Verma', submittedAt: '2026-08-04' },
-      { id: 'DR006', name: 'Dr. Rahul Joshi', specialization: 'Sports Medicine', agent: 'Amit Kumar', submittedAt: '2026-08-03' },
-    ],
-    recentPatients: [
-      { id: 'PAT-101', name: 'Ramesh Gupta', doctor: 'Dr. Rajesh Sharma', programme: 'Lower Back Recovery', paymentStatus: 'successful', date: '2026-08-06' },
-      { id: 'PAT-102', name: 'Sunita Kapoor', doctor: 'Dr. Priya Patel', programme: 'Knee Strengthening', paymentStatus: 'successful', date: '2026-08-06' },
-      { id: 'PAT-103', name: 'Vikram Malhotra', doctor: 'Dr. Rajesh Sharma', programme: 'Lower Back Recovery', paymentStatus: 'pending', date: '2026-08-06' },
-    ],
-  };
+  const pendingDoctorsQuery = useQuery({
+    queryKey: ['admin-dashboard', 'pending-doctors'],
+    queryFn: () => apiClient.get('/admin/doctors', { params: { status: 'submitted', limit: 5, sortBy: 'createdAt', sortOrder: 'desc' } }).then((r) => r.data),
+  });
+
+  const recentPatientsQuery = useQuery({
+    queryKey: ['admin-dashboard', 'recent-patients'],
+    queryFn: () => apiClient.get('/admin/patients', { params: { limit: 5, sortBy: 'createdAt', sortOrder: 'desc' } }).then((r) => r.data),
+  });
+
+  const stats: AdminStats = normalizeAdminDashboard(data ?? emptyAdminStats);
+  const pendingDoctors = extractItems(pendingDoctorsQuery.data).map(mapPendingDoctor);
+  const recentPatients = extractItems(recentPatientsQuery.data).map(mapRecentPatient);
 
   const metrics = [
     { title: 'Total Agents', value: stats.totalAgents, icon: Users, tone: 'bg-sky-50 text-sky-600', href: '/admin/agents' },
@@ -98,6 +181,7 @@ export default function AdminDashboardPage() {
 
   const moduleCards = [
     { title: 'Agents', desc: 'Register clinics, follow-ups, and onboarding flow.', href: '/admin/agents' },
+    { title: 'Agent Clinic Visits', desc: 'Review field visits, follow-up outcomes, and clinic notes.', href: '/admin/clinic-visits' },
     { title: 'Doctors', desc: 'Approve doctors, assign fees, and manage QR status.', href: '/admin/doctors' },
     { title: 'Patients', desc: 'Track registrations, payments, and program access.', href: '/admin/patients' },
     { title: 'Payments', desc: 'Review collections, refunds, and transaction status.', href: '/admin/payments' },
@@ -111,7 +195,7 @@ export default function AdminDashboardPage() {
     { label: 'High-risk assessments', value: stats.highRiskAssessments, href: '/admin/risk-reviews', tone: 'text-rose-700 bg-rose-50' },
     { label: 'Pending doctor payouts', value: formatCurrency(stats.pendingPayouts), href: '/admin/withdrawals', tone: 'text-violet-700 bg-violet-50' },
     { label: 'Open support tickets', value: stats.openSupportTickets, href: '/admin/support', tone: 'text-sky-700 bg-sky-50' },
-    { label: 'Payment reconciliation checks', value: 7, href: '/admin/reconciliation', tone: 'text-teal-700 bg-teal-50' },
+    { label: 'Payment reconciliation checks', value: 0, href: '/admin/reconciliation', tone: 'text-teal-700 bg-teal-50' },
   ];
 
   const financialOverview = [
@@ -154,7 +238,7 @@ export default function AdminDashboardPage() {
 
       {isError && (
         <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-          Live dashboard data could not be loaded. Showing fallback admin metrics.
+          Live dashboard data could not be loaded. Check backend connection or refresh after signing in again.
         </div>
       )}
 
@@ -252,7 +336,12 @@ export default function AdminDashboardPage() {
             </button>
           </div>
           <div className="space-y-3">
-            {stats.pendingDoctors.map((doctor) => (
+            {!pendingDoctors.length && (
+              <div className="rounded-xl border border-neutral-100 bg-neutral-50 px-4 py-6 text-center text-sm text-neutral-500">
+                {pendingDoctorsQuery.isLoading ? 'Loading pending approvals...' : 'No pending doctor approvals found.'}
+              </div>
+            )}
+            {pendingDoctors.map((doctor) => (
               <div key={doctor.id} className="flex items-start justify-between gap-3 rounded-xl border border-neutral-100 px-4 py-3">
                 <div className="min-w-0">
                   <p className="font-medium text-neutral-900 text-sm">{doctor.name}</p>
@@ -278,7 +367,12 @@ export default function AdminDashboardPage() {
             </button>
           </div>
           <div className="space-y-3">
-            {stats.recentPatients.map((patient) => (
+            {!recentPatients.length && (
+              <div className="rounded-xl border border-neutral-100 bg-neutral-50 px-4 py-6 text-center text-sm text-neutral-500">
+                {recentPatientsQuery.isLoading ? 'Loading recent registrations...' : 'No recent patient registrations found.'}
+              </div>
+            )}
+            {recentPatients.map((patient) => (
               <div key={patient.id} className="flex items-start justify-between gap-3 rounded-xl border border-neutral-100 px-4 py-3">
                 <div className="min-w-0">
                   <p className="font-medium text-neutral-900 text-sm">{patient.name}</p>

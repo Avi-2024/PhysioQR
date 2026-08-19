@@ -11,74 +11,77 @@ import { PublicLayout } from '@/layouts/PublicLayout';
 
 // Lazy Pages
 const LoginPage = lazy(() => import('@/features/auth/pages/LoginPage'));
-const PatientQRLandingPage = lazy(() => import('@/features/patients/pages/PatientQRLandingPage'));
-const PatientRegistrationPage = lazy(() => import('@/features/patients/pages/PatientRegistrationPage'));
-const PaymentSuccessPage = lazy(() => import('@/features/payments/pages/PaymentResultPages').then(m => ({ default: m.PaymentSuccessPage })));
-const PaymentFailedPage = lazy(() => import('@/features/payments/pages/PaymentResultPages').then(m => ({ default: m.PaymentFailedPage })));
+const PatientQRLandingPage = lazy(() => import('@/features/patients/pages/registration/PatientQRLandingPage'));
+const PatientRegistrationPage = lazy(() => import('@/features/patients/pages/registration/PatientRegistrationPage'));
+const PaymentSuccessPage = lazy(() => import('@/features/payments/pages/results/PaymentSuccessPage'));
+const PaymentFailedPage = lazy(() => import('@/features/payments/pages/results/PaymentFailedPage'));
 
 // Admin Pages
 const AdminDashboardPage = lazy(() => import('@/features/admin/pages/AdminDashboardPage'));
-const AdminAgentsPage = lazy(() => import('@/features/admin/pages/AdminStubPages').then(m => ({ default: m.AdminAgentsPage })));
-const AdminAgentDetailPage = lazy(() => import('@/features/admin/pages/AdminDetailPages').then(m => ({ default: m.AdminAgentDetailWorkspacePage })));
-const AdminDoctorsPage = lazy(() => import('@/features/admin/pages/AdminStubPages').then(m => ({ default: m.AdminDoctorsPage })));
-const AdminDoctorNewPage = lazy(() => import('@/features/admin/pages/AdminDetailPages').then(m => ({ default: m.AdminDoctorCreatePage })));
-const AdminDoctorDetailPage = lazy(() => import('@/features/admin/pages/AdminDetailPages').then(m => ({ default: m.AdminDoctorDetailWorkspacePage })));
-const AdminPatientsPage = lazy(() => import('@/features/admin/pages/AdminStubPages').then(m => ({ default: m.AdminPatientsPage })));
-const AdminPatientDetailPage = lazy(() => import('@/features/admin/pages/AdminDetailPages').then(m => ({ default: m.AdminPatientDetailWorkspacePage })));
-const AdminClinicsPage = lazy(() => import('@/features/admin/pages/AdminOperationsPages').then(m => ({ default: m.AdminClinicsPage })));
-const AdminReferralsPage = lazy(() => import('@/features/admin/pages/AdminOperationsPages').then(m => ({ default: m.AdminReferralsPage })));
-const AdminAssessmentsPage = lazy(() => import('@/features/admin/pages/AdminOperationsPages').then(m => ({ default: m.AdminAssessmentsPage })));
-const AdminRiskReviewsPage = lazy(() => import('@/features/admin/pages/AdminOperationsPages').then(m => ({ default: m.AdminRiskReviewsPage })));
-const AdminPainCategoriesPage = lazy(() => import('@/features/admin/pages/AdminOperationsPages').then(m => ({ default: m.AdminPainCategoriesPage })));
-const AdminProgramsPage = lazy(() => import('@/features/admin/pages/AdminOperationsPages').then(m => ({ default: m.AdminProgramsPage })));
-const AdminExercisesPage = lazy(() => import('@/features/admin/pages/AdminOperationsPages').then(m => ({ default: m.AdminExercisesPage })));
-const AdminVideosPage = lazy(() => import('@/features/admin/pages/AdminOperationsPages').then(m => ({ default: m.AdminVideosPage })));
-const AdminOrdersPage = lazy(() => import('@/features/admin/pages/AdminOperationsPages').then(m => ({ default: m.AdminOrdersPage })));
-const AdminPaymentsPage = lazy(() => import('@/features/admin/pages/AdminStubPages').then(m => ({ default: m.AdminPaymentsPage })));
-const AdminPaymentDetailPage = lazy(() => import('@/features/admin/pages/AdminDetailPages').then(m => ({ default: m.AdminPaymentDetailWorkspacePage })));
-const AdminRefundsPage = lazy(() => import('@/features/admin/pages/AdminOperationsPages').then(m => ({ default: m.AdminRefundsPage })));
-const AdminCouponsPage = lazy(() => import('@/features/admin/pages/AdminOperationsPages').then(m => ({ default: m.AdminCouponsPage })));
-const AdminRevenueModelsPage = lazy(() => import('@/features/admin/pages/AdminOperationsPages').then(m => ({ default: m.AdminRevenueModelsPage })));
-const AdminFeeSharesPage = lazy(() => import('@/features/admin/pages/AdminOperationsPages').then(m => ({ default: m.AdminFeeSharesPage })));
-const AdminWalletsPage = lazy(() => import('@/features/admin/pages/AdminOperationsPages').then(m => ({ default: m.AdminWalletsPage })));
-const AdminWithdrawalsPage = lazy(() => import('@/features/admin/pages/AdminStubPages').then(m => ({ default: m.AdminWithdrawalsPage })));
-const AdminWithdrawalDetailPage = lazy(() => import('@/features/admin/pages/AdminDetailPages').then(m => ({ default: m.AdminWithdrawalDetailWorkspacePage })));
-const AdminPayoutsPage = lazy(() => import('@/features/admin/pages/AdminOperationsPages').then(m => ({ default: m.AdminPayoutsPage })));
-const AdminReconciliationPage = lazy(() => import('@/features/admin/pages/AdminOperationsPages').then(m => ({ default: m.AdminReconciliationPage })));
-const AdminNotificationsPage = lazy(() => import('@/features/admin/pages/AdminOperationsPages').then(m => ({ default: m.AdminNotificationsPage })));
-const AdminSupportPage = lazy(() => import('@/features/admin/pages/AdminOperationsPages').then(m => ({ default: m.AdminSupportPage })));
-const AdminSupportTicketDetailPage = lazy(() => import('@/features/admin/pages/AdminDetailPages').then(m => ({ default: m.AdminSupportTicketDetailPage })));
-const AdminReportsPage = lazy(() => import('@/features/admin/pages/AdminOperationsPages').then(m => ({ default: m.AdminReportsPage })));
-const AdminFraudRiskPage = lazy(() => import('@/features/admin/pages/AdminOperationsPages').then(m => ({ default: m.AdminFraudRiskPage })));
-const AdminAuditLogsPage = lazy(() => import('@/features/admin/pages/AdminOperationsPages').then(m => ({ default: m.AdminAuditLogsPage })));
-const AdminSettingsPage = lazy(() => import('@/features/admin/pages/AdminOperationsPages').then(m => ({ default: m.AdminSettingsPage })));
+const AdminAgentsPage = lazy(() => import('@/features/admin/pages/agents/AdminAgentsPage'));
+const AdminAgentDetailPage = lazy(() => import('@/features/admin/pages/agents/AdminAgentDetailPage'));
+const AdminDoctorsPage = lazy(() => import('@/features/admin/pages/doctors/AdminDoctorsPage'));
+const AdminDoctorNewPage = lazy(() => import('@/features/admin/pages/doctors/AdminDoctorCreatePage'));
+const AdminDoctorDetailPage = lazy(() => import('@/features/admin/pages/doctors/AdminDoctorDetailPage'));
+const AdminPatientsPage = lazy(() => import('@/features/admin/pages/patients/AdminPatientsPage'));
+const AdminPatientDetailPage = lazy(() => import('@/features/admin/pages/patients/AdminPatientDetailPage'));
+const AdminClinicVisitsPage = lazy(() => import('@/features/admin/pages/clinics/AdminClinicVisitsPage'));
+const AdminClinicsPage = lazy(() => import('@/features/admin/pages/clinics/AdminClinicsPage'));
+const AdminReferralsPage = lazy(() => import('@/features/admin/pages/clinics/AdminReferralsPage'));
+const AdminAssessmentsPage = lazy(() => import('@/features/admin/pages/assessments/AdminAssessmentsPage'));
+const AdminRiskReviewsPage = lazy(() => import('@/features/admin/pages/risk/AdminRiskReviewsPage'));
+const AdminPainCategoriesPage = lazy(() => import('@/features/admin/pages/assessments/AdminPainCategoriesPage'));
+const AdminProgramsPage = lazy(() => import('@/features/admin/pages/content/AdminProgramsPage'));
+const AdminExercisesPage = lazy(() => import('@/features/admin/pages/content/AdminExercisesPage'));
+const AdminVideosPage = lazy(() => import('@/features/admin/pages/content/AdminVideosPage'));
+const AdminOrdersPage = lazy(() => import('@/features/admin/pages/payments/AdminOrdersPage'));
+const AdminPaymentsPage = lazy(() => import('@/features/admin/pages/payments/AdminPaymentsPage'));
+const AdminPaymentDetailPage = lazy(() => import('@/features/admin/pages/payments/AdminPaymentDetailPage'));
+const AdminRefundsPage = lazy(() => import('@/features/admin/pages/payments/AdminRefundsPage'));
+const AdminCouponsPage = lazy(() => import('@/features/admin/pages/payments/AdminCouponsPage'));
+const AdminRevenueModelsPage = lazy(() => import('@/features/admin/pages/finance/AdminRevenueModelsPage'));
+const AdminFeeSharesPage = lazy(() => import('@/features/admin/pages/finance/AdminFeeSharesPage'));
+const AdminWalletsPage = lazy(() => import('@/features/admin/pages/finance/AdminWalletsPage'));
+const AdminWithdrawalsPage = lazy(() => import('@/features/admin/pages/finance/AdminWithdrawalsPage'));
+const AdminWithdrawalDetailPage = lazy(() => import('@/features/admin/pages/finance/AdminWithdrawalDetailPage'));
+const AdminPayoutsPage = lazy(() => import('@/features/admin/pages/finance/AdminPayoutsPage'));
+const AdminReconciliationPage = lazy(() => import('@/features/admin/pages/finance/AdminReconciliationPage'));
+const AdminNotificationsPage = lazy(() => import('@/features/admin/pages/notifications/AdminNotificationsPage'));
+const AdminSupportPage = lazy(() => import('@/features/admin/pages/support/AdminSupportPage'));
+const AdminSupportTicketDetailPage = lazy(() => import('@/features/admin/pages/support/AdminSupportTicketDetailPage'));
+const AdminReportsPage = lazy(() => import('@/features/admin/pages/reports/AdminReportsPage'));
+const AdminFraudRiskPage = lazy(() => import('@/features/admin/pages/risk/AdminFraudRiskPage'));
+const AdminAuditLogsPage = lazy(() => import('@/features/admin/pages/risk/AdminAuditLogsPage'));
+const AdminSettingsPage = lazy(() => import('@/features/admin/pages/settings/AdminSettingsPage'));
 
 // Agent Pages
-const AgentDashboardPage = lazy(() => import('@/features/agents/pages/AgentDashboardPage'));
-const AgentDoctorsPage = lazy(() => import('@/features/common/StubPages').then(m => ({ default: m.AgentDoctorsPage })));
-const AgentRegisterDoctorPage = lazy(() => import('@/features/agents/pages/AgentRegisterDoctorPage'));
-const AgentClinicVisitsPage = lazy(() => import('@/features/common/StubPages').then(m => ({ default: m.AgentClinicVisitsPage })));
-const AgentPerformancePage = lazy(() => import('@/features/common/StubPages').then(m => ({ default: m.AgentPerformancePage })));
+const AgentDashboardPage = lazy(() => import('@/features/agents/pages/dashboard/AgentDashboardPage'));
+const AgentDoctorsPage = lazy(() => import('@/features/agents/pages/doctors/AgentDoctorsPage'));
+const AgentRegisterDoctorPage = lazy(() => import('@/features/agents/pages/doctors/AgentRegisterDoctorPage'));
+const AgentClinicVisitsPage = lazy(() => import('@/features/agents/pages/clinic-visits/AgentClinicVisitsPage'));
+const AgentPerformancePage = lazy(() => import('@/features/agents/pages/performance/AgentPerformancePage'));
 
 // Doctor Pages
-const DoctorDashboardPage = lazy(() => import('@/features/doctors/pages/DoctorDashboardPage'));
-const DoctorPatientsPage = lazy(() => import('@/features/doctors/pages/DoctorPatientsPage'));
-const DoctorQRReferralPage = lazy(() => import('@/features/doctors/pages/DoctorQRReferralPage'));
-const DoctorEarningsPage = lazy(() => import('@/features/common/StubPages').then(m => ({ default: m.DoctorEarningsPage })));
-const DoctorWalletPage = lazy(() => import('@/features/doctors/pages/DoctorWalletPage'));
-const DoctorWithdrawalsPage = lazy(() => import('@/features/common/StubPages').then(m => ({ default: m.DoctorWithdrawalsPage })));
-const DoctorBankKYCPage = lazy(() => import('@/features/common/StubPages').then(m => ({ default: m.DoctorBankKYCPage })));
-const DoctorProfilePage = lazy(() => import('@/features/common/StubPages').then(m => ({ default: m.DoctorProfilePage })));
+const DoctorDashboardPage = lazy(() => import('@/features/doctors/pages/dashboard/DoctorDashboardPage'));
+const DoctorPatientsPage = lazy(() => import('@/features/doctors/pages/patients/DoctorPatientsPage'));
+const DoctorQRReferralPage = lazy(() => import('@/features/doctors/pages/referrals/DoctorQRReferralPage'));
+const DoctorEarningsPage = lazy(() => import('@/features/doctors/pages/earnings/DoctorEarningsPage'));
+const DoctorWalletPage = lazy(() => import('@/features/doctors/pages/wallet/DoctorWalletPage'));
+const DoctorWithdrawalsPage = lazy(() => import('@/features/doctors/pages/withdrawals/DoctorWithdrawalsPage'));
+const DoctorBankKYCPage = lazy(() => import('@/features/doctors/pages/kyc/DoctorBankKYCPage'));
+const DoctorProfilePage = lazy(() => import('@/features/doctors/pages/profile/DoctorProfilePage'));
+const DoctorSupportPage = lazy(() => import('@/features/doctors/pages/support/DoctorSupportPage'));
 
 // Patient Pages
-const PatientDashboardPage = lazy(() => import('@/features/patients/pages/PatientDashboardPage'));
-const PatientProgrammePage = lazy(() => import('@/features/common/StubPages').then(m => ({ default: m.PatientProgrammePage })));
-const ProgrammeDayPage = lazy(() => import('@/features/patients/pages/ProgrammeDayPage'));
-const PatientProgressPage = lazy(() => import('@/features/common/StubPages').then(m => ({ default: m.PatientProgressPage })));
-const PatientPaymentsPage = lazy(() => import('@/features/common/StubPages').then(m => ({ default: m.PatientPaymentsPage })));
+const PatientDashboardPage = lazy(() => import('@/features/patients/pages/dashboard/PatientDashboardPage'));
+const PatientProgrammePage = lazy(() => import('@/features/patients/pages/program/PatientProgrammePage'));
+const ProgrammeDayPage = lazy(() => import('@/features/patients/pages/program/ProgrammeDayPage'));
+const PatientProgressPage = lazy(() => import('@/features/patients/pages/progress/PatientProgressPage'));
+const PatientPaymentsPage = lazy(() => import('@/features/patients/pages/payments/PatientPaymentsPage'));
+const PatientSupportPage = lazy(() => import('@/features/patients/pages/support/PatientSupportPage'));
 
-const ForgotPasswordPage = lazy(() => import('@/features/common/StubPages').then(m => ({ default: m.ForgotPasswordPage })));
-const NotFoundPage = lazy(() => import('@/features/common/StubPages').then(m => ({ default: m.NotFoundPage })));
+const ForgotPasswordPage = lazy(() => import('@/features/common/pages/ForgotPasswordPage'));
+const NotFoundPage = lazy(() => import('@/features/common/pages/NotFoundPage'));
 const LandingPage = lazy(() => import('@/features/landing/LandingPage'));
 
 function PageLoader() {
@@ -178,6 +181,7 @@ export const router = createBrowserRouter([
       { path: 'dashboard', element: <Suspense fallback={<PageLoader />}><AdminDashboardPage /></Suspense> },
       { path: 'agents', element: <Suspense fallback={<PageLoader />}><AdminAgentsPage /></Suspense> },
       { path: 'agents/:agentId', element: <Suspense fallback={<PageLoader />}><AdminAgentDetailPage /></Suspense> },
+      { path: 'clinic-visits', element: <Suspense fallback={<PageLoader />}><AdminClinicVisitsPage /></Suspense> },
       { path: 'doctors', element: <Suspense fallback={<PageLoader />}><AdminDoctorsPage /></Suspense> },
       { path: 'doctors/new', element: <Suspense fallback={<PageLoader />}><AdminDoctorNewPage /></Suspense> },
       { path: 'doctors/:doctorId', element: <Suspense fallback={<PageLoader />}><AdminDoctorDetailPage /></Suspense> },
@@ -246,6 +250,7 @@ export const router = createBrowserRouter([
       { path: 'wallet', element: <Suspense fallback={<PageLoader />}><DoctorWalletPage /></Suspense> },
       { path: 'withdrawals', element: <Suspense fallback={<PageLoader />}><DoctorWithdrawalsPage /></Suspense> },
       { path: 'bank-kyc', element: <Suspense fallback={<PageLoader />}><DoctorBankKYCPage /></Suspense> },
+      { path: 'support', element: <Suspense fallback={<PageLoader />}><DoctorSupportPage /></Suspense> },
       { path: 'profile', element: <Suspense fallback={<PageLoader />}><DoctorProfilePage /></Suspense> },
     ],
   },
@@ -264,6 +269,7 @@ export const router = createBrowserRouter([
       { path: 'programme/day/:dayNumber', element: <Suspense fallback={<PageLoader />}><ProgrammeDayPage /></Suspense> },
       { path: 'progress', element: <Suspense fallback={<PageLoader />}><PatientProgressPage /></Suspense> },
       { path: 'payments', element: <Suspense fallback={<PageLoader />}><PatientPaymentsPage /></Suspense> },
+      { path: 'support', element: <Suspense fallback={<PageLoader />}><PatientSupportPage /></Suspense> },
     ],
   },
   {

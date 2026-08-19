@@ -1,23 +1,37 @@
 const express = require('express');
 const router = express.Router();
 const { protect, authorize } = require('../middlewares/auth.middleware');
-const { requireFields } = require('../middlewares/validate.middleware');
+const { validateSchema } = require('../middlewares/validate.middleware');
 const {
-  registerPatient, verifyPatientMobile,
-  recordConsent, getMyProgram, getMyProgress, getMyPayments,
+  registerPatient,
+  verifyPatientMobile,
+  recordConsent,
+  getOnboardingQuote,
+  getMyProgram,
+  getMyProgress,
+  getMyPayments,
 } = require('../controllers/patient.controller');
 
-// Public — patient registers via QR code (no login needed yet)
-router.post('/register', requireFields('fullName', 'mobile'), registerPatient);
-router.post('/verify-mobile', requireFields('mobile'), verifyPatientMobile);
+// Public patient registration from a doctor QR code.
+router.post('/register', validateSchema({
+  body: {
+    fullName: { type: 'string', min: 2, max: 100, required: true },
+    mobile: { type: 'mobile', required: true },
+    doctorCode: { type: 'string', min: 3, max: 40 },
+    scanId: { type: 'objectId' },
+    email: { type: 'email' },
+    city: { type: 'string', max: 80 },
+  },
+}), registerPatient);
+router.post('/verify-mobile', validateSchema({ body: { mobile: { type: 'mobile', required: true } } }), verifyPatientMobile);
 
-// Patient submits consent (SRS §13)
-router.post('/consent', requireFields('patient'), recordConsent);
-
-// Protected — patient must be logged in (via OTP token)
+// Protected patient self-service APIs require an OTP-backed patient session.
 router.use(protect);
-router.get('/me/program',   getMyProgram);
-router.get('/me/progress',  getMyProgress);
-router.get('/me/payments',  getMyPayments);
+router.use(authorize('patient'));
+router.post('/consent', recordConsent);
+router.get('/me/onboarding-quote', getOnboardingQuote);
+router.get('/me/program', getMyProgram);
+router.get('/me/progress', getMyProgress);
+router.get('/me/payments', getMyPayments);
 
 module.exports = router;
