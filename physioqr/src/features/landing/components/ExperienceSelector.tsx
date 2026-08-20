@@ -60,7 +60,8 @@ export function ExperienceSelector({ onOpenPortal }: ExperienceSelectorProps) {
                   'Clinical pain assessment questionnaire',
                   'Day-wise exercise video guidance',
                   'Clear progress percentages & hold precautions',
-                  'Online payment & digital receipts'
+                  'Online payment & digital receipts',
+                  'WhatsApp exercise reminders'
                 ].map((item, idx) => (
                   <li key={idx} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px', color: 'var(--text-primary)', fontWeight: 600 }}>
                     <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'var(--teal-100)', color: 'var(--teal-700)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -101,16 +102,15 @@ export function ExperienceSelector({ onOpenPortal }: ExperienceSelectorProps) {
               </div>
 
               <p style={{ fontSize: '15px', color: 'var(--text-secondary)', marginBottom: '24px', lineHeight: '1.6' }}>
-                Refer patients through your clinic QR code, follow referral activity, and stay informed about patient progress from one clear portal.
+                Refer patients via your unique QR code standee, track registration and programme activity, and stay connected to patient progress.
               </p>
 
               <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '32px' }}>
                 {[
                   'Unique clinic QR referral standee & link',
                   'Real-time referral & patient progress tracking',
-                  'Programme activation and progress alerts',
-                  'Simple patient referral history',
-                  'Clear clinic-level activity overview'
+                  'Payment status & programme activation alerts',
+                  'KYC verification'
                 ].map((item, idx) => (
                   <li key={idx} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px', color: 'var(--text-primary)', fontWeight: 600 }}>
                     <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'var(--bg-surface-soft)', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
