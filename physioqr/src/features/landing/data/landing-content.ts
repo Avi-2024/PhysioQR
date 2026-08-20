@@ -16,11 +16,6 @@ export const TRUST_FOUNDATION_ITEMS: TrustItem[] = [
     description: 'Day-wise rehabilitation content provides patients with a clear, guided recovery path.',
     iconName: 'ClipboardCheck',
   },
-  {
-    title: 'Transparent Workflow',
-    description: 'Referral, payment, and programme progress remain visible throughout the journey.',
-    iconName: 'LockKeyhole',
-  },
 ];
 
 export const JOURNEY_STEPS: JourneyStepItem[] = [
