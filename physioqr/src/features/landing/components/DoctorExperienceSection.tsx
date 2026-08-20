@@ -1,5 +1,5 @@
 import React from 'react';
-import { Stethoscope, QrCode, Users, CheckCircle2, ArrowRight, Wallet } from 'lucide-react';
+import { QrCode, ArrowRight } from 'lucide-react';
 import { UserRole } from '../types/landing.types';
 
 interface DoctorExperienceProps {
@@ -18,7 +18,6 @@ export function DoctorExperienceSection({ onOpenPortal }: DoctorExperienceProps)
     >
       <div className="rc-container">
         <div style={{ display: 'grid', gridTemplateColumns: '0.9fr 1.1fr', gap: '64px', alignItems: 'center', maxWidth: '1120px', margin: '0 auto' }} className="rc-dashboard-grid-2 grid-cols-1 lg:grid-cols-2">
-          {/* Left Column: Realistic Dashboard Preview (Section 41) */}
           <div
             className="rc-card"
             style={{
@@ -32,7 +31,6 @@ export function DoctorExperienceSection({ onOpenPortal }: DoctorExperienceProps)
               gap: '16px'
             }}
           >
-            {/* Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-default)', paddingBottom: '12px' }}>
               <div>
                 <span style={{ fontSize: '11px', color: 'var(--teal-600)', fontWeight: 800 }}>DOCTOR PORTAL PREVIEW</span>
@@ -45,7 +43,6 @@ export function DoctorExperienceSection({ onOpenPortal }: DoctorExperienceProps)
               </div>
             </div>
 
-            {/* 3 Metric Cards */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }} className="rc-responsive-grid-3">
               <div style={{ background: 'var(--bg-surface-soft)', padding: '10px 12px', borderRadius: '10px', border: '1px solid var(--border-soft)' }}>
                 <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 700 }}>REGISTERED</span>
@@ -63,16 +60,6 @@ export function DoctorExperienceSection({ onOpenPortal }: DoctorExperienceProps)
               </div>
             </div>
 
-            {/* Split Model Wallet Preview */}
-            <div style={{ background: 'var(--teal-50)', border: '1px solid var(--teal-200)', borderRadius: '12px', padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Wallet className="w-4 h-4 text-teal-700" />
-                <span style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--teal-900)' }}>Available Fee Share:</span>
-              </div>
-              <strong style={{ fontSize: '16px', color: 'var(--teal-800)', fontWeight: 800 }}>₹5,400</strong>
-            </div>
-
-            {/* Recent Referrals Table Preview */}
             <div>
               <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '8px', letterSpacing: '0.5px' }}>RECENT REFERRED PATIENTS</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -95,7 +82,6 @@ export function DoctorExperienceSection({ onOpenPortal }: DoctorExperienceProps)
             </div>
           </div>
 
-          {/* Right Column: Copy & Benefits */}
           <div>
             <span className="rc-eyebrow">CLINICIAN EXPERIENCE</span>
             <h2 className="rc-heading-section" style={{ marginTop: '8px', marginBottom: '16px' }}>
@@ -107,9 +93,9 @@ export function DoctorExperienceSection({ onOpenPortal }: DoctorExperienceProps)
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '32px' }}>
               {[
-                { title: 'Printable Acrylic QR Standees', desc: 'Recieve custom clinic reception QR standees for seamless patient onboarding.' },
+                { title: 'Printable Acrylic QR Standees', desc: 'Receive custom clinic reception QR standees for seamless patient onboarding.' },
                 { title: 'Real-Time Referral Attribution', desc: 'Track exactly how many patients scanned, registered, and activated their exercise programmes.' },
-                { title: 'Transparent Commercial Structure', desc: 'Clear visibility into eligible fee shares, holding release dates, and bank payouts.' },
+                { title: 'Clear Patient Progress', desc: 'See active referrals and rehabilitation progress from one straightforward clinician view.' },
               ].map((item, idx) => (
                 <div key={idx} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
                   <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'var(--teal-100)', color: 'var(--teal-700)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, flexShrink: 0 }}>
