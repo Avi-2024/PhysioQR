@@ -12,13 +12,14 @@ import {
   ReceiptText,
   RefreshCw,
   ShieldCheck,
+  Users,
   Video,
   Wallet,
 } from 'lucide-react';
 import type { AdminResourceConfig, AdminResourceKey } from './admin-resource.types';
 
 export const adminResourceModules: Record<AdminResourceKey, AdminResourceConfig> = {
-  agents: { title: 'Agents', eyebrow: 'AGENT MANAGEMENT', description: 'Live field-agent records with region, city, status, onboarding attribution, and contact details.', endpoint: '/admin/agents', icon: ShieldCheck, searchPlaceholder: 'Search agent name, mobile, email, city, or region', primaryField: 'fullName', secondaryFields: ['mobile', 'email', 'city', 'assignedRegion'], statusField: 'status', dateField: 'joiningDate', idField: 'agentId', ownerField: 'assignedRegion', createKind: 'agent', extraField: 'city', columnLabels: { record: 'Agent', owner: 'Region', status: 'Status', amount: 'City', updated: 'Joined' } },
+  agents: { title: 'Agents', eyebrow: 'AGENT MANAGEMENT', description: 'Live field-agent records with region, city, status, onboarding attribution, and contact details.', endpoint: '/admin/agents', icon: Users, searchPlaceholder: 'Search agent name, mobile, email, city, or region', primaryField: 'fullName', secondaryFields: ['mobile', 'email', 'city', 'assignedRegion'], statusField: 'status', dateField: 'joiningDate', idField: 'agentId', ownerField: 'assignedRegion', createKind: 'agent', extraField: 'city', columnLabels: { record: 'Agent', owner: 'Region', status: 'Status', amount: 'City', updated: 'Joined' } },
   clinicVisits: { title: 'Agent Clinic Visits', eyebrow: 'FIELD VISIT TRACKING', description: 'Admin view of field-agent clinic visits, follow-up outcomes, interest levels, and next actions.', endpoint: '/agents/visits', icon: ClipboardList, searchPlaceholder: 'Search agent, doctor, clinic, outcome, or follow-up note', primaryField: 'clinicName', secondaryFields: ['doctorName', 'agent.fullName', 'clinicLocation', 'outcome', 'followUpStatus'], statusField: 'followUpStatus', dateField: 'visitDate', ownerField: 'agent.fullName' },
   clinics: { title: 'Clinics', eyebrow: 'CLINIC NETWORK', description: 'Clinic records derived from approved and onboarding doctors, including location, branch, QR, and agent attribution.', endpoint: '/admin/clinics', icon: QrCode, searchPlaceholder: 'Search clinic, doctor, city, state, or agent', primaryField: 'clinicName', secondaryFields: ['clinicId', 'doctor.fullName', 'city', 'state', 'clinicContact'], statusField: 'status', dateField: 'updatedAt', ownerField: 'doctor.fullName', idField: 'clinicId' },
   referrals: { title: 'Referral Tracking', eyebrow: 'QR FUNNEL', description: 'QR scan and referral funnel records with doctor, agent, patient, registration, and payment conversion state.', endpoint: '/admin/referrals', icon: QrCode, searchPlaceholder: 'Search referral, doctor, clinic, patient, payment status', primaryField: 'referralId', secondaryFields: ['doctor.fullName', 'doctor.clinicName', 'patient.fullName', 'paymentStatus'], statusField: 'conversionStage', dateField: 'scanDate', ownerField: 'doctor.fullName', idField: 'referralId' },
