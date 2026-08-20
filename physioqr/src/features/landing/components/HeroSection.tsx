@@ -1,147 +1,136 @@
 import React from 'react';
-import { Stethoscope, ShieldCheck, ClipboardCheck, LockKeyhole, ArrowRight, QrCode, HeartPulse, CheckCircle2 } from 'lucide-react';
+import {
+  ArrowRight,
+  Check,
+  CheckCircle2,
+  Heart,
+  Play,
+  QrCode,
+} from 'lucide-react';
 import { UserRole } from '../types/landing.types';
 
 interface HeroSectionProps {
   onOpenPortal: (role?: UserRole) => void;
 }
 
+const trustItems = ['Doctor Recommended', 'Secure Payment', 'Personalised Exercises'];
+
 export function HeroSection({ onOpenPortal }: HeroSectionProps) {
+  const scrollToHowItWorks = () => {
+    document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' });
+  };
+
   return (
-    <section
-      style={{
-        background: 'linear-gradient(180deg, #FFFFFF 0%, #F2FAF8 100%)',
-        paddingTop: '64px',
-        paddingBottom: '88px',
-        borderBottom: '1px solid var(--border-default)',
-        position: 'relative',
-        overflow: 'hidden'
-      }}
-    >
-      <div className="rc-container">
-        <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: '48px', alignItems: 'center' }} className="rc-hero-grid grid-cols-1 lg:grid-cols-2">
-          {/* Left Column (55% Copy) */}
-          <div className="rc-hero-copy">
-            <div className="rc-eyebrow" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#E6F4F1', color: '#0B4F4A', padding: '4px 12px', borderRadius: '20px' }}>
-              <span>CONNECTED DIGITAL REHABILITATION</span>
+    <section className="relative overflow-hidden border-b border-[#dcebe8] bg-[linear-gradient(115deg,#f8fcfb_0%,#f5fbfa_52%,#e9f8f5_100%)] py-14 sm:py-16 lg:py-20">
+      <div className="pointer-events-none absolute right-[7%] top-[16%] h-[430px] w-[430px] rounded-full bg-[#d9f5ef]/55 blur-3xl" />
+
+      <div className="rc-container relative z-10">
+        <div className="grid items-center gap-14 lg:grid-cols-[1.08fr_0.92fr] lg:gap-16">
+          <div className="max-w-[650px]">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#d8e9e6] bg-white/80 px-3 py-1.5 text-xs font-bold text-[#178f82] shadow-sm backdrop-blur">
+              <span className="h-2.5 w-2.5 rounded-full bg-[#20b8a6] shadow-[0_0_0_4px_rgba(32,184,166,0.12)]" />
+              Digital Physiotherapy Platform
             </div>
 
-            <h1 className="rc-heading-hero" style={{ color: '#062F2E', marginTop: '16px', marginBottom: '20px' }}>
-              From doctor referral to <span style={{ color: '#14756E' }}>guided recovery</span>.
+            <h1 className="mt-7 max-w-[650px] text-[44px] font-extrabold leading-[1.08] tracking-[-0.045em] text-[#123f3b] sm:text-[54px] lg:text-[62px]">
+              Your Recovery Journey,
+              <span className="mt-1 block text-[#12a58f]">Simplified with QR</span>
             </h1>
 
-            <p className="rc-subheading" style={{ marginBottom: '32px' }}>
-              PhysioQR connects doctors and patients through one structured rehabilitation journey—from QR referral and assessment to secure payments, day-wise exercise programmes and progress tracking.
+            <p className="mt-7 max-w-[610px] text-base leading-7 text-[#66817d] sm:text-[17px]">
+              Scan your doctor&apos;s QR code, complete your assessment, make a secure payment and access personalised physiotherapy exercises anytime, anywhere.
             </p>
 
-            {/* CTAs (Section 26) */}
-            <div className="rc-hero-actions" style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '36px' }}>
-              <div className="rc-hero-action" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <button className="rc-btn-primary" onClick={() => onOpenPortal('patient')} style={{ padding: '14px 28px', fontSize: '16px' }}>
-                  <span>I'm a Patient</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-                <span style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center', fontWeight: 500 }}>
-                  Access my programme
-                </span>
-              </div>
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
+              <button
+                type="button"
+                onClick={() => onOpenPortal('patient')}
+                className="inline-flex min-h-12 items-center justify-center gap-3 rounded-xl bg-[#10aa94] px-6 py-3 text-sm font-bold text-white shadow-[0_10px_24px_rgba(16,170,148,0.2)] transition hover:-translate-y-0.5 hover:bg-[#0e9986]"
+              >
+                Scan QR &amp; Get Started
+                <ArrowRight className="h-4 w-4" />
+              </button>
 
-              <div className="rc-hero-action" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <button className="rc-btn-outline" onClick={() => onOpenPortal('doctor')} style={{ padding: '14px 28px', fontSize: '16px' }}>
-                  <span>I'm a Doctor</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-                <span style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center', fontWeight: 500 }}>
-                  Open referral portal
+              <button
+                type="button"
+                onClick={scrollToHowItWorks}
+                className="inline-flex min-h-12 items-center justify-center gap-3 rounded-xl border border-[#d8e5e3] bg-white/85 px-6 py-3 text-sm font-bold text-[#456c67] shadow-sm transition hover:border-[#bcd8d3] hover:bg-white"
+              >
+                <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-[#e6f7f3] text-[#13a48f]">
+                  <Play className="h-3.5 w-3.5 fill-current" />
                 </span>
-              </div>
+                How It Works
+              </button>
             </div>
 
-            {/* Trust Row (Section 27) */}
-            <div className="rc-hero-trust-row" style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', paddingTop: '20px', borderTop: '1px solid var(--border-default)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                <Stethoscope className="w-4 h-4 text-teal-600" />
-                <span>Doctor connected</span>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                <ShieldCheck className="w-4 h-4 text-teal-600" />
-                <span>OTP verified</span>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                <ClipboardCheck className="w-4 h-4 text-teal-600" />
-                <span>Structured programmes</span>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                <LockKeyhole className="w-4 h-4 text-teal-600" />
-                <span>Secure payments</span>
-              </div>
+            <div className="mt-8 flex flex-wrap gap-x-6 gap-y-3">
+              {trustItems.map((item) => (
+                <div key={item} className="flex items-center gap-2 text-xs font-semibold text-[#718985]">
+                  <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#dff5ef] text-[#13a48f]">
+                    <Check className="h-3 w-3 stroke-[3]" />
+                  </span>
+                  {item}
+                </div>
+              ))}
             </div>
           </div>
 
-          {/* Right Column Product Visual (Section 28) */}
-          <div style={{ position: 'relative' }}>
-            <div
-              className="rc-card rc-hero-visual-card"
-              style={{
-                background: '#FFFFFF',
-                borderRadius: 'var(--radius-showcase)',
-                border: '1.5px solid var(--border-default)',
-                padding: '28px',
-                boxShadow: 'var(--shadow-elevated)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '20px'
-              }}
-            >
-              {/* Doctor Referral Badge Card */}
-              <div className="rc-hero-referral-card" style={{ background: 'var(--teal-950)', color: '#FFFFFF', borderRadius: '14px', padding: '18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
-                  <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--teal-600)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '13px' }}>DR</div>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: '14.5px', fontWeight: 700 }}>Dr. Amit Sharma</div>
-                    <div style={{ fontSize: '11px', color: 'var(--teal-300)' }}>Sharma Orthopaedics · Ref Code: DR001</div>
-                  </div>
-                </div>
+          <div className="relative mx-auto w-full max-w-[500px] lg:mx-0 lg:justify-self-end">
+            <div className="absolute -inset-8 rounded-full bg-[#ccefe8]/45 blur-3xl" />
 
-                <div className="rc-hero-status-badge" style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(20, 184, 166, 0.2)', padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 700, color: '#14B8A6' }}>
-                  <QrCode className="w-3.5 h-3.5" />
-                  <span>QR Verified</span>
+            <div className="relative rounded-[28px] border border-white/90 bg-white/85 p-6 shadow-[0_24px_70px_rgba(30,96,86,0.13)] backdrop-blur sm:p-7">
+              <div className="text-xs font-semibold text-[#7d9994]">Welcome to</div>
+              <div className="mt-1 text-2xl font-extrabold tracking-[-0.03em] text-[#214e49]">PhysioQR</div>
+
+              <div className="mt-6 flex items-center gap-4 rounded-2xl border border-[#e0ece9] bg-[#fbfefd] p-4 shadow-[0_8px_20px_rgba(38,91,83,0.04)] sm:p-5">
+                <div className="inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-white text-[#13a48f] shadow-[0_5px_16px_rgba(31,113,101,0.12)]">
+                  <QrCode className="h-11 w-11" strokeWidth={2.2} />
+                </div>
+                <div>
+                  <div className="text-sm font-extrabold text-[#345f5a]">Scan Doctor QR</div>
+                  <div className="mt-1 text-xs text-[#8aa09d]">Start your physiotherapy program</div>
                 </div>
               </div>
 
-              {/* Connecting Stepper Indicator */}
-              <div className="rc-hero-connector" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', color: 'var(--teal-600)', fontSize: '12px', fontWeight: 700 }}>
-                <div style={{ height: '20px', width: '2px', background: 'var(--teal-500)' }}></div>
-                <span>Referral Connected → Patient Recovery</span>
-                <div style={{ height: '20px', width: '2px', background: 'var(--teal-500)' }}></div>
+              <div className="mt-4 rounded-2xl bg-[#154f48] p-4 text-white shadow-[0_10px_24px_rgba(21,79,72,0.15)]">
+                <div className="flex items-center justify-between text-xs font-semibold">
+                  <span className="text-[#d8eeea]">Your Recovery Progress</span>
+                  <span className="text-sm font-extrabold">72%</span>
+                </div>
+                <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/15">
+                  <div className="h-full w-[72%] rounded-full bg-[linear-gradient(90deg,#39d1bd,#8ce8db)]" />
+                </div>
               </div>
 
-              {/* Patient Day 5/14 Programme Active Card */}
-              <div style={{ background: 'var(--teal-50)', border: '1px solid var(--teal-200)', borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div className="rc-programme-row rc-hero-programme-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-                    <HeartPulse className="w-5 h-5 text-teal-600" />
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: '14px', fontWeight: 800, color: 'var(--teal-950)' }}>Knee Mobility Rehabilitation</div>
-                      <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>Assigned to Priya Verma · 14-Day Protocol</div>
-                    </div>
-                  </div>
-                  <span className="badge-status active rc-hero-status-badge">PROGRAMME ACTIVE</span>
+              <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-[#e3eeec] bg-white p-4">
+                <div className="min-w-0">
+                  <div className="text-[10px] font-bold uppercase tracking-wide text-[#9aadaa]">Today&apos;s Exercise</div>
+                  <div className="mt-1 truncate text-sm font-extrabold text-[#365f5a]">Lower Back Stretch</div>
+                  <div className="mt-1 text-[11px] text-[#8aa09d]">10 minutes</div>
                 </div>
+                <button type="button" onClick={() => onOpenPortal('patient')} className="rounded-lg bg-[#e0f5ef] px-4 py-2 text-xs font-extrabold text-[#149582]">
+                  Start
+                </button>
+              </div>
+            </div>
 
-                {/* Progress Bar */}
-                <div style={{ background: '#FFFFFF', padding: '12px', borderRadius: '10px', border: '1px solid var(--border-soft)' }}>
-                  <div className="rc-hero-progress-row" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                    <span style={{ color: 'var(--text-primary)' }}>Day 05 of 14</span>
-                    <span style={{ color: 'var(--teal-700)' }}>36% Completed</span>
-                  </div>
-                  <div style={{ height: '8px', background: 'var(--border-default)', borderRadius: '4px', overflow: 'hidden' }}>
-                    <div style={{ width: '36%', height: '100%', background: 'linear-gradient(90deg, #14756E, #1B8A80)' }}></div>
-                  </div>
-                </div>
+            <div className="absolute -right-4 top-5 hidden items-center gap-3 rounded-2xl border border-white bg-white/95 px-4 py-3 shadow-[0_12px_30px_rgba(27,88,79,0.12)] sm:flex lg:-right-10">
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-[#1bad98] text-white">
+                <CheckCircle2 className="h-5 w-5" />
+              </span>
+              <div>
+                <div className="text-xs font-extrabold text-[#3b615c]">Verified Program</div>
+                <div className="mt-0.5 text-[10px] text-[#91a5a2]">Designed by experts</div>
+              </div>
+            </div>
+
+            <div className="absolute -bottom-5 -left-5 hidden items-center gap-3 rounded-2xl border border-white bg-white/95 px-4 py-3 shadow-[0_12px_30px_rgba(27,88,79,0.12)] sm:flex lg:-left-16">
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-[#fff0f2] text-[#ef7180]">
+                <Heart className="h-4 w-4 fill-current" />
+              </span>
+              <div>
+                <div className="text-sm font-extrabold text-[#3b615c]">1,200+</div>
+                <div className="text-[10px] text-[#91a5a2]">Patients Helped</div>
               </div>
             </div>
           </div>
