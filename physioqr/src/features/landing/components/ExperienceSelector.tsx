@@ -17,7 +17,6 @@ export function ExperienceSelector({ onOpenPortal }: ExperienceSelectorProps) {
       }}
     >
       <div className="rc-container">
-        {/* Header */}
         <div style={{ textAlign: 'center', maxWidth: '680px', margin: '0 auto 48px auto' }}>
           <span className="rc-eyebrow">DUAL PORTAL ARCHITECTURE</span>
           <h2 className="rc-heading-section" style={{ marginTop: '8px', marginBottom: '12px' }}>
@@ -29,7 +28,6 @@ export function ExperienceSelector({ onOpenPortal }: ExperienceSelectorProps) {
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px', maxWidth: '980px', margin: '0 auto' }} className="rc-responsive-grid-2 grid-cols-1 md:grid-cols-2">
-          {/* Patient Card (Section 37) */}
           <div
             className="rc-card rc-experience-card"
             style={{
@@ -80,7 +78,6 @@ export function ExperienceSelector({ onOpenPortal }: ExperienceSelectorProps) {
             </button>
           </div>
 
-          {/* Doctor Card (Section 38) */}
           <div
             className="rc-card rc-experience-card"
             style={{
@@ -104,16 +101,16 @@ export function ExperienceSelector({ onOpenPortal }: ExperienceSelectorProps) {
               </div>
 
               <p style={{ fontSize: '15px', color: 'var(--text-secondary)', marginBottom: '24px', lineHeight: '1.6' }}>
-                Refer patients via your unique QR code standee, track registration & programme activity, and access transparent fee-share statements.
+                Refer patients through your clinic QR code, follow referral activity, and stay informed about patient progress from one clear portal.
               </p>
 
               <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '32px' }}>
                 {[
                   'Unique clinic QR referral standee & link',
                   'Real-time referral & patient progress tracking',
-                  'Payment status & programme activation alerts',
-                  'Commercial fee-share wallet & withdrawal history',
-                  'KYC verification & bank payout portal'
+                  'Programme activation and progress alerts',
+                  'Simple patient referral history',
+                  'Clear clinic-level activity overview'
                 ].map((item, idx) => (
                   <li key={idx} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px', color: 'var(--text-primary)', fontWeight: 600 }}>
                     <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'var(--bg-surface-soft)', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
