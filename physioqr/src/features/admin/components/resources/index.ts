@@ -1,3 +1,4 @@
+export { AdminResourceActionDrawer } from './AdminResourceActionDrawer';
 export { AdminResourceHeader } from './AdminResourceHeader';
 export { AdminResourceStats } from './AdminResourceStats';
 export { AdminResourceTable } from './AdminResourceTable';
