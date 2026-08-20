@@ -8,7 +8,6 @@ import { PatientExperienceSection } from './components/PatientExperienceSection'
 import { DoctorExperienceSection } from './components/DoctorExperienceSection';
 import { CapabilitiesSection } from './components/CapabilitiesSection';
 // import { RevenueModelsSection } from './components/RevenueModelsSection';
-import { ProgrammeExperienceSection } from './components/ProgrammeExperienceSection';
 import { SafetySection } from './components/SafetySection';
 import { FAQSection } from './components/FAQSection';
 import { FinalCTASection } from './components/FinalCTASection';
@@ -68,20 +67,17 @@ export function LandingPage({ onNavigateToPortal }: LandingPageProps) {
         {/* 09 Revenue Models */}
         {/* <RevenueModelsSection /> */}
 
-        {/* 10 Rehabilitation Programme Experience */}
-        <ProgrammeExperienceSection />
-
-        {/* 11 Security & Safety */}
+        {/* 10 Security & Safety */}
         <SafetySection />
 
-        {/* 12 FAQ */}
+        {/* 11 FAQ */}
         <FAQSection />
 
-        {/* 13 Final Portal CTA */}
+        {/* 12 Final Portal CTA */}
         <FinalCTASection onOpenPortal={handleOpenPortalModal} />
       </main>
 
-      {/* 14 Enterprise Footer */}
+      {/* 13 Enterprise Footer */}
       <LandingFooter onOpenPortal={handleOpenPortalModal} />
 
       {/* Portal Access Selector Modal */}
