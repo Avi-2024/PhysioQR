@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { HeartPulse, Stethoscope, X, ArrowRight, ShieldCheck, UserCheck } from 'lucide-react';
+import { HeartPulse, Stethoscope, X, ArrowRight } from 'lucide-react';
 import { UserRole } from '../types/landing.types';
 
 interface PortalAccessModalProps {
@@ -28,7 +28,6 @@ export function PortalAccessModal({ isOpen, onClose, onSelectRole }: PortalAcces
   return (
     <div className="rc-modal-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-labelledby="portal-modal-title">
       <div className="rc-modal-container" onClick={(e) => e.stopPropagation()}>
-        {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', marginBottom: '24px' }}>
           <div style={{ minWidth: 0 }}>
             <span className="rc-eyebrow">PORTAL ACCESS SELECTOR</span>
@@ -36,7 +35,7 @@ export function PortalAccessModal({ isOpen, onClose, onSelectRole }: PortalAcces
               Welcome to PhysioQR
             </h2>
             <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-              Choose how you'd like to continue your rehabilitation journey.
+              Choose the portal that matches your PhysioQR experience.
             </p>
           </div>
 
@@ -49,7 +48,6 @@ export function PortalAccessModal({ isOpen, onClose, onSelectRole }: PortalAcces
           </button>
         </div>
 
-        {/* 20. Patient Access Card */}
         <div
           className="rc-card rc-card-interactive"
           onClick={() => onSelectRole('patient')}
@@ -68,7 +66,7 @@ export function PortalAccessModal({ isOpen, onClose, onSelectRole }: PortalAcces
                 </span>
               </div>
               <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                Access your assigned rehabilitation programme, daily exercises, progress tracking, and payment receipts.
+                Access your assigned rehabilitation programme, daily exercises, progress tracking, reminders, and payment receipts.
               </p>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '12px', color: 'var(--teal-700)', fontWeight: 700, fontSize: '13.5px' }}>
                 <span>Patient Login</span>
@@ -78,11 +76,10 @@ export function PortalAccessModal({ isOpen, onClose, onSelectRole }: PortalAcces
           </div>
         </div>
 
-        {/* 21. Doctor Access Card */}
         <div
           className="rc-card rc-card-interactive"
           onClick={() => onSelectRole('doctor')}
-          style={{ marginBottom: '24px', cursor: 'pointer' }}
+          style={{ cursor: 'pointer' }}
         >
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
             <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'var(--teal-900)', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -97,7 +94,7 @@ export function PortalAccessModal({ isOpen, onClose, onSelectRole }: PortalAcces
                 </span>
               </div>
               <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                Manage patient referrals, clinic QR standees, patient activity monitoring, and fee-share payouts.
+                Manage patient referrals, clinic QR standees, KYC verification, and patient progress monitoring.
               </p>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '12px', color: 'var(--teal-600)', fontWeight: 700, fontSize: '13.5px' }}>
                 <span>Doctor Portal</span>
@@ -105,18 +102,6 @@ export function PortalAccessModal({ isOpen, onClose, onSelectRole }: PortalAcces
               </div>
             </div>
           </div>
-        </div>
-
-        {/* 22. Staff Access Footer */}
-        <div style={{ paddingTop: '16px', borderTop: '1px solid var(--border-default)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Admin or Field Agent?</span>
-          <button
-            onClick={() => onSelectRole('admin')}
-            style={{ border: 'none', background: 'transparent', color: 'var(--teal-700)', fontWeight: 700, fontSize: '13.5px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
-          >
-            <span>Staff Login</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
         </div>
       </div>
     </div>

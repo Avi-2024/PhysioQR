@@ -45,7 +45,7 @@ export function FinalCTASection({ onOpenPortal }: FinalCTAProps) {
           </h2>
 
           <p style={{ fontSize: '17px', color: 'var(--teal-900)', lineHeight: '1.6', maxWidth: '580px', fontWeight: 500 }}>
-            Select your role to open the experience designed for your rehabilitation journey or referral workflow.
+            Choose the portal that matches your PhysioQR experience and continue with a simple, guided workflow.
           </p>
         </div>
 
@@ -80,13 +80,13 @@ export function FinalCTASection({ onOpenPortal }: FinalCTAProps) {
               <span style={{ fontSize: '12px', fontWeight: 800, color: 'var(--teal-700)', letterSpacing: '0.6px', textTransform: 'uppercase' }}>PATIENT PORTAL</span>
               <h3 style={{ fontSize: 'clamp(20px, 2.4vw, 26px)', fontWeight: 800, color: 'var(--teal-950)', marginTop: '4px', marginBottom: '10px' }}>Patient Access</h3>
               <p style={{ fontSize: '14.5px', color: 'var(--text-secondary)', lineHeight: '1.6', marginBottom: '20px' }}>
-                Access your assigned rehabilitation exercise videos, daily progress tracking, and digital payment receipts.
+                Access your assigned rehabilitation videos, progress tracking, reminders, and your complete recovery programme in one place.
               </p>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px', color: 'var(--text-primary)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle2 className="w-4 h-4 text-teal-600" /> OTP-verified mobile access</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle2 className="w-4 h-4 text-teal-600" /> Day-wise exercise video guidance</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle2 className="w-4 h-4 text-teal-600" /> Direct doctor referral link</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle2 className="w-4 h-4 text-teal-600" /> WhatsApp exercise reminders</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle2 className="w-4 h-4 text-teal-600" /> One-time fee for your full program</div>
               </div>
             </div>
 

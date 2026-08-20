@@ -96,24 +96,30 @@ export const FAQ_ITEMS: FAQItem[] = [
   },
   {
     id: 'faq-4',
+    category: 'patient',
+    question: 'How does payment work for the recovery programme?',
+    answer: 'One-time secure payment unlocks your complete personalized exercise program.',
+  },
+  {
+    id: 'faq-5',
     category: 'doctor',
     question: 'How does a doctor refer patients?',
     answer: 'Approved doctors receive a high-resolution acrylic QR standee for clinic reception along with a unique digital referral link to share via WhatsApp or SMS.',
   },
   {
-    id: 'faq-5',
+    id: 'faq-6',
     category: 'doctor',
     question: 'Can doctors track their patient referrals and programme activity?',
     answer: 'Yes. Doctors log in to their Doctor Portal to monitor total referrals, active programs, and patient progress percentages in real-time.',
   },
   {
-    id: 'faq-6',
+    id: 'faq-7',
     category: 'general',
     question: 'Are exercise programmes unlocked day by day?',
     answer: 'Yes. Exercises are structured sequentially by day (Day 01, Day 02, etc.) to prevent over-exertion and ensure safe clinical progression.',
   },
   {
-    id: 'faq-7',
+    id: 'faq-8',
     category: 'general',
     question: 'What if a patient needs help or experiences discomfort?',
     answer: 'Patients can submit instant support tickets through the platform, access exercise precautions, or consult their referring doctor.',

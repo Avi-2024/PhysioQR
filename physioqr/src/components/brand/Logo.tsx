@@ -31,7 +31,7 @@ export function Logo({
         }}
       >
         <img
-          src="/PhysioQR.png"
+          src="/newlogo.jpeg"
           alt="PhysioQR logo"
           width={width}
           height={height}
