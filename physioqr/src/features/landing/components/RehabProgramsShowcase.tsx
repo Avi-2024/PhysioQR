@@ -3,19 +3,29 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 const slides = [
   {
-    src: '/rehab-showcase/pain-knee.webp',
+    src: '/ChatGPT Image Aug 20, 2026, 11_59_34 PM.png',
     alt: 'PhysioQR knee pain care programme showcase',
     label: 'Knee Pain',
   },
   {
-    src: '/rehab-showcase/pain-neck.webp',
+    src: '/ChatGPT Image Aug 21, 2026, 12_01_15 AM.png',
     alt: 'PhysioQR neck pain care programme showcase',
     label: 'Neck Pain',
   },
   {
-    src: '/rehab-showcase/pain-back.webp',
+    src: '/ChatGPT Image Aug 21, 2026, 12_02_13 AM.png',
     alt: 'PhysioQR back pain care programme showcase',
     label: 'Back Pain',
+  },
+  {
+    src: '/WhatsApp Image 2026-08-16 at 10.43.56 AM.jpeg',
+    alt: 'PhysioQR post total knee replacement day-wise rehabilitation programme',
+    label: 'Post TKR Rehab',
+  },
+  {
+    src: '/WhatsApp Image 2026-08-16 at 10.44.09 AM.jpeg',
+    alt: 'PhysioQR post knee ligament surgery day-wise rehabilitation programme',
+    label: 'Post Ligament Surgery Rehab',
   },
 ] as const;
 
@@ -47,10 +57,13 @@ export function RehabProgramsShowcase() {
   }, [isPaused]);
 
   const getSlideOffset = (index: number) => {
-    const raw = index - activeIndex;
-    if (raw > 1) return raw - slides.length;
-    if (raw < -1) return raw + slides.length;
-    return raw;
+    let offset = index - activeIndex;
+    const half = Math.floor(slides.length / 2);
+
+    if (offset > half) offset -= slides.length;
+    if (offset < -half) offset += slides.length;
+
+    return offset;
   };
 
   return (
@@ -71,7 +84,7 @@ export function RehabProgramsShowcase() {
             <span className="block text-primary-700">we have you covered</span>
           </h2>
           <p className="mx-auto mt-5 max-w-2xl text-base leading-7 text-neutral-600 sm:text-lg">
-            Explore structured physiotherapy programmes designed around common pain areas and everyday recovery goals.
+            Explore structured physiotherapy and post-surgery rehabilitation programmes designed around common pain areas and recovery goals.
           </p>
         </div>
 
@@ -148,7 +161,7 @@ export function RehabProgramsShowcase() {
           </button>
         </div>
 
-        <div className="mt-7 flex items-center justify-center gap-2.5" aria-label="Recovery programme slides">
+        <div className="mt-7 flex flex-wrap items-center justify-center gap-2.5" aria-label="Recovery programme slides">
           {slides.map((slide, index) => (
             <button
               key={slide.label}
@@ -164,7 +177,7 @@ export function RehabProgramsShowcase() {
         </div>
 
         <p className="mt-4 text-center text-sm text-neutral-500">
-          Slides advance automatically. Hover, focus, or use the controls to explore at your own pace.
+          Slides advance automatically. Hover, focus, swipe, or use the controls to explore at your own pace.
         </p>
       </div>
     </section>
