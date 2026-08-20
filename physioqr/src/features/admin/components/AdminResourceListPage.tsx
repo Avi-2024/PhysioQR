@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import {
   AdminResourceActionDrawer,
   AdminResourceHeader,
+  AdminResourceRowActions,
   AdminResourceStats,
   AdminResourceTable,
   AuditExportButton,
@@ -68,7 +69,6 @@ export function AdminResourceListPage({ moduleKey }: { moduleKey: AdminResourceK
       )}
 
       <AdminResourceTable
-        moduleKey={moduleKey}
         config={config}
         rows={rows}
         search={search}
@@ -76,8 +76,14 @@ export function AdminResourceListPage({ moduleKey }: { moduleKey: AdminResourceK
         isLoading={query.isLoading}
         isError={query.isError}
         onRetry={() => query.refetch()}
-        onDetails={(row) => setDrawer({ mode: 'details', row })}
-        onAction={(row, action, mode) => setDrawer({ mode, row, action })}
+        renderActions={(row) => (
+          <AdminResourceRowActions
+            moduleKey={moduleKey}
+            row={row}
+            onDetails={() => setDrawer({ mode: 'details', row })}
+            onAction={(action, mode) => setDrawer({ mode, row, action })}
+          />
+        )}
       />
 
       <AdminResourceActionDrawer
