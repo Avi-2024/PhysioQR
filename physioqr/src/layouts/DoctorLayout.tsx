@@ -41,7 +41,7 @@ export function DoctorLayout() {
       {/* Sidebar Desktop */}
       <aside className="hidden lg:flex w-64 bg-neutral-900 text-white flex-col fixed inset-y-0 z-30">
         <div className="h-20 flex items-center gap-4 px-6 border-b border-neutral-800">
-          <Logo width={56} height={56} withText={false} />
+          <Logo width={56} height={56}  />
           <div>
             <h1 className="font-bold text-white leading-none text-lg">Doctor Portal</h1>
           </div>
@@ -91,7 +91,7 @@ export function DoctorLayout() {
           <aside className="relative flex h-full w-[min(84vw,20rem)] flex-col bg-neutral-900 text-white shadow-2xl">
             <div className="h-16 flex items-center justify-between gap-3 px-4 border-b border-neutral-800">
               <div className="flex items-center gap-3 min-w-0">
-                <Logo width={48} height={48} withText={false} />
+                <Logo width={48} height={48}  />
                 <div className="min-w-0">
                   <h1 className="font-bold text-white leading-none text-base truncate">Doctor Portal</h1>
                 </div>

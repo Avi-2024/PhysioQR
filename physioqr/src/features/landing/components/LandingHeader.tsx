@@ -50,7 +50,7 @@ export function LandingHeader({ onOpenPortal }: LandingHeaderProps) {
         >
           {/* Logo */}
           <a href="#" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', minWidth: 0, justifySelf: 'start' }}>
-            <Logo width={210} height={60} withText={false} imageScale={2.8} />
+            <Logo width={210} height={60}  imageScale={2.8} />
           </a>
 
           {/* Desktop Navigation Links */}
