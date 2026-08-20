@@ -1,4 +1,5 @@
 export { adminResourceModules } from './admin-resource.config';
+export { useAdminResourceQuery } from './useAdminResourceQuery';
 export type {
   AdminResourceConfig,
   AdminResourceDrawerMode,
