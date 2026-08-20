@@ -3,27 +3,27 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 const slides = [
   {
-    src: '/ChatGPT Image Aug 20, 2026, 11_59_34 PM.png',
+    src: '/rehab-showcase/knee-pain.png',
     alt: 'PhysioQR knee pain care programme showcase',
     label: 'Knee Pain',
   },
   {
-    src: '/ChatGPT Image Aug 21, 2026, 12_01_15 AM.png',
+    src: '/rehab-showcase/neck-pain.png',
     alt: 'PhysioQR neck pain care programme showcase',
     label: 'Neck Pain',
   },
   {
-    src: '/ChatGPT Image Aug 21, 2026, 12_02_13 AM.png',
+    src: '/rehab-showcase/back-pain.png',
     alt: 'PhysioQR back pain care programme showcase',
     label: 'Back Pain',
   },
   {
-    src: '/WhatsApp Image 2026-08-16 at 10.43.56 AM.jpeg',
+    src: '/rehab-showcase/post-tkr-rehab.jpeg',
     alt: 'PhysioQR post total knee replacement day-wise rehabilitation programme',
     label: 'Post TKR Rehab',
   },
   {
-    src: '/WhatsApp Image 2026-08-16 at 10.44.09 AM.jpeg',
+    src: '/rehab-showcase/post-knee-ligament-rehab.jpeg',
     alt: 'PhysioQR post knee ligament surgery day-wise rehabilitation programme',
     label: 'Post Ligament Surgery Rehab',
   },
