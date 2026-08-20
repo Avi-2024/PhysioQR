@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Plus, RefreshCw } from 'lucide-react';
 import type { AdminResourceConfig } from '@/features/admin/resources';
 
@@ -16,7 +17,7 @@ export function AdminResourceHeader({
   config: AdminResourceConfig;
   onCreate?: () => void;
   onRefresh: () => void;
-  auditAction?: React.ReactNode;
+  auditAction?: ReactNode;
 }) {
   const Icon = config.icon;
 
