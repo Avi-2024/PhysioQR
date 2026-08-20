@@ -73,20 +73,6 @@ export const CAPABILITIES: CapabilityItem[] = [
     size: 'large',
     visualType: 'programme',
   },
-  {
-    title: 'Connected Field Operations',
-    description: 'Field agents onboard doctors, manage clinic desk visits, and track assigned medical networks with operational visibility.',
-    badge: 'FIELD NETWORK',
-    size: 'standard',
-    visualType: 'agent',
-  },
-  {
-    title: 'Centralised Administration',
-    description: 'PhysioQR operations remain centrally controlled through programme management, doctor onboarding, payment auditing, and clinical reporting.',
-    badge: 'ENTERPRISE CONTROL',
-    size: 'standard',
-    visualType: 'admin',
-  },
 ];
 
 export const FAQ_ITEMS: FAQItem[] = [
@@ -118,22 +104,16 @@ export const FAQ_ITEMS: FAQItem[] = [
     id: 'faq-5',
     category: 'doctor',
     question: 'Can doctors track their patient referrals and programme activity?',
-    answer: 'Yes. Doctors log in to their Doctor Portal to monitor total referrals, active programs, patient progress percentages, and commercial fee shares in real-time.',
+    answer: 'Yes. Doctors log in to their Doctor Portal to monitor total referrals, active programs, and patient progress percentages in real-time.',
   },
   {
     id: 'faq-6',
-    category: 'doctor',
-    question: 'What is the difference between Split Model and Platform Fee Model?',
-    answer: 'In the Split Model, the patient pays ₹500 online which is shared (60% doctor / 40% platform). In the Platform Fee Model, the doctor collects their clinic consultation fee separately while the patient pays only the PhysioQR platform fee online.',
-  },
-  {
-    id: 'faq-7',
     category: 'general',
     question: 'Are exercise programmes unlocked day by day?',
     answer: 'Yes. Exercises are structured sequentially by day (Day 01, Day 02, etc.) to prevent over-exertion and ensure safe clinical progression.',
   },
   {
-    id: 'faq-8',
+    id: 'faq-7',
     category: 'general',
     question: 'What if a patient needs help or experiences discomfort?',
     answer: 'Patients can submit instant support tickets through the platform, access exercise precautions, or consult their referring doctor.',
@@ -145,11 +125,6 @@ export const SAFETY_RULES: SafetyRuleItem[] = [
     title: 'Secure Account Access',
     description: 'OTP-based mobile authentication protects patient accounts without complicated passwords.',
     iconName: 'ShieldCheck',
-  },
-  {
-    title: 'Role-Based Visibility',
-    description: 'Doctors, patients, agents, and administrators access strictly scoped information appropriate to their role.',
-    iconName: 'LockKeyhole',
   },
   {
     title: 'Patient Informed Consent',

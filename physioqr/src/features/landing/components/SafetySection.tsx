@@ -1,10 +1,9 @@
 import React from 'react';
 import { SAFETY_RULES } from '../data/landing-content';
-import { ShieldCheck, LockKeyhole, FileCheck2, Bell, Shield } from 'lucide-react';
+import { ShieldCheck, FileCheck2, Bell, Shield } from 'lucide-react';
 
 const iconMap: Record<string, React.ReactNode> = {
   ShieldCheck: <ShieldCheck className="w-6 h-6 text-teal-600" />,
-  LockKeyhole: <LockKeyhole className="w-6 h-6 text-teal-600" />,
   FileCheck2: <FileCheck2 className="w-6 h-6 text-teal-600" />,
   Bell: <Bell className="w-6 h-6 text-teal-600" />,
 };
@@ -20,7 +19,6 @@ export function SafetySection() {
       }}
     >
       <div className="rc-container">
-        {/* Section Header */}
         <div style={{ textAlign: 'center', maxWidth: '700px', margin: '0 auto 56px auto' }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'var(--teal-100)', color: 'var(--teal-800)', padding: '4px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: 800, letterSpacing: '0.6px', marginBottom: '12px' }}>
             <Shield className="w-3.5 h-3.5" />
@@ -36,8 +34,7 @@ export function SafetySection() {
           </p>
         </div>
 
-        {/* 4 Safety Rule Cards Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '24px' }} className="rc-responsive-grid-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px', maxWidth: '980px', margin: '0 auto' }} className="rc-responsive-grid-3 grid-cols-1 md:grid-cols-3">
           {SAFETY_RULES.map((rule, idx) => (
             <div
               key={idx}
