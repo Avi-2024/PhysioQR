@@ -8,6 +8,7 @@ const { getDoctors } = require('../controllers/admin/doctors.controller');
 const { getClinics, getClinicById, updateClinic } = require('../controllers/admin/clinics.controller');
 const { getReferrals, getReferralById } = require('../controllers/admin/referrals.controller');
 const { getClinicVisits, getClinicVisitById } = require('../controllers/admin/clinic-visits.controller');
+const { getPatients, getPatientById, updatePatientStatus } = require('../controllers/admin/patients.controller');
 const {
   getAuditLogs,
   getAuditLogById,
@@ -16,8 +17,6 @@ const {
   getDoctorById,
   getRevenueModels,
   updateRevenueModel,
-  getPatients,
-  getPatientById,
   getPayments,
   getOrders,
   getWithdrawals,
@@ -69,6 +68,15 @@ router.patch('/clinics/:id', validateSchema({
 router.get('/referrals', getReferrals);
 router.get('/referrals/:id', getReferralById);
 
+router.get('/patients', getPatients);
+router.get('/patients/:id', getPatientById);
+router.patch('/patients/:id/status', validateSchema({
+  body: {
+    status: { type: 'enum', values: ['active', 'inactive', 'blocked'], required: true },
+    reason: { type: 'string', max: 500, required: true },
+  },
+}), updatePatientStatus);
+
 router.get('/revenue-models', getRevenueModels);
 router.patch('/revenue-models/:doctorId', validateSchema({
   params: {
@@ -88,9 +96,6 @@ router.patch('/revenue-models/:doctorId', validateSchema({
     reason: { type: 'string', max: 500 },
   },
 }), updateRevenueModel);
-
-router.get('/patients', getPatients);
-router.get('/patients/:id', getPatientById);
 
 router.get('/payments', getPayments);
 router.get('/orders', getOrders);
