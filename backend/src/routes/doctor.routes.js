@@ -4,10 +4,11 @@ const multer = require('multer');
 const { protect, authorize } = require('../middlewares/auth.middleware');
 const { requireFields, validateNumberRange } = require('../middlewares/validate.middleware');
 const { reactivateDoctor } = require('../controllers/admin/doctor-reactivation.controller');
+const { updateDoctorKycAndBank } = require('../controllers/admin/doctor-kyc.controller');
 const {
   registerDoctor, getAllDoctors, getDoctorById,
   approveDoctor, rejectDoctor, requestDoctorDocuments, suspendDoctor,
-  generateQrCode, disableQrCode, reactivateQrCode, updateKycAndBank,
+  generateQrCode, disableQrCode, reactivateQrCode,
   uploadKycDocument, getKycDocumentAccess, uploadMyKycDocument, getMyKycDocumentAccess,
   getMyProfile, updateMyProfile, getMySummary, getMyPatients, getMyQrStats,
 } = require('../controllers/doctor.controller');
@@ -49,7 +50,7 @@ router.post('/:id/reject',         authorize('admin'), rejectDoctor);
 router.post('/:id/request-documents', authorize('admin'), requireFields('reason'), requestDoctorDocuments);
 router.post('/:id/suspend',        authorize('admin'), suspendDoctor);
 router.post('/:id/reactivate',     authorize('admin'), requireFields('reason'), reactivateDoctor);
-router.patch('/:id/kyc-bank',      authorize('admin'), updateKycAndBank);
+router.patch('/:id/kyc-bank',      authorize('admin'), updateDoctorKycAndBank);
 router.post('/:id/kyc-documents',  authorize('admin'), upload.single('document'), uploadKycDocument);
 router.get('/:id/kyc-documents/:documentId/access', authorize('admin'), getKycDocumentAccess);
 router.post('/:id/qr-code',        authorize('admin'), generateQrCode);
