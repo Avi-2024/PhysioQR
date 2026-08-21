@@ -4,12 +4,9 @@ import { useNavigate } from 'react-router-dom';
 import {
   Activity,
   ArrowRight,
-  ArrowUpRight,
   Bell,
   Clock,
   CreditCard,
-  FileText,
-  LayoutDashboard,
   RefreshCw,
   ShieldAlert,
   TrendingUp,
@@ -20,7 +17,6 @@ import {
 import { queryKeys } from '@/app/query-client';
 import apiClient from '@/lib/api-client';
 import { formatCurrency } from '@/lib/formatters';
-import { cn } from '@/lib/cn';
 
 interface AdminStats {
   totalAgents: number;
@@ -30,19 +26,21 @@ interface AdminStats {
   suspendedDoctors: number;
   totalQrScans: number;
   totalPatients: number;
-  paidPatients: number;
+  uniquePaidPatients: number;
+  successfulPayments: number;
   activePrograms: number;
   todayRevenue: number;
   monthlyRevenue: number;
-  pendingPayouts: number;
+  totalDoctorFeeShare: number;
+  physioQrEarnings: number;
+  pendingWithdrawals: number;
+  pendingWithdrawalAmount: number;
   completedPayouts: number;
-  totalRefunds: number;
+  completedPayoutAmount: number;
+  refundedPayments: number;
+  totalRefundAmount: number;
   highRiskAssessments: number;
   openSupportTickets: number;
-  platformRevenue: number;
-  doctorFeeSharePayable: number;
-  pendingDoctors: { id: string; name: string; specialization: string; agent: string; submittedAt: string }[];
-  recentPatients: { id: string; name: string; doctor: string; programme: string; paymentStatus: string; date: string }[];
 }
 
 type ApiRecord = Record<string, unknown>;
@@ -55,64 +53,66 @@ const emptyAdminStats: AdminStats = {
   suspendedDoctors: 0,
   totalQrScans: 0,
   totalPatients: 0,
-  paidPatients: 0,
+  uniquePaidPatients: 0,
+  successfulPayments: 0,
   activePrograms: 0,
   todayRevenue: 0,
   monthlyRevenue: 0,
-  pendingPayouts: 0,
+  totalDoctorFeeShare: 0,
+  physioQrEarnings: 0,
+  pendingWithdrawals: 0,
+  pendingWithdrawalAmount: 0,
   completedPayouts: 0,
-  totalRefunds: 0,
+  completedPayoutAmount: 0,
+  refundedPayments: 0,
+  totalRefundAmount: 0,
   highRiskAssessments: 0,
   openSupportTickets: 0,
-  platformRevenue: 0,
-  doctorFeeSharePayable: 0,
-  pendingDoctors: [],
-  recentPatients: [],
 };
 
 export function normalizeAdminDashboard(input: unknown = {}): AdminStats {
-  const normalizedInput = input && typeof input === 'object' ? input as Partial<AdminStats> & Record<string, unknown> : {};
-  const pendingDoctors = Array.isArray(normalizedInput.pendingDoctors) ? normalizedInput.pendingDoctors : [];
-  const recentPatients = Array.isArray(normalizedInput.recentPatients) ? normalizedInput.recentPatients : [];
+  const source = input && typeof input === 'object' ? (input as Record<string, unknown>) : {};
+  const number = (key: string, fallbackKey?: string) =>
+    Number(source[key] ?? (fallbackKey ? source[fallbackKey] : undefined) ?? 0);
 
   return {
-    ...emptyAdminStats,
-    ...normalizedInput,
-    totalAgents: Number(normalizedInput.totalAgents ?? 0),
-    totalDoctors: Number(normalizedInput.totalDoctors ?? 0),
-    activeDoctors: Number(normalizedInput.activeDoctors ?? 0),
-    pendingApprovals: Number(normalizedInput.pendingApprovals ?? 0),
-    suspendedDoctors: Number(normalizedInput.suspendedDoctors ?? 0),
-    totalQrScans: Number(normalizedInput.totalQrScans ?? 0),
-    totalPatients: Number(normalizedInput.totalPatients ?? 0),
-    paidPatients: Number(normalizedInput.paidPatients ?? normalizedInput.totalPaidPatients ?? 0),
-    activePrograms: Number(normalizedInput.activePrograms ?? 0),
-    todayRevenue: Number(normalizedInput.todayRevenue ?? 0),
-    monthlyRevenue: Number(normalizedInput.monthlyRevenue ?? 0),
-    pendingPayouts: Number(normalizedInput.pendingPayouts ?? normalizedInput.pendingWithdrawals ?? 0),
-    completedPayouts: Number(normalizedInput.completedPayouts ?? 0),
-    totalRefunds: Number(normalizedInput.totalRefunds ?? 0),
-    highRiskAssessments: Number(normalizedInput.highRiskAssessments ?? 0),
-    openSupportTickets: Number(normalizedInput.openSupportTickets ?? normalizedInput.openTickets ?? 0),
-    platformRevenue: Number(normalizedInput.platformRevenue ?? normalizedInput.physioQrEarnings ?? 0),
-    doctorFeeSharePayable: Number(normalizedInput.doctorFeeSharePayable ?? normalizedInput.totalDoctorFeeShare ?? 0),
-    pendingDoctors: pendingDoctors as AdminStats['pendingDoctors'],
-    recentPatients: recentPatients as AdminStats['recentPatients'],
+    totalAgents: number('totalAgents'),
+    totalDoctors: number('totalDoctors'),
+    activeDoctors: number('activeDoctors'),
+    pendingApprovals: number('pendingApprovals'),
+    suspendedDoctors: number('suspendedDoctors'),
+    totalQrScans: number('totalQrScans'),
+    totalPatients: number('totalPatients'),
+    uniquePaidPatients: number('uniquePaidPatients', 'totalPaidPatients'),
+    successfulPayments: number('successfulPayments'),
+    activePrograms: number('activePrograms'),
+    todayRevenue: number('todayRevenue'),
+    monthlyRevenue: number('monthlyRevenue'),
+    totalDoctorFeeShare: number('totalDoctorFeeShare'),
+    physioQrEarnings: number('physioQrEarnings'),
+    pendingWithdrawals: number('pendingWithdrawals'),
+    pendingWithdrawalAmount: number('pendingWithdrawalAmount'),
+    completedPayouts: number('completedPayouts'),
+    completedPayoutAmount: number('completedPayoutAmount'),
+    refundedPayments: number('refundedPayments', 'totalRefunds'),
+    totalRefundAmount: number('totalRefundAmount'),
+    highRiskAssessments: number('highRiskAssessments'),
+    openSupportTickets: number('openSupportTickets', 'openTickets'),
   };
 }
 
 function extractItems(payload: unknown): ApiRecord[] {
   if (Array.isArray(payload)) return payload as ApiRecord[];
-  if (payload && typeof payload === 'object') {
-    const record = payload as { items?: unknown; data?: unknown; docs?: unknown };
-    if (Array.isArray(record.items)) return record.items as ApiRecord[];
-    if (Array.isArray(record.data)) return record.data as ApiRecord[];
-    if (Array.isArray(record.docs)) return record.docs as ApiRecord[];
-  }
+  if (!payload || typeof payload !== 'object') return [];
+
+  const record = payload as { items?: unknown; data?: unknown; docs?: unknown };
+  if (Array.isArray(record.items)) return record.items as ApiRecord[];
+  if (Array.isArray(record.data)) return record.data as ApiRecord[];
+  if (Array.isArray(record.docs)) return record.docs as ApiRecord[];
   return [];
 }
 
-function text(value: unknown, fallback = '') {
+function text(value: unknown, fallback = '—') {
   if (value === undefined || value === null || value === '') return fallback;
   return String(value);
 }
@@ -124,299 +124,513 @@ function nested(record: ApiRecord, path: string) {
   }, record);
 }
 
-function mapPendingDoctor(record: ApiRecord): AdminStats['pendingDoctors'][number] {
-  return {
-    id: text(record._id || record.id || record.doctorId),
-    name: text(record.fullName || record.name, 'Doctor profile'),
-    specialization: text(record.specialization || record.qualification, 'Not specified'),
-    agent: text(nested(record, 'agent.fullName') || nested(record, 'assignedAgent.fullName'), 'Direct/Admin'),
-    submittedAt: text(record.submittedAt || record.createdAt, '-').slice(0, 10),
-  };
+function formatDate(value: unknown) {
+  if (!value) return '—';
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) return '—';
+  return new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }).format(date);
 }
 
-function mapRecentPatient(record: ApiRecord): AdminStats['recentPatients'][number] {
-  return {
-    id: text(record._id || record.id || record.patientId),
-    name: text(record.fullName || record.name, 'Patient'),
-    doctor: text(nested(record, 'referringDoctor.fullName') || nested(record, 'doctor.fullName'), 'Unassigned doctor'),
-    programme: text(nested(record, 'activeProgram.program.name') || nested(record, 'program.name') || record.painCategory, 'Program pending'),
-    paymentStatus: text(record.paymentStatus || record.lastPaymentStatus || (record.referralLocked ? 'successful' : 'pending'), 'pending'),
-    date: text(record.createdAt || record.registrationDate, '-').slice(0, 10),
-  };
+function statusClasses(status: string) {
+  const value = status.toLowerCase();
+  if (['successful', 'paid', 'approved', 'active'].includes(value)) return 'bg-emerald-50 text-emerald-700 ring-emerald-600/10';
+  if (['failed', 'rejected', 'suspended', 'cancelled'].includes(value)) return 'bg-rose-50 text-rose-700 ring-rose-600/10';
+  if (['pending', 'submitted', 'under_review', 'processing'].includes(value)) return 'bg-amber-50 text-amber-700 ring-amber-600/10';
+  return 'bg-neutral-100 text-neutral-700 ring-neutral-600/10';
 }
 
-// This screen shows the main admin operating picture and links into the core management modules.
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-6 animate-pulse" aria-label="Loading admin dashboard">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <div key={index} className="h-32 rounded-2xl border border-neutral-200 bg-neutral-100" />
+        ))}
+      </div>
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="h-80 rounded-2xl border border-neutral-200 bg-neutral-100" />
+        <div className="h-80 rounded-2xl border border-neutral-200 bg-neutral-100" />
+      </div>
+    </div>
+  );
+}
+
 export default function AdminDashboardPage() {
   const navigate = useNavigate();
 
-  const { data, isError, refetch } = useQuery<AdminStats>({
+  const dashboardQuery = useQuery<AdminStats>({
     queryKey: queryKeys.adminDashboard,
-    queryFn: () => apiClient.get('/admin/dashboard').then((r) => r.data),
+    queryFn: () => apiClient.get('/admin/dashboard').then((response) => response.data),
   });
 
   const pendingDoctorsQuery = useQuery({
     queryKey: ['admin-dashboard', 'pending-doctors'],
-    queryFn: () => apiClient.get('/admin/doctors', { params: { status: 'submitted', limit: 5, sortBy: 'createdAt', sortOrder: 'desc' } }).then((r) => r.data),
+    queryFn: () =>
+      apiClient
+        .get('/admin/doctors', {
+          params: { status: 'submitted', limit: 5, sortBy: 'createdAt', sortOrder: 'desc' },
+        })
+        .then((response) => response.data),
   });
 
   const recentPatientsQuery = useQuery({
     queryKey: ['admin-dashboard', 'recent-patients'],
-    queryFn: () => apiClient.get('/admin/patients', { params: { limit: 5, sortBy: 'createdAt', sortOrder: 'desc' } }).then((r) => r.data),
+    queryFn: () =>
+      apiClient
+        .get('/admin/patients', { params: { limit: 5, sortBy: 'createdAt', sortOrder: 'desc' } })
+        .then((response) => response.data),
   });
 
-  const stats: AdminStats = normalizeAdminDashboard(data ?? emptyAdminStats);
-  const pendingDoctors = extractItems(pendingDoctorsQuery.data).map(mapPendingDoctor);
-  const recentPatients = extractItems(recentPatientsQuery.data).map(mapRecentPatient);
+  const refreshAll = () => {
+    void Promise.all([
+      dashboardQuery.refetch(),
+      pendingDoctorsQuery.refetch(),
+      recentPatientsQuery.refetch(),
+    ]);
+  };
 
-  const metrics = [
-    { title: 'Total Agents', value: stats.totalAgents, icon: Users, tone: 'bg-sky-50 text-sky-600', href: '/admin/agents' },
-    { title: 'Total Doctors', value: stats.totalDoctors, icon: UserCheck, tone: 'bg-primary-50 text-primary-600', href: '/admin/doctors' },
-    { title: 'Pending Approvals', value: stats.pendingApprovals, icon: Clock, tone: 'bg-amber-50 text-amber-600', href: '/admin/doctors?status=pending' },
-    { title: 'Suspended Doctors', value: stats.suspendedDoctors, icon: ShieldAlert, tone: 'bg-rose-50 text-rose-600', href: '/admin/doctors?status=suspended' },
-    { title: 'QR Scans', value: stats.totalQrScans, icon: Activity, tone: 'bg-teal-50 text-teal-600', href: '/admin/reports' },
-    { title: 'Paid Patients', value: stats.paidPatients, icon: CreditCard, tone: 'bg-emerald-50 text-emerald-600', href: '/admin/patients' },
-    { title: 'Monthly Revenue', value: formatCurrency(stats.monthlyRevenue), icon: TrendingUp, tone: 'bg-violet-50 text-violet-600', href: '/admin/reports' },
-    { title: 'Pending Payouts', value: formatCurrency(stats.pendingPayouts), icon: Wallet, tone: 'bg-orange-50 text-orange-600', href: '/admin/withdrawals' },
-  ];
+  if (dashboardQuery.isLoading) {
+    return (
+      <div className="min-w-0 space-y-6">
+        <PageHeader isFetching={false} onRefresh={refreshAll} />
+        <DashboardSkeleton />
+      </div>
+    );
+  }
 
-  const moduleCards = [
-    { title: 'Agents', desc: 'Register clinics, follow-ups, and onboarding flow.', href: '/admin/agents' },
-    { title: 'Agent Clinic Visits', desc: 'Review field visits, follow-up outcomes, and clinic notes.', href: '/admin/clinic-visits' },
-    { title: 'Doctors', desc: 'Approve doctors, assign fees, and manage QR status.', href: '/admin/doctors' },
-    { title: 'Patients', desc: 'Track registrations, payments, and program access.', href: '/admin/patients' },
-    { title: 'Payments', desc: 'Review collections, refunds, and transaction status.', href: '/admin/payments' },
-    { title: 'Withdrawals', desc: 'Approve doctor payout requests and settlement flow.', href: '/admin/withdrawals' },
-    { title: 'Reports', desc: 'View financial, operational, and conversion reports.', href: '/admin/reports' },
-    { title: 'Settings', desc: 'Configure platform defaults and admin controls.', href: '/admin/settings' },
+  if (dashboardQuery.isError || !dashboardQuery.data) {
+    return (
+      <div className="min-w-0 space-y-6">
+        <PageHeader isFetching={dashboardQuery.isFetching} onRefresh={refreshAll} />
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 p-6">
+          <div className="flex items-start gap-3">
+            <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-rose-600" />
+            <div>
+              <h2 className="font-semibold text-rose-900">Dashboard data is unavailable</h2>
+              <p className="mt-1 text-sm leading-6 text-rose-700">
+                No fallback business values are being shown because the live admin dashboard API could not be loaded.
+              </p>
+              <button
+                type="button"
+                onClick={refreshAll}
+                className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-lg bg-rose-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-800"
+              >
+                <RefreshCw className="h-4 w-4" /> Retry
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const stats = normalizeAdminDashboard(dashboardQuery.data);
+  const pendingDoctors = extractItems(pendingDoctorsQuery.data);
+  const recentPatients = extractItems(recentPatientsQuery.data);
+
+  const primaryMetrics = [
+    {
+      label: 'Total Doctors',
+      value: stats.totalDoctors.toLocaleString('en-IN'),
+      detail: `${stats.activeDoctors.toLocaleString('en-IN')} approved`,
+      icon: UserCheck,
+      href: '/admin/doctors',
+    },
+    {
+      label: 'Total Patients',
+      value: stats.totalPatients.toLocaleString('en-IN'),
+      detail: `${stats.uniquePaidPatients.toLocaleString('en-IN')} paid patients`,
+      icon: Users,
+      href: '/admin/patients',
+    },
+    {
+      label: 'Monthly Revenue',
+      value: formatCurrency(stats.monthlyRevenue),
+      detail: `${formatCurrency(stats.todayRevenue)} today`,
+      icon: TrendingUp,
+      href: '/admin/reports',
+    },
+    {
+      label: 'Active Programs',
+      value: stats.activePrograms.toLocaleString('en-IN'),
+      detail: `${stats.successfulPayments.toLocaleString('en-IN')} verified payments`,
+      icon: Activity,
+      href: '/admin/programs',
+    },
   ];
 
   const actionItems = [
-    { label: 'Doctors awaiting approval', value: stats.pendingApprovals, href: '/admin/doctors?status=pending', tone: 'text-amber-700 bg-amber-50' },
-    { label: 'High-risk assessments', value: stats.highRiskAssessments, href: '/admin/risk-reviews', tone: 'text-rose-700 bg-rose-50' },
-    { label: 'Pending doctor payouts', value: formatCurrency(stats.pendingPayouts), href: '/admin/withdrawals', tone: 'text-violet-700 bg-violet-50' },
-    { label: 'Open support tickets', value: stats.openSupportTickets, href: '/admin/support', tone: 'text-sky-700 bg-sky-50' },
-    { label: 'Payment reconciliation checks', value: 0, href: '/admin/reconciliation', tone: 'text-teal-700 bg-teal-50' },
+    {
+      label: 'Doctor approvals',
+      value: stats.pendingApprovals.toLocaleString('en-IN'),
+      description: 'Submitted doctors waiting for admin review',
+      href: '/admin/doctors?status=submitted',
+      icon: Clock,
+      tone: 'bg-amber-50 text-amber-700',
+    },
+    {
+      label: 'High-risk assessments',
+      value: stats.highRiskAssessments.toLocaleString('en-IN'),
+      description: 'Assessments requiring manual safety review',
+      href: '/admin/risk-reviews',
+      icon: ShieldAlert,
+      tone: 'bg-rose-50 text-rose-700',
+    },
+    {
+      label: 'Open withdrawals',
+      value: stats.pendingWithdrawals.toLocaleString('en-IN'),
+      description: `${formatCurrency(stats.pendingWithdrawalAmount)} requested`,
+      href: '/admin/withdrawals',
+      icon: Wallet,
+      tone: 'bg-violet-50 text-violet-700',
+    },
+    {
+      label: 'Open support tickets',
+      value: stats.openSupportTickets.toLocaleString('en-IN'),
+      description: 'Open, in-progress, waiting, and reopened tickets',
+      href: '/admin/support',
+      icon: Bell,
+      tone: 'bg-sky-50 text-sky-700',
+    },
   ];
 
-  const financialOverview = [
-    { label: "Today's Collection", value: formatCurrency(stats.todayRevenue) },
-    { label: 'This Month', value: formatCurrency(stats.monthlyRevenue) },
-    { label: 'Doctor Fee Share', value: formatCurrency(stats.doctorFeeSharePayable) },
-    { label: 'PhysioQR Revenue', value: formatCurrency(stats.platformRevenue) },
-    { label: 'Refunds', value: formatCurrency(stats.totalRefunds) },
-    { label: 'Pending Payouts', value: formatCurrency(stats.pendingPayouts) },
+  const financialItems = [
+    { label: "Today's collection", value: formatCurrency(stats.todayRevenue) },
+    { label: 'This month', value: formatCurrency(stats.monthlyRevenue) },
+    { label: 'Doctor fee share', value: formatCurrency(stats.totalDoctorFeeShare) },
+    { label: 'PhysioQR earnings', value: formatCurrency(stats.physioQrEarnings) },
+    { label: 'Completed refunds', value: formatCurrency(stats.totalRefundAmount) },
+    { label: 'Completed payouts', value: formatCurrency(stats.completedPayoutAmount) },
   ];
 
-  const referralFunnel = [
-    { label: 'QR Scanned', value: stats.totalQrScans },
-    { label: 'Registered', value: stats.totalPatients },
-    { label: 'Paid', value: stats.paidPatients },
-    { label: 'Program Active', value: stats.activePrograms },
+  const funnelItems = [
+    { label: 'QR scans', value: stats.totalQrScans },
+    { label: 'Registered patients', value: stats.totalPatients },
+    { label: 'Paid patients', value: stats.uniquePaidPatients },
+    { label: 'Active programs', value: stats.activePrograms },
   ];
 
   return (
-    <div className="space-y-6 min-w-0">
-      <div className="flex items-start justify-between flex-wrap gap-3">
-        <div className="min-w-0">
-          <div className="inline-flex items-center gap-2 rounded-full bg-teal-50 px-3 py-1 text-[11px] font-extrabold tracking-[0.08em] text-teal-700">
-            <LayoutDashboard className="h-3.5 w-3.5" />
-            ADMIN COMMAND CENTRE
-          </div>
-          <h1 className="mt-3 text-2xl sm:text-3xl font-bold text-neutral-900">Admin Dashboard</h1>
-          <p className="mt-1 text-sm text-neutral-500">Platform overview for doctors, agents, patients, payments, payouts, and support.</p>
-        </div>
+    <div className="min-w-0 space-y-6">
+      <PageHeader isFetching={dashboardQuery.isFetching} onRefresh={refreshAll} />
 
-        <div className="flex w-full sm:w-auto flex-col sm:flex-row items-stretch sm:items-center gap-2">
-          <button onClick={() => refetch()} className="flex min-h-11 items-center justify-center gap-2 px-4 py-2.5 border border-neutral-300 text-neutral-700 text-sm font-medium rounded-lg hover:bg-neutral-50 transition-colors">
-            <RefreshCw className="w-4 h-4" /> Refresh
-          </button>
-          <button onClick={() => navigate('/admin/doctors/new')} className="flex min-h-11 items-center justify-center gap-2 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold rounded-lg transition-colors">
-            <ArrowUpRight className="w-4 h-4" /> New Doctor
-          </button>
-        </div>
-      </div>
-
-      {isError && (
-        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-          Live dashboard data could not be loaded. Check backend connection or refresh after signing in again.
-        </div>
-      )}
-
-      {stats.pendingApprovals > 0 && (
-        <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-          <Bell className="w-5 h-5 text-amber-600 flex-shrink-0" />
-          <p className="text-sm text-amber-900 font-medium">
-            {stats.pendingApprovals} doctor approvals are waiting.{' '}
-            <button onClick={() => navigate('/admin/doctors?status=pending')} className="underline font-semibold">
-              Review queue
-            </button>
-          </p>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        {metrics.map((metric) => (
-          <button key={metric.title} onClick={() => navigate(metric.href)} className="card p-4 sm:p-5 text-left min-w-0 hover:shadow-card-hover transition-shadow">
-            <div className={cn('w-11 h-11 rounded-xl flex items-center justify-center mb-3', metric.tone)}>
-              <metric.icon className="w-5 h-5" />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {primaryMetrics.map((metric) => (
+          <button
+            key={metric.label}
+            type="button"
+            onClick={() => navigate(metric.href)}
+            className="group rounded-2xl border border-neutral-200 bg-white p-5 text-left transition hover:border-primary-200 hover:shadow-sm focus:outline-none focus-visible:ring-4 focus-visible:ring-primary-100"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-neutral-500">{metric.label}</p>
+                <p className="mt-2 break-words text-2xl font-bold tracking-tight text-neutral-950">{metric.value}</p>
+                <p className="mt-1 text-xs text-neutral-500">{metric.detail}</p>
+              </div>
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-700">
+                <metric.icon className="h-5 w-5" />
+              </div>
             </div>
-            <div className="text-2xl font-bold text-neutral-900 break-words">{metric.value}</div>
-            <div className="mt-1 text-sm font-medium text-neutral-600">{metric.title}</div>
           </button>
         ))}
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
-        <section className="card p-5 min-w-0">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h2 className="font-semibold text-neutral-900">Action Required</h2>
-              <p className="text-sm text-neutral-500">Priority operational queues that need admin attention.</p>
-            </div>
-            <Bell className="h-5 w-5 text-neutral-400" />
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <section className="rounded-2xl border border-neutral-200 bg-white">
+          <div className="border-b border-neutral-200 px-5 py-4 sm:px-6">
+            <h2 className="font-semibold text-neutral-950">Action required</h2>
+            <p className="mt-1 text-sm text-neutral-500">Queues that need an admin decision or follow-up.</p>
           </div>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          <div className="divide-y divide-neutral-100">
             {actionItems.map((item) => (
               <button
                 key={item.label}
+                type="button"
                 onClick={() => navigate(item.href)}
-                className="flex items-center justify-between gap-3 rounded-lg border border-neutral-200 bg-white px-4 py-3 text-left hover:border-primary-200 hover:bg-primary-50/40"
+                className="flex w-full items-center gap-4 px-5 py-4 text-left transition hover:bg-neutral-50 sm:px-6"
               >
-                <span className="text-sm font-semibold text-neutral-800">{item.label}</span>
-                <span className={cn('rounded-full px-2.5 py-1 text-xs font-bold', item.tone)}>{item.value}</span>
+                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${item.tone}`}>
+                  <item.icon className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <p className="font-medium text-neutral-900">{item.label}</p>
+                    <p className="text-lg font-bold text-neutral-950">{item.value}</p>
+                  </div>
+                  <p className="mt-0.5 text-xs text-neutral-500">{item.description}</p>
+                </div>
+                <ArrowRight className="h-4 w-4 shrink-0 text-neutral-400" />
               </button>
             ))}
           </div>
         </section>
 
-        <section className="card p-5 min-w-0">
-          <h2 className="font-semibold text-neutral-900">Financial Overview</h2>
-          <p className="text-sm text-neutral-500">Ledger-facing values from payments, fee share, refunds, and payouts.</p>
-          <div className="mt-5 grid grid-cols-2 gap-3">
-            {financialOverview.map((item) => (
-              <div key={item.label} className="rounded-lg border border-neutral-200 bg-neutral-50 p-3">
-                <div className="text-xs font-semibold text-neutral-500">{item.label}</div>
-                <div className="mt-1 text-base font-bold text-neutral-900">{item.value}</div>
+        <section className="rounded-2xl border border-neutral-200 bg-white p-5 sm:p-6">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="font-semibold text-neutral-950">Financial overview</h2>
+              <p className="mt-1 text-sm text-neutral-500">Verified backend totals.</p>
+            </div>
+            <CreditCard className="h-5 w-5 text-neutral-400" />
+          </div>
+          <dl className="mt-5 divide-y divide-neutral-100">
+            {financialItems.map((item) => (
+              <div key={item.label} className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0">
+                <dt className="text-sm text-neutral-500">{item.label}</dt>
+                <dd className="text-sm font-semibold text-neutral-950">{item.value}</dd>
               </div>
             ))}
-          </div>
+          </dl>
         </section>
       </div>
 
-      <section className="card p-5 min-w-0">
-        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+      <section className="rounded-2xl border border-neutral-200 bg-white p-5 sm:p-6">
+        <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h2 className="font-semibold text-neutral-900">Referral Funnel</h2>
-            <p className="text-sm text-neutral-500">QR scan to active programme conversion snapshot.</p>
+            <h2 className="font-semibold text-neutral-950">Referral and program flow</h2>
+            <p className="mt-1 text-sm text-neutral-500">Operational counts from QR scan through active rehabilitation access.</p>
           </div>
-          <button onClick={() => navigate('/admin/referrals')} className="text-sm font-semibold text-primary-700">
-            Open referral tracking
+          <button type="button" onClick={() => navigate('/admin/referrals')} className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary-700 hover:text-primary-800">
+            View referrals <ArrowRight className="h-4 w-4" />
           </button>
         </div>
-        <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-4">
-          {referralFunnel.map((step, index) => (
-            <div key={step.label} className="relative rounded-lg border border-neutral-200 bg-white p-4">
-              <div className="text-xs font-bold uppercase tracking-wide text-neutral-400">Step {index + 1}</div>
-              <div className="mt-2 text-2xl font-bold text-neutral-900">{step.value}</div>
-              <div className="mt-1 text-sm font-semibold text-neutral-600">{step.label}</div>
+        <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {funnelItems.map((item, index) => (
+            <div key={item.label} className="relative rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">{item.label}</p>
+              <p className="mt-2 text-2xl font-bold text-neutral-950">{item.value.toLocaleString('en-IN')}</p>
+              {index < funnelItems.length - 1 && (
+                <ArrowRight className="absolute -right-2 top-1/2 hidden h-4 w-4 -translate-y-1/2 text-neutral-300 lg:block" />
+              )}
             </div>
           ))}
         </div>
       </section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <section className="card p-5 min-w-0">
-          <div className="flex items-center justify-between gap-3 mb-4">
-            <div>
-              <h2 className="font-semibold text-neutral-900">Pending Doctor Approvals</h2>
-              <p className="text-sm text-neutral-500">Review submitted doctor profiles before QR activation.</p>
+      <div className="grid gap-6 xl:grid-cols-2">
+        <DashboardTableShell
+          title="Doctors awaiting approval"
+          description="Latest submitted doctor profiles. Approval actions stay on the doctor detail page."
+          actionLabel="View all"
+          onAction={() => navigate('/admin/doctors?status=submitted')}
+        >
+          {pendingDoctorsQuery.isLoading ? (
+            <TableLoading />
+          ) : pendingDoctorsQuery.isError ? (
+            <TableMessage message="Doctor approval queue could not be loaded." />
+          ) : pendingDoctors.length === 0 ? (
+            <TableMessage message="No submitted doctors are waiting for approval." />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-neutral-200 text-sm">
+                <thead className="bg-neutral-50">
+                  <tr>
+                    <TableHead>Doctor</TableHead>
+                    <TableHead>Specialization</TableHead>
+                    <TableHead>Agent</TableHead>
+                    <TableHead>Submitted</TableHead>
+                    <TableHead align="right">Action</TableHead>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-100 bg-white">
+                  {pendingDoctors.map((record) => {
+                    const id = text(record.doctorId || record.id || record._id, '');
+                    return (
+                      <tr key={id || text(record._id)} className="hover:bg-neutral-50/70">
+                        <TableCell strong>{text(record.fullName || record.name)}</TableCell>
+                        <TableCell>{text(record.specialization || record.qualification)}</TableCell>
+                        <TableCell>{text(nested(record, 'agent.fullName'), 'Direct/Admin')}</TableCell>
+                        <TableCell>{formatDate(record.submittedAt || record.createdAt)}</TableCell>
+                        <TableCell align="right">
+                          <button
+                            type="button"
+                            disabled={!id}
+                            onClick={() => id && navigate(`/admin/doctors/${id}`)}
+                            className="inline-flex items-center gap-1 text-sm font-semibold text-primary-700 hover:text-primary-800 disabled:cursor-not-allowed disabled:text-neutral-400"
+                          >
+                            Review <ArrowRight className="h-3.5 w-3.5" />
+                          </button>
+                        </TableCell>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
-            <button onClick={() => navigate('/admin/doctors?status=pending')} className="text-sm text-primary-600 hover:text-primary-700 font-medium">
-              View all
-            </button>
-          </div>
-          <div className="space-y-3">
-            {!pendingDoctors.length && (
-              <div className="rounded-xl border border-neutral-100 bg-neutral-50 px-4 py-6 text-center text-sm text-neutral-500">
-                {pendingDoctorsQuery.isLoading ? 'Loading pending approvals...' : 'No pending doctor approvals found.'}
-              </div>
-            )}
-            {pendingDoctors.map((doctor) => (
-              <div key={doctor.id} className="flex items-start justify-between gap-3 rounded-xl border border-neutral-100 px-4 py-3">
-                <div className="min-w-0">
-                  <p className="font-medium text-neutral-900 text-sm">{doctor.name}</p>
-                  <p className="text-xs text-neutral-500">{doctor.specialization} - Via {doctor.agent}</p>
-                  <p className="text-xs text-neutral-400 mt-1">Submitted {doctor.submittedAt}</p>
-                </div>
-                <button onClick={() => navigate(`/admin/doctors/${doctor.id}`)} className="rounded-lg bg-primary-50 px-3 py-1.5 text-xs font-semibold text-primary-700 hover:bg-primary-100">
-                  Review
-                </button>
-              </div>
-            ))}
-          </div>
-        </section>
+          )}
+        </DashboardTableShell>
 
-        <section className="card p-5 min-w-0">
-          <div className="flex items-center justify-between gap-3 mb-4">
-            <div>
-              <h2 className="font-semibold text-neutral-900">Recent Registrations</h2>
-              <p className="text-sm text-neutral-500">Latest patient registrations and payment status.</p>
+        <DashboardTableShell
+          title="Recent patients"
+          description="Latest patient registrations from the live patient API."
+          actionLabel="View all"
+          onAction={() => navigate('/admin/patients')}
+        >
+          {recentPatientsQuery.isLoading ? (
+            <TableLoading />
+          ) : recentPatientsQuery.isError ? (
+            <TableMessage message="Recent patients could not be loaded." />
+          ) : recentPatients.length === 0 ? (
+            <TableMessage message="No patient registrations are available yet." />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-neutral-200 text-sm">
+                <thead className="bg-neutral-50">
+                  <tr>
+                    <TableHead>Patient</TableHead>
+                    <TableHead>Doctor</TableHead>
+                    <TableHead>Payment</TableHead>
+                    <TableHead>Registered</TableHead>
+                    <TableHead align="right">Action</TableHead>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-100 bg-white">
+                  {recentPatients.map((record) => {
+                    const id = text(record.patientId || record.id || record._id, '');
+                    const paymentStatus = text(record.paymentStatus || record.lastPaymentStatus);
+                    return (
+                      <tr key={id || text(record._id)} className="hover:bg-neutral-50/70">
+                        <TableCell strong>{text(record.fullName || record.name)}</TableCell>
+                        <TableCell>{text(nested(record, 'referringDoctor.fullName') || nested(record, 'doctor.fullName'))}</TableCell>
+                        <TableCell>
+                          {paymentStatus === '—' ? (
+                            <span className="text-neutral-400">—</span>
+                          ) : (
+                            <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ring-1 ring-inset ${statusClasses(paymentStatus)}`}>
+                              {paymentStatus.replaceAll('_', ' ')}
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell>{formatDate(record.registrationDate || record.createdAt)}</TableCell>
+                        <TableCell align="right">
+                          <button
+                            type="button"
+                            disabled={!id}
+                            onClick={() => id && navigate(`/admin/patients/${id}`)}
+                            className="inline-flex items-center gap-1 text-sm font-semibold text-primary-700 hover:text-primary-800 disabled:cursor-not-allowed disabled:text-neutral-400"
+                          >
+                            View <ArrowRight className="h-3.5 w-3.5" />
+                          </button>
+                        </TableCell>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
-            <button onClick={() => navigate('/admin/patients')} className="text-sm text-primary-600 hover:text-primary-700 font-medium">
-              View all
-            </button>
-          </div>
-          <div className="space-y-3">
-            {!recentPatients.length && (
-              <div className="rounded-xl border border-neutral-100 bg-neutral-50 px-4 py-6 text-center text-sm text-neutral-500">
-                {recentPatientsQuery.isLoading ? 'Loading recent registrations...' : 'No recent patient registrations found.'}
-              </div>
-            )}
-            {recentPatients.map((patient) => (
-              <div key={patient.id} className="flex items-start justify-between gap-3 rounded-xl border border-neutral-100 px-4 py-3">
-                <div className="min-w-0">
-                  <p className="font-medium text-neutral-900 text-sm">{patient.name}</p>
-                  <p className="text-xs text-neutral-500">{patient.programme} - {patient.doctor}</p>
-                  <p className="text-xs text-neutral-400 mt-1">{patient.date}</p>
-                </div>
-                <span
-                  className={cn(
-                    'px-2 py-1 rounded-full text-xs font-semibold',
-                    patient.paymentStatus === 'successful' ? 'bg-success-100 text-success-700' : 'bg-warning-100 text-warning-700'
-                  )}
-                >
-                  {patient.paymentStatus === 'successful' ? 'Paid' : 'Pending'}
-                </span>
-              </div>
-            ))}
-          </div>
-        </section>
+          )}
+        </DashboardTableShell>
       </div>
 
-      <section className="card p-5 min-w-0">
-        <div className="flex items-center justify-between gap-3 mb-4">
-          <div>
-            <h2 className="font-semibold text-neutral-900">Admin Modules</h2>
-            <p className="text-sm text-neutral-500">Main entry points for the phase-1 admin build.</p>
-          </div>
-          <FileText className="w-5 h-5 text-neutral-400" />
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-          {moduleCards.map((module) => (
-            <button
-              key={module.title}
-              onClick={() => navigate(module.href)}
-              className="rounded-xl border border-neutral-200 bg-white p-4 text-left hover:border-primary-200 hover:bg-primary-50/40 transition-colors"
-            >
-              <div className="font-semibold text-neutral-900">{module.title}</div>
-              <div className="mt-1 text-sm text-neutral-500">{module.desc}</div>
-              <div className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-primary-600">
-                Open <ArrowRight className="h-3.5 w-3.5" />
-              </div>
-            </button>
-          ))}
-        </div>
-      </section>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <CompactStat label="Agents" value={stats.totalAgents} onClick={() => navigate('/admin/agents')} />
+        <CompactStat label="Suspended doctors" value={stats.suspendedDoctors} onClick={() => navigate('/admin/doctors?status=suspended')} />
+        <CompactStat label="Refunded payments" value={stats.refundedPayments} onClick={() => navigate('/admin/refunds')} />
+        <CompactStat label="Completed payouts" value={stats.completedPayouts} onClick={() => navigate('/admin/payouts')} />
+      </div>
     </div>
+  );
+}
+
+function PageHeader({ isFetching, onRefresh }: { isFetching: boolean; onRefresh: () => void }) {
+  return (
+    <div className="flex flex-wrap items-start justify-between gap-4">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight text-neutral-950 sm:text-3xl">Admin Dashboard</h1>
+        <p className="mt-1 max-w-2xl text-sm leading-6 text-neutral-500">
+          Live operational and financial overview of the PhysioQR platform.
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={onRefresh}
+        disabled={isFetching}
+        className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-neutral-300 bg-white px-3.5 py-2 text-sm font-semibold text-neutral-700 transition hover:bg-neutral-50 disabled:cursor-wait disabled:opacity-60"
+      >
+        <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+        Refresh
+      </button>
+    </div>
+  );
+}
+
+function DashboardTableShell({
+  title,
+  description,
+  actionLabel,
+  onAction,
+  children,
+}: {
+  title: string;
+  description: string;
+  actionLabel: string;
+  onAction: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="overflow-hidden rounded-2xl border border-neutral-200 bg-white">
+      <div className="flex items-start justify-between gap-4 border-b border-neutral-200 px-5 py-4 sm:px-6">
+        <div>
+          <h2 className="font-semibold text-neutral-950">{title}</h2>
+          <p className="mt-1 text-sm text-neutral-500">{description}</p>
+        </div>
+        <button type="button" onClick={onAction} className="shrink-0 text-sm font-semibold text-primary-700 hover:text-primary-800">
+          {actionLabel}
+        </button>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function TableHead({ children, align = 'left' }: { children: React.ReactNode; align?: 'left' | 'right' }) {
+  return (
+    <th className={`whitespace-nowrap px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500 ${align === 'right' ? 'text-right' : 'text-left'}`}>
+      {children}
+    </th>
+  );
+}
+
+function TableCell({
+  children,
+  align = 'left',
+  strong = false,
+}: {
+  children: React.ReactNode;
+  align?: 'left' | 'right';
+  strong?: boolean;
+}) {
+  return (
+    <td className={`whitespace-nowrap px-4 py-3.5 ${align === 'right' ? 'text-right' : 'text-left'} ${strong ? 'font-medium text-neutral-900' : 'text-neutral-600'}`}>
+      {children}
+    </td>
+  );
+}
+
+function TableLoading() {
+  return (
+    <div className="space-y-3 p-5 sm:p-6">
+      {Array.from({ length: 4 }).map((_, index) => (
+        <div key={index} className="h-10 animate-pulse rounded-lg bg-neutral-100" />
+      ))}
+    </div>
+  );
+}
+
+function TableMessage({ message }: { message: string }) {
+  return <div className="px-5 py-10 text-center text-sm text-neutral-500 sm:px-6">{message}</div>;
+}
+
+function CompactStat({ label, value, onClick }: { label: string; value: number; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-xl border border-neutral-200 bg-white px-4 py-3 text-left transition hover:border-primary-200 hover:bg-primary-50/30"
+    >
+      <p className="text-xs font-medium text-neutral-500">{label}</p>
+      <p className="mt-1 text-xl font-bold text-neutral-950">{value.toLocaleString('en-IN')}</p>
+    </button>
   );
 }
