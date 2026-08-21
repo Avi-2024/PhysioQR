@@ -6,6 +6,8 @@ const { writeAuditLog } = require('../../utils/auditLogger');
 const { getPagination } = require('../../utils/queryHelpers');
 const asyncHandler = require('../../utils/asyncHandler');
 
+const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 const normalize = (category, counts = {}) => ({
   ...category,
   id: category._id,
@@ -22,7 +24,7 @@ const getPainCategories = asyncHandler(async (req, res) => {
   if (req.query.status === 'active') filter.isActive = true;
   if (req.query.status === 'inactive') filter.isActive = false;
   if (req.query.search) {
-    const regex = new RegExp(String(req.query.search).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+    const regex = new RegExp(escapeRegex(req.query.search), 'i');
     filter.$or = [{ name: regex }, { nameHindi: regex }, { description: regex }];
   }
 
@@ -72,21 +74,27 @@ const getPainCategoryById = asyncHandler(async (req, res) => {
     PatientAssessment.countDocuments({ painCategory: category._id }),
   ]);
 
-  res.json(normalize(category, {
+  const data = normalize(category, {
     linkedQuestions: questions.length,
     activeQuestions: questions.filter((item) => item.isActive).length,
     linkedPrograms: programs.length,
     activePrograms: programs.filter((item) => item.isActive).length,
     assessmentUsage,
-  }) |> ((data) => ({ ...data, questions, programs })));
+  });
+  res.json({ ...data, questions, programs });
 });
 
 const createPainCategory = asyncHandler(async (req, res) => {
   const name = String(req.body.name || '').trim();
   if (!name) return res.status(400).json({ message: 'Category name is required' });
-  const duplicate = await PainCategory.findOne({ name: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') });
+  const duplicate = await PainCategory.findOne({ name: new RegExp(`^${escapeRegex(name)}$`, 'i') });
   if (duplicate) return res.status(409).json({ message: 'A pain category with this name already exists' });
-  const category = await PainCategory.create({ name, nameHindi: String(req.body.nameHindi || '').trim(), description: String(req.body.description || '').trim(), isActive: true });
+  const category = await PainCategory.create({
+    name,
+    nameHindi: String(req.body.nameHindi || '').trim(),
+    description: String(req.body.description || '').trim(),
+    isActive: true,
+  });
   await writeAuditLog({ req, action: 'pain_category_created', module: 'PainCategory', recordId: category._id, newValue: category });
   res.status(201).json(category);
 });
@@ -98,7 +106,7 @@ const updatePainCategory = asyncHandler(async (req, res) => {
   if (req.body.name !== undefined) {
     const name = String(req.body.name).trim();
     if (!name) return res.status(400).json({ message: 'Category name cannot be empty' });
-    const duplicate = await PainCategory.findOne({ _id: { $ne: category._id }, name: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') });
+    const duplicate = await PainCategory.findOne({ _id: { $ne: category._id }, name: new RegExp(`^${escapeRegex(name)}$`, 'i') });
     if (duplicate) return res.status(409).json({ message: 'A pain category with this name already exists' });
     category.name = name;
   }
@@ -119,7 +127,15 @@ const setPainCategoryStatus = asyncHandler(async (req, res) => {
   const previousValue = { isActive: category.isActive };
   category.isActive = isActive;
   await category.save();
-  await writeAuditLog({ req, action: isActive ? 'pain_category_reactivated' : 'pain_category_deactivated', module: 'PainCategory', recordId: category._id, previousValue, newValue: { isActive }, reason });
+  await writeAuditLog({
+    req,
+    action: isActive ? 'pain_category_reactivated' : 'pain_category_deactivated',
+    module: 'PainCategory',
+    recordId: category._id,
+    previousValue,
+    newValue: { isActive },
+    reason,
+  });
   res.json(category);
 });
 
