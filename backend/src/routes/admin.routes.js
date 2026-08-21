@@ -3,11 +3,11 @@ const router = express.Router();
 const { protect, authorize } = require('../middlewares/auth.middleware');
 const { requireFields, validateSchema } = require('../middlewares/validate.middleware');
 const { getDashboard } = require('../controllers/admin/dashboard.controller');
+const { getAgents } = require('../controllers/admin/agents.controller');
 const {
   getAuditLogs,
   getAuditLogById,
   exportAuditLogs,
-  getAgents,
   getAgentById,
   getDoctors,
   getDoctorById,
