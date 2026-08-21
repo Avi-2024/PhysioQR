@@ -4,12 +4,12 @@ const { protect, authorize } = require('../middlewares/auth.middleware');
 const { requireFields, validateSchema } = require('../middlewares/validate.middleware');
 const { getDashboard } = require('../controllers/admin/dashboard.controller');
 const { getAgents } = require('../controllers/admin/agents.controller');
+const { getDoctors } = require('../controllers/admin/doctors.controller');
 const {
   getAuditLogs,
   getAuditLogById,
   exportAuditLogs,
   getAgentById,
-  getDoctors,
   getDoctorById,
   getClinics,
   getReferrals,
