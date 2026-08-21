@@ -13,6 +13,7 @@ const AdminDoctorDetailPage = lazy(() => import('@/features/admin/pages/doctors/
 const AdminPatientsPage = lazy(() => import('@/features/admin/pages/patients/AdminPatientsPage'));
 const AdminPatientDetailPage = lazy(() => import('@/features/admin/pages/patients/AdminPatientDetailPage'));
 const AdminClinicVisitsPage = lazy(() => import('@/features/admin/pages/clinics/AdminClinicVisitsPage'));
+const AdminClinicVisitDetailPage = lazy(() => import('@/features/admin/pages/clinics/AdminClinicVisitDetailPage'));
 const AdminClinicsPage = lazy(() => import('@/features/admin/pages/clinics/AdminClinicsPage'));
 const AdminClinicDetailPage = lazy(() => import('@/features/admin/pages/clinics/AdminClinicDetailPage'));
 const AdminReferralsPage = lazy(() => import('@/features/admin/pages/clinics/AdminReferralsPage'));
@@ -58,6 +59,7 @@ export const adminRoutes: RouteObject = {
     { path: 'agents', element: withSuspense(<AdminAgentsPage />) },
     { path: 'agents/:agentId', element: withSuspense(<AdminAgentDetailPage />) },
     { path: 'clinic-visits', element: withSuspense(<AdminClinicVisitsPage />) },
+    { path: 'clinic-visits/:visitId', element: withSuspense(<AdminClinicVisitDetailPage />) },
     { path: 'doctors', element: withSuspense(<AdminDoctorsPage />) },
     { path: 'doctors/new', element: withSuspense(<AdminDoctorNewPage />) },
     { path: 'doctors/:doctorId', element: withSuspense(<AdminDoctorDetailPage />) },
