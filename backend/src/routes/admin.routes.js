@@ -10,6 +10,14 @@ const { getReferrals, getReferralById } = require('../controllers/admin/referral
 const { getClinicVisits, getClinicVisitById } = require('../controllers/admin/clinic-visits.controller');
 const { getPatients, getPatientById, updatePatientStatus } = require('../controllers/admin/patients.controller');
 const {
+  getAssessmentQuestions,
+  getAssessmentQuestionById,
+  createAssessmentQuestion,
+  updateAssessmentQuestion,
+  deactivateAssessmentQuestion,
+  reactivateAssessmentQuestion,
+} = require('../controllers/admin/assessment-questions.controller');
+const {
   getAuditLogs,
   getAuditLogById,
   exportAuditLogs,
@@ -76,6 +84,24 @@ router.patch('/patients/:id/status', validateSchema({
     reason: { type: 'string', max: 500, required: true },
   },
 }), updatePatientStatus);
+
+router.get('/assessment-questions', getAssessmentQuestions);
+router.get('/assessment-questions/:id', getAssessmentQuestionById);
+router.post('/assessment-questions', validateSchema({
+  body: {
+    questionText: { type: 'string', max: 1000, required: true },
+    questionTextHindi: { type: 'string', max: 1000 },
+    questionType: { type: 'enum', values: ['single_choice', 'multiple_choice', 'yes_no', 'pain_scale', 'number', 'text', 'date', 'image'], required: true },
+    painCategory: { type: 'objectId' },
+    isRedFlag: { type: 'boolean' },
+    redFlagOperator: { type: 'enum', values: ['any_answer', 'equals', 'not_equals', 'includes', 'gte', 'lte', 'between'] },
+    redFlagSafetyMessage: { type: 'string', max: 1000 },
+    displayOrder: { type: 'number', min: 0, max: 100000 },
+  },
+}), createAssessmentQuestion);
+router.patch('/assessment-questions/:id', updateAssessmentQuestion);
+router.post('/assessment-questions/:id/deactivate', validateSchema({ body: { reason: { type: 'string', max: 500, required: true } } }), deactivateAssessmentQuestion);
+router.post('/assessment-questions/:id/reactivate', validateSchema({ body: { reason: { type: 'string', max: 500, required: true } } }), reactivateAssessmentQuestion);
 
 router.get('/revenue-models', getRevenueModels);
 router.patch('/revenue-models/:doctorId', validateSchema({
