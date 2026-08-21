@@ -11,6 +11,7 @@ import {
   MapPin,
   QrCode,
   RefreshCw,
+  RotateCcw,
   ShieldCheck,
   Stethoscope,
   UserRoundCheck,
@@ -125,6 +126,7 @@ type ActionType =
   | 'request-documents'
   | 'reject'
   | 'suspend'
+  | 'reactivate-doctor'
   | 'kyc-bank'
   | 'generate-qr'
   | 'disable-qr'
@@ -144,7 +146,7 @@ const text = (value?: string | number | null, fallback = '—') => {
   return String(value);
 };
 
-const humanize = (value?: string) => text(value, '—').replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+const humanize = (value?: string) => text(value, '—').replace(/_/g, ' ').replace(/-/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 
 const maskSensitive = (value?: string) => {
   if (!value) return '—';
@@ -225,6 +227,7 @@ export default function AdminDoctorDetailPage() {
       if (action === 'request-documents') return apiClient.post(`/doctors/${id}/request-documents`, { reason });
       if (action === 'reject') return apiClient.post(`/doctors/${id}/reject`, { reason });
       if (action === 'suspend') return apiClient.post(`/doctors/${id}/suspend`, { reason });
+      if (action === 'reactivate-doctor') return apiClient.post(`/doctors/${id}/reactivate`, { reason });
       if (action === 'generate-qr') return apiClient.post(`/doctors/${id}/qr-code`);
       if (action === 'disable-qr') return apiClient.post(`/doctors/${id}/disable-qr`);
       if (action === 'reactivate-qr') return apiClient.post(`/doctors/${id}/reactivate-qr`);
@@ -243,7 +246,14 @@ export default function AdminDoctorDetailPage() {
       }
     },
     onSuccess: async () => {
-      setSuccessMessage('Doctor record updated successfully.');
+      const message = action === 'approve'
+        ? 'Doctor approved. Login, wallet and referral QR are now enabled.'
+        : action === 'suspend'
+          ? 'Doctor suspended. Portal access and QR referrals are disabled.'
+          : action === 'reactivate-doctor'
+            ? 'Doctor reactivated successfully.'
+            : 'Doctor record updated successfully.';
+      setSuccessMessage(message);
       setAction(null);
       await queryClient.invalidateQueries({ queryKey: ['admin-doctor-detail', doctorId] });
       await queryClient.invalidateQueries({ queryKey: ['admin-doctors'] });
@@ -272,6 +282,7 @@ export default function AdminDoctorDetailPage() {
 
   const canReview = ['submitted', 'under_review', 'documents_required'].includes(doctor.status);
   const canSuspend = doctor.status === 'approved';
+  const canReactivate = doctor.status === 'suspended';
   const canOperateQr = doctor.status === 'approved';
   const location = [doctor.city, doctor.state].filter(Boolean).join(', ') || 'Location not provided';
 
@@ -361,9 +372,10 @@ export default function AdminDoctorDetailPage() {
 
         <aside className="space-y-4 xl:sticky xl:top-5">
           <section className="overflow-hidden rounded-xl border border-neutral-200 bg-white">
-            <div className="border-b border-neutral-100 bg-neutral-50/60 px-4 py-4"><h2 className="text-sm font-bold text-neutral-950">Review actions</h2><p className="mt-1 text-xs text-neutral-500">Actions below call protected backend APIs and refresh this record after success.</p></div>
+            <div className="border-b border-neutral-100 bg-neutral-50/60 px-4 py-4"><h2 className="text-sm font-bold text-neutral-950">Review actions</h2><p className="mt-1 text-xs text-neutral-500">Only actions valid for the doctor’s current backend state are shown.</p></div>
             <div className="space-y-2 p-4">
               {canReview && <button type="button" onClick={() => setAction('approve')} className="flex w-full items-center gap-3 rounded-xl bg-primary-600 px-4 py-3 text-left text-sm font-semibold text-white hover:bg-primary-700"><CheckCircle2 className="h-4 w-4" />Approve doctor</button>}
+              {canReactivate && <button type="button" onClick={() => setAction('reactivate-doctor')} className="flex w-full items-center gap-3 rounded-xl bg-primary-600 px-4 py-3 text-left text-sm font-semibold text-white hover:bg-primary-700"><RotateCcw className="h-4 w-4" />Reactivate doctor</button>}
               <button type="button" onClick={() => setAction('kyc-bank')} className="flex w-full items-center gap-3 rounded-xl border border-neutral-200 px-4 py-3 text-left text-sm font-semibold text-neutral-700 hover:bg-neutral-50"><Landmark className="h-4 w-4" />Update KYC / bank</button>
               {canReview && <button type="button" onClick={() => setAction('request-documents')} className="flex w-full items-center gap-3 rounded-xl border border-neutral-200 px-4 py-3 text-left text-sm font-semibold text-neutral-700 hover:bg-neutral-50"><FileWarning className="h-4 w-4" />Request documents</button>}
               {canOperateQr && <button type="button" onClick={() => setAction(doctor.qrCodeActive ? 'disable-qr' : doctor.qrCodeUrl ? 'reactivate-qr' : 'generate-qr')} className="flex w-full items-center gap-3 rounded-xl border border-neutral-200 px-4 py-3 text-left text-sm font-semibold text-neutral-700 hover:bg-neutral-50"><QrCode className="h-4 w-4" />{doctor.qrCodeActive ? 'Disable QR' : doctor.qrCodeUrl ? 'Reactivate QR' : 'Generate QR'}</button>}
@@ -382,9 +394,10 @@ export default function AdminDoctorDetailPage() {
 
       <Modal isOpen={Boolean(action)} onClose={() => !mutation.isPending && setAction(null)} title={action ? humanize(action) : undefined} size="lg">
         <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); mutation.mutate(new FormData(event.currentTarget)); }}>
-          {action === 'approve' && <div className="grid gap-4 sm:grid-cols-2"><Field name="approvedPatientFee" label="Approved patient fee" type="number" defaultValue={doctor.approvedPatientFee ?? doctor.requestedPatientFee ?? 0} /><Field name="feeSharePercentage" label="Fee share %" type="number" defaultValue={doctor.feeSharePercentage ?? 0} /><Field name="feeShareHoldingDays" label="Holding days" type="number" defaultValue={doctor.feeShareHoldingDays ?? 15} /><SelectField name="revenueModel" label="Revenue model" defaultValue={doctor.revenueModel ?? 'split'} options={[['split', 'Split'], ['platform_fee', 'Platform fee']]} /><SelectField name="feeShareType" label="Fee share type" defaultValue={doctor.feeShareType ?? 'percentage'} options={[['percentage', 'Percentage'], ['fixed', 'Fixed'], ['slab', 'Slab']]} /><Field name="fixedFeeShareAmount" label="Fixed share amount" type="number" defaultValue={doctor.fixedFeeShareAmount ?? 0} /></div>}
+          {action === 'approve' && <><div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">Approval creates/enables the doctor login, creates the wallet and automatically generates an active referral QR on the backend.</div><div className="grid gap-4 sm:grid-cols-2"><Field name="approvedPatientFee" label="Approved patient fee" type="number" defaultValue={doctor.approvedPatientFee ?? doctor.requestedPatientFee ?? 0} /><Field name="feeSharePercentage" label="Fee share %" type="number" defaultValue={doctor.feeSharePercentage ?? 0} /><Field name="feeShareHoldingDays" label="Holding days" type="number" defaultValue={doctor.feeShareHoldingDays ?? 15} /><SelectField name="revenueModel" label="Revenue model" defaultValue={doctor.revenueModel ?? 'split'} options={[['split', 'Split'], ['platform_fee', 'Platform fee']]} /><SelectField name="feeShareType" label="Fee share type" defaultValue={doctor.feeShareType ?? 'percentage'} options={[['percentage', 'Percentage'], ['fixed', 'Fixed'], ['slab', 'Slab']]} /><Field name="fixedFeeShareAmount" label="Fixed share amount" type="number" defaultValue={doctor.fixedFeeShareAmount ?? 0} /></div></>}
           {action === 'kyc-bank' && <div className="grid gap-4 sm:grid-cols-2"><SelectField name="kycStatus" label="KYC status" defaultValue={doctor.kycStatus ?? 'pending'} options={[['pending', 'Pending'], ['submitted', 'Submitted'], ['approved', 'Approved'], ['rejected', 'Rejected']]} /><SelectField name="bankVerified" label="Bank verified" defaultValue={doctor.bankVerified ? 'true' : 'false'} options={[['false', 'No'], ['true', 'Yes']]} /><Field name="bankAccountHolder" label="Account holder" defaultValue={doctor.bankAccountHolder ?? ''} /><Field name="bankName" label="Bank name" defaultValue={doctor.bankName ?? ''} /><Field name="branchName" label="Branch" defaultValue={doctor.branchName ?? ''} /><Field name="ifscCode" label="IFSC" defaultValue={doctor.ifscCode ?? ''} /><Field name="upiId" label="UPI ID" defaultValue={doctor.upiId ?? ''} /><Field name="bankAccountNumber" label="Replace account number" placeholder="Leave blank to keep current" /></div>}
-          {['request-documents', 'reject', 'suspend'].includes(action ?? '') && <label className="block"><span className="text-sm font-semibold text-neutral-700">Reason / admin note <span className="text-rose-500">*</span></span><textarea name="reason" required className="mt-2 min-h-28 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100" placeholder="Enter a clear reason for the audit trail" /></label>}
+          {['request-documents', 'reject', 'suspend', 'reactivate-doctor'].includes(action ?? '') && <label className="block"><span className="text-sm font-semibold text-neutral-700">Reason / admin note <span className="text-rose-500">*</span></span><textarea name="reason" required className="mt-2 min-h-28 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100" placeholder="Enter a clear reason for the audit trail" /></label>}
+          {action === 'reactivate-doctor' && <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-4 text-sm text-neutral-700">Reactivation restores the doctor to <strong>Approved</strong>, enables portal login, and re-enables the existing referral QR when one already exists.</div>}
           {['generate-qr', 'disable-qr', 'reactivate-qr'].includes(action ?? '') && <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-4 text-sm text-neutral-700">This action will update referral QR availability for <strong>{doctor.fullName}</strong>.</div>}
           {mutation.isError && <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">{(mutation.error as any)?.response?.data?.message || 'The backend could not complete this action.'}</div>}
           <div className="flex justify-end gap-2"><button type="button" onClick={() => setAction(null)} disabled={mutation.isPending} className="rounded-lg border border-neutral-300 px-4 py-2.5 text-sm font-semibold text-neutral-700">Cancel</button><button type="submit" disabled={mutation.isPending} className={cn('rounded-lg px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60', ['reject', 'suspend', 'disable-qr'].includes(action ?? '') ? 'bg-rose-600 hover:bg-rose-700' : 'bg-primary-600 hover:bg-primary-700')}>{mutation.isPending ? 'Processing…' : 'Confirm action'}</button></div>
