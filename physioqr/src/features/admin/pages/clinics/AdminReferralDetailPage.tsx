@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, BadgeIndianRupee, ExternalLink, LockKeyhole, QrCode, RefreshCw, Stethoscope, UserRound, Users } from 'lucide-react';
+import { ArrowLeft, ExternalLink, LockKeyhole, QrCode, RefreshCw, Stethoscope, UserRound, Users } from 'lucide-react';
 import apiClient from '@/lib/api-client';
 import ErrorState from '@/components/feedback/ErrorState';
 import { Skeleton } from '@/components/ui/Skeleton';
