@@ -5,13 +5,13 @@ const { requireFields, validateSchema } = require('../middlewares/validate.middl
 const { getDashboard } = require('../controllers/admin/dashboard.controller');
 const { getAgents } = require('../controllers/admin/agents.controller');
 const { getDoctors } = require('../controllers/admin/doctors.controller');
+const { getClinics, getClinicById, updateClinic } = require('../controllers/admin/clinics.controller');
 const {
   getAuditLogs,
   getAuditLogById,
   exportAuditLogs,
   getAgentById,
   getDoctorById,
-  getClinics,
   getReferrals,
   getRevenueModels,
   updateRevenueModel,
@@ -46,6 +46,22 @@ router.get('/doctors', getDoctors);
 router.get('/doctors/:id', getDoctorById);
 
 router.get('/clinics', getClinics);
+router.get('/clinics/:id', getClinicById);
+router.patch('/clinics/:id', validateSchema({
+  body: {
+    clinicName: { type: 'string', max: 160 },
+    clinicAddress: { type: 'string', max: 500 },
+    city: { type: 'string', max: 100 },
+    state: { type: 'string', max: 100 },
+    postalCode: { type: 'string', max: 20 },
+    clinicContact: { type: 'string', max: 30 },
+    clinicEmail: { type: 'string', max: 160 },
+    clinicWorkingHours: { type: 'string', max: 200 },
+    googleMapsLink: { type: 'string', max: 1000 },
+    clinicBranches: { type: 'number', min: 1, max: 1000 },
+  },
+}), updateClinic);
+
 router.get('/referrals', getReferrals);
 router.get('/revenue-models', getRevenueModels);
 router.patch('/revenue-models/:doctorId', validateSchema({
