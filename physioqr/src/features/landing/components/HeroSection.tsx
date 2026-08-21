@@ -4,7 +4,6 @@ import {
   Check,
   CheckCircle2,
   Heart,
-  Play,
   QrCode,
 } from 'lucide-react';
 import { UserRole } from '../types/landing.types';
@@ -13,7 +12,7 @@ interface HeroSectionProps {
   onOpenPortal: (role?: UserRole) => void;
 }
 
-const trustItems = ['Doctor Recommended', 'Secure Payment', 'Personalised Exercises'];
+const trustItems = ['Secure & private', 'WhatsApp reminders', 'Progress tracked'];
 
 export function HeroSection({ onOpenPortal }: HeroSectionProps) {
   const scrollToHowItWorks = () => {
@@ -29,37 +28,25 @@ export function HeroSection({ onOpenPortal }: HeroSectionProps) {
           <div className="max-w-[650px]">
             <div className="inline-flex items-center gap-2 rounded-full border border-[#d8e9e6] bg-white/80 px-3 py-1.5 text-xs font-bold text-[#178f82] shadow-sm backdrop-blur">
               <span className="h-2.5 w-2.5 rounded-full bg-[#20b8a6] shadow-[0_0_0_4px_rgba(32,184,166,0.12)]" />
-              Digital Physiotherapy Platform
+              QR-based physiotherapy platform
             </div>
 
             <h1 className="mt-7 max-w-[650px] text-[44px] font-extrabold leading-[1.08] tracking-[-0.045em] text-[#123f3b] sm:text-[54px] lg:text-[62px]">
-              Your Recovery Journey,
-              <span className="mt-1 block text-[#12a58f]">Simplified with QR</span>
+              Recover faster with a plan designed by your doctor.
             </h1>
 
             <p className="mt-7 max-w-[610px] text-base leading-7 text-[#66817d] sm:text-[17px]">
-              Scan your doctor&apos;s QR code, complete your assessment, make a secure payment and access personalised physiotherapy exercises anytime, anywhere.
+              Scan your doctor&apos;s QR code, complete a quick assessment, and unlock a personalized video-based recovery program.
             </p>
 
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="mt-8">
               <button
                 type="button"
                 onClick={() => onOpenPortal('patient')}
                 className="inline-flex min-h-12 items-center justify-center gap-3 rounded-xl bg-[#10aa94] px-6 py-3 text-sm font-bold text-white shadow-[0_10px_24px_rgba(16,170,148,0.2)] transition hover:-translate-y-0.5 hover:bg-[#0e9986]"
               >
-                Scan QR &amp; Get Started
+                Start Your Recovery
                 <ArrowRight className="h-4 w-4" />
-              </button>
-
-              <button
-                type="button"
-                onClick={scrollToHowItWorks}
-                className="inline-flex min-h-12 items-center justify-center gap-3 rounded-xl border border-[#d8e5e3] bg-white/85 px-6 py-3 text-sm font-bold text-[#456c67] shadow-sm transition hover:border-[#bcd8d3] hover:bg-white"
-              >
-                <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-[#e6f7f3] text-[#13a48f]">
-                  <Play className="h-3.5 w-3.5 fill-current" />
-                </span>
-                How It Works
               </button>
             </div>
 

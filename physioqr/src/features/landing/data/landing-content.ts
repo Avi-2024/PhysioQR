@@ -16,11 +16,6 @@ export const TRUST_FOUNDATION_ITEMS: TrustItem[] = [
     description: 'Day-wise rehabilitation content provides patients with a clear, guided recovery path.',
     iconName: 'ClipboardCheck',
   },
-  {
-    title: 'Transparent Workflow',
-    description: 'Referral, payment, and programme progress remain visible throughout the journey.',
-    iconName: 'LockKeyhole',
-  },
 ];
 
 export const JOURNEY_STEPS: JourneyStepItem[] = [
@@ -78,20 +73,6 @@ export const CAPABILITIES: CapabilityItem[] = [
     size: 'large',
     visualType: 'programme',
   },
-  {
-    title: 'Connected Field Operations',
-    description: 'Field agents onboard doctors, manage clinic desk visits, and track assigned medical networks with operational visibility.',
-    badge: 'FIELD NETWORK',
-    size: 'standard',
-    visualType: 'agent',
-  },
-  {
-    title: 'Centralised Administration',
-    description: 'PhysioQR operations remain centrally controlled through programme management, doctor onboarding, payment auditing, and clinical reporting.',
-    badge: 'ENTERPRISE CONTROL',
-    size: 'standard',
-    visualType: 'admin',
-  },
 ];
 
 export const FAQ_ITEMS: FAQItem[] = [
@@ -115,21 +96,21 @@ export const FAQ_ITEMS: FAQItem[] = [
   },
   {
     id: 'faq-4',
+    category: 'patient',
+    question: 'How does payment work for the recovery programme?',
+    answer: 'One-time secure payment unlocks your complete personalized exercise program.',
+  },
+  {
+    id: 'faq-5',
     category: 'doctor',
     question: 'How does a doctor refer patients?',
     answer: 'Approved doctors receive a high-resolution acrylic QR standee for clinic reception along with a unique digital referral link to share via WhatsApp or SMS.',
   },
   {
-    id: 'faq-5',
-    category: 'doctor',
-    question: 'Can doctors track their patient referrals and programme activity?',
-    answer: 'Yes. Doctors log in to their Doctor Portal to monitor total referrals, active programs, patient progress percentages, and commercial fee shares in real-time.',
-  },
-  {
     id: 'faq-6',
     category: 'doctor',
-    question: 'What is the difference between Split Model and Platform Fee Model?',
-    answer: 'In the Split Model, the patient pays ₹500 online which is shared (60% doctor / 40% platform). In the Platform Fee Model, the doctor collects their clinic consultation fee separately while the patient pays only the PhysioQR platform fee online.',
+    question: 'Can doctors track their patient referrals and programme activity?',
+    answer: 'Yes. Doctors log in to their Doctor Portal to monitor total referrals, active programs, and patient progress percentages in real-time.',
   },
   {
     id: 'faq-7',
@@ -150,11 +131,6 @@ export const SAFETY_RULES: SafetyRuleItem[] = [
     title: 'Secure Account Access',
     description: 'OTP-based mobile authentication protects patient accounts without complicated passwords.',
     iconName: 'ShieldCheck',
-  },
-  {
-    title: 'Role-Based Visibility',
-    description: 'Doctors, patients, agents, and administrators access strictly scoped information appropriate to their role.',
-    iconName: 'LockKeyhole',
   },
   {
     title: 'Patient Informed Consent',

@@ -19,7 +19,6 @@ export function FinalCTASection({ onOpenPortal }: FinalCTAProps) {
       }}
     >
       <div className="rc-container" style={{ position: 'relative', zIndex: 10 }}>
-        {/* Section Header */}
         <div style={{ maxWidth: '680px', margin: '0 auto 52px auto', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px' }}>
           <div
             style={{
@@ -46,14 +45,11 @@ export function FinalCTASection({ onOpenPortal }: FinalCTAProps) {
           </h2>
 
           <p style={{ fontSize: '17px', color: 'var(--teal-900)', lineHeight: '1.6', maxWidth: '580px', fontWeight: 500 }}>
-            Select your role to access your dedicated digital rehabilitation portal.
+            Choose the portal that matches your PhysioQR experience and continue with a simple, guided workflow.
           </p>
         </div>
 
-        {/* 2 World-Class Interactive Role Cards */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px', maxWidth: '960px', margin: '0 auto' }} className="rc-responsive-grid-2 grid-cols-1 md:grid-cols-2">
-          
-          {/* Card 1: Patient Access */}
           <div
             className="rc-card-interactive"
             onClick={() => onOpenPortal('patient')}
@@ -81,40 +77,25 @@ export function FinalCTASection({ onOpenPortal }: FinalCTAProps) {
                 </span>
               </div>
 
-              <span style={{ fontSize: '12px', fontWeight: 800, color: 'var(--teal-700)', letterSpacing: '0.6px', textTransform: 'uppercase' }}>
-                PATIENT PORTAL
-              </span>
-              <h3 style={{ fontSize: 'clamp(20px, 2.4vw, 26px)', fontWeight: 800, color: 'var(--teal-950)', marginTop: '4px', marginBottom: '10px' }}>
-                Patient Access
-              </h3>
+              <span style={{ fontSize: '12px', fontWeight: 800, color: 'var(--teal-700)', letterSpacing: '0.6px', textTransform: 'uppercase' }}>PATIENT PORTAL</span>
+              <h3 style={{ fontSize: 'clamp(20px, 2.4vw, 26px)', fontWeight: 800, color: 'var(--teal-950)', marginTop: '4px', marginBottom: '10px' }}>Patient Access</h3>
               <p style={{ fontSize: '14.5px', color: 'var(--text-secondary)', lineHeight: '1.6', marginBottom: '20px' }}>
-                Access your assigned rehabilitation exercise videos, daily progress tracking, and digital payment receipts.
+                Access your assigned rehabilitation videos, progress tracking, reminders, and your complete recovery programme in one place.
               </p>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px', color: 'var(--text-primary)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle2 className="w-4 h-4 text-teal-600" /> OTP-verified mobile access</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle2 className="w-4 h-4 text-teal-600" /> Day-wise exercise video guidance</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle2 className="w-4 h-4 text-teal-600" /> Direct doctor referral link</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle2 className="w-4 h-4 text-teal-600" /> WhatsApp exercise reminders</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle2 className="w-4 h-4 text-teal-600" /> One-time fee for your full program</div>
               </div>
             </div>
 
-            <button
-              className="rc-btn-primary"
-              style={{
-                width: '100%',
-                justifyContent: 'center',
-                padding: '16px',
-                fontSize: '16px',
-                borderRadius: '14px',
-                boxShadow: '0 6px 20px rgba(20, 117, 110, 0.35)'
-              }}
-            >
+            <button className="rc-btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '16px', fontSize: '16px', borderRadius: '14px', boxShadow: '0 6px 20px rgba(20, 117, 110, 0.35)' }}>
               <span>Login as Patient</span>
               <ArrowRight className="w-4 h-4 ml-1" />
             </button>
           </div>
 
-          {/* Card 2: Doctor Portal */}
           <div
             className="rc-card-interactive"
             onClick={() => onOpenPortal('doctor')}
@@ -142,20 +123,16 @@ export function FinalCTASection({ onOpenPortal }: FinalCTAProps) {
                 </span>
               </div>
 
-              <span style={{ fontSize: '12px', fontWeight: 800, color: 'var(--teal-700)', letterSpacing: '0.6px', textTransform: 'uppercase' }}>
-                DOCTOR PORTAL
-              </span>
-              <h3 style={{ fontSize: 'clamp(20px, 2.4vw, 26px)', fontWeight: 800, color: 'var(--teal-950)', marginTop: '4px', marginBottom: '10px' }}>
-                Doctor Portal
-              </h3>
+              <span style={{ fontSize: '12px', fontWeight: 800, color: 'var(--teal-700)', letterSpacing: '0.6px', textTransform: 'uppercase' }}>DOCTOR PORTAL</span>
+              <h3 style={{ fontSize: 'clamp(20px, 2.4vw, 26px)', fontWeight: 800, color: 'var(--teal-950)', marginTop: '4px', marginBottom: '10px' }}>Doctor Portal</h3>
               <p style={{ fontSize: '14.5px', color: 'var(--text-secondary)', lineHeight: '1.6', marginBottom: '20px' }}>
-                Manage clinic QR standees, track patient referral activity, monitor progress, and access fee-share statements.
+                Manage clinic QR standees, track patient referral activity, and monitor rehabilitation progress from one clear portal.
               </p>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px', color: 'var(--text-primary)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle2 className="w-4 h-4 text-teal-600" /> Printable reception QR standees</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle2 className="w-4 h-4 text-teal-600" /> Real-time patient progress monitoring</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle2 className="w-4 h-4 text-teal-600" /> Transparent commercial fee-share wallet</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle2 className="w-4 h-4 text-teal-600" /> Clear referral activity overview</div>
               </div>
             </div>
 
@@ -189,7 +166,6 @@ export function FinalCTASection({ onOpenPortal }: FinalCTAProps) {
               <ArrowRight className="w-4 h-4 text-teal-700" />
             </button>
           </div>
-
         </div>
       </div>
     </section>

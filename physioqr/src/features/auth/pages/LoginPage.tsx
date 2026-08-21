@@ -96,7 +96,7 @@ export default function LoginPage() {
         <div className="bg-gradient-to-br from-primary-900 via-primary-800 to-neutral-900 p-8 text-white  flex-col justify-between  sm:flex">
           <div>
             <div className="flex items-center gap-3 mb-8">
-              <Logo width={210} height={40} withText={false} />
+              <Logo width={210} height={40}  />
               <div>
                 <h1 className="font-bold text-xl leading-none">physioqr</h1>
                 <span className="text-xs text-primary-300 font-medium">Rehabilitation Platform</span>

@@ -5,10 +5,10 @@ import { TrustFoundation } from './components/TrustFoundation';
 import { CareJourney } from './components/CareJourney';
 import { ExperienceSelector } from './components/ExperienceSelector';
 import { PatientExperienceSection } from './components/PatientExperienceSection';
+import { WhatsAppReminderSection } from './components/WhatsAppReminderSection';
 import { DoctorExperienceSection } from './components/DoctorExperienceSection';
 import { CapabilitiesSection } from './components/CapabilitiesSection';
 // import { RevenueModelsSection } from './components/RevenueModelsSection';
-import { ProgrammeExperienceSection } from './components/ProgrammeExperienceSection';
 import { SafetySection } from './components/SafetySection';
 import { FAQSection } from './components/FAQSection';
 import { FinalCTASection } from './components/FinalCTASection';
@@ -59,17 +59,17 @@ export function LandingPage({ onNavigateToPortal }: LandingPageProps) {
         {/* 06 Patient Experience */}
         <PatientExperienceSection onOpenPortal={handleOpenPortalModal} />
 
-        {/* 07 Doctor Experience */}
+        {/* 07 WhatsApp Reminder Experience */}
+        <WhatsAppReminderSection />
+
+        {/* 08 Doctor Experience */}
         <DoctorExperienceSection onOpenPortal={handleOpenPortalModal} />
 
-        {/* 08 Platform Capabilities */}
+        {/* 09 Platform Capabilities */}
         <CapabilitiesSection />
 
-        {/* 09 Revenue Models */}
+        {/* 10 Revenue Models */}
         {/* <RevenueModelsSection /> */}
-
-        {/* 10 Rehabilitation Programme Experience */}
-        <ProgrammeExperienceSection />
 
         {/* 11 Security & Safety */}
         <SafetySection />

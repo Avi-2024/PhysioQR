@@ -19,7 +19,7 @@ export function PatientLayout() {
       {/* Top Header */}
       <header className="min-h-16 sm:min-h-20 bg-white border-b border-neutral-200 px-4 sm:px-6 flex items-center justify-between gap-3 sticky top-0 z-20">
         <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-          <Logo width={56} height={56} withText={false} />
+          <Logo width={56} height={56}  />
           <div className="min-w-0">
             <h1 className="font-bold text-neutral-900 leading-none text-base sm:text-lg truncate">Patient Portal</h1>
           </div>

@@ -1,49 +1,46 @@
-import React from 'react';
+import React from "react";
 
 interface LogoProps {
   width?: number;
   height?: number;
-  withText?: boolean;
   className?: string;
   textClassName?: string;
-  imageScale?: number;
 }
 
 export function Logo({
-  width = 40,
-  height = 40,
-  withText = true,
-  className = '',
-  textClassName = 'text-neutral-900',
-  imageScale = 1,
+
 }: LogoProps) {
   return (
-    <div className={`inline-flex items-center gap-3 ${className}`.trim()}>
-      <span
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "4px",
+      }}
+    >
+      <img
+        src="/PhysioQR.png"
+        alt="PhysioQR logo"
         style={{
-          width,
-          height,
-          overflow: 'hidden',
-          display: 'inline-flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+          width: "56px",
+          height: "56px",
+          objectFit: "contain",
+          display: "block",
           flexShrink: 0,
         }}
+      />
+
+      <span
+        style={{
+          fontSize: "22px",
+          fontWeight: 800,
+color: '#169B45',
+          lineHeight: 1,
+          whiteSpace: "nowrap",
+        }}
       >
-        <img
-          src="/PhysioQR.png"
-          alt="PhysioQR logo"
-          width={width}
-          height={height}
-          className="block object-contain"
-          style={{ width, height, objectFit: 'contain', transform: `scale(${imageScale})` }}
-        />
+        PhysioQR
       </span>
-      {withText && (
-        <span className={`font-bold text-lg tracking-tight ${textClassName}`.trim()}>
-          PhysioQR
-        </span>
-      )}
     </div>
   );
 }

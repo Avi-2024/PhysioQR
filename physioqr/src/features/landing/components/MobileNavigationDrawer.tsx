@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { X, ArrowRight, ShieldCheck } from 'lucide-react';
+import { X } from 'lucide-react';
 import { APP_CONFIG } from '../../../config/app.config';
 import { Logo } from '../../../components/brand/Logo';
 import { UserRole } from '../types/landing.types';
@@ -45,7 +45,7 @@ export function MobileNavigationDrawer({ isOpen, onClose, onOpenPortal }: Mobile
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', paddingBottom: '16px', borderBottom: '1px solid var(--border-default)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-            <Logo width={210} height={56} withText={false} imageScale={2.8} />
+            <Logo width={210} height={56}  imageScale={2.8} />
           </div>
 
           <button onClick={onClose} style={{ border: 'none', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', minWidth: '44px', minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -77,17 +77,6 @@ export function MobileNavigationDrawer({ isOpen, onClose, onOpenPortal }: Mobile
             }}
           >
             Sign In to Portal
-          </button>
-
-          <button
-            onClick={() => {
-              onClose();
-              onOpenPortal('admin');
-            }}
-            style={{ border: 'none', background: 'transparent', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', cursor: 'pointer' }}
-          >
-            <span>Admin or Agent? Staff Access</span>
-            <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
