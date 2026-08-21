@@ -15,6 +15,10 @@ interface HeroSectionProps {
 const trustItems = ['Secure & private', 'WhatsApp reminders', 'Progress tracked'];
 
 export function HeroSection({ onOpenPortal }: HeroSectionProps) {
+  const scrollToHowItWorks = () => {
+    document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' });
+  };
+
   return (
     <section className="relative overflow-hidden border-b border-[#dcebe8] bg-[linear-gradient(115deg,#f8fcfb_0%,#f5fbfa_52%,#e9f8f5_100%)] py-14 sm:py-16 lg:py-20">
       <div className="pointer-events-none absolute right-[7%] top-[16%] h-[430px] w-[430px] rounded-full bg-[#d9f5ef]/55 blur-3xl" />
