@@ -1,5 +1,5 @@
 import { useDeferredValue, useState } from 'react';
-import type { FormEvent } from 'react';
+import type { FormEvent, ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Activity, ChevronLeft, ChevronRight, FolderHeart, Plus, RefreshCw, Search, ShieldCheck } from 'lucide-react';
@@ -89,6 +89,6 @@ export default function AdminPainCategoriesPage() {
   </div>;
 }
 
-function Summary({ label, value, icon }: { label: string; value: number | string; icon: React.ReactNode }) {
+function Summary({ label, value, icon }: { label: string; value: number | string; icon: ReactNode }) {
   return <div className="rounded-2xl border border-slate-200 bg-white p-4"><div className="flex items-center justify-between"><p className="text-sm text-slate-500">{label}</p><span className="text-slate-400">{icon}</span></div><p className="mt-3 text-2xl font-semibold text-slate-950">{value}</p></div>;
 }
