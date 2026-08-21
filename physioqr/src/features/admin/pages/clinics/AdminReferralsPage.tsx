@@ -1,7 +1,7 @@
 import { useDeferredValue, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle2, ChevronLeft, ChevronRight, ExternalLink, LockKeyhole, QrCode, RefreshCw, UserRoundCheck, XCircle } from 'lucide-react';
+import { CheckCircle2, ChevronLeft, ChevronRight, ExternalLink, LockKeyhole, QrCode, RefreshCw, UserRoundCheck } from 'lucide-react';
 import apiClient from '@/lib/api-client';
 import ErrorState from '@/components/feedback/ErrorState';
 import { SearchInput } from '@/components/ui/SearchInput';
