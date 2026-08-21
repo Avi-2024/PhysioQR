@@ -30,7 +30,7 @@ export function LandingFooter({ onOpenPortal }: LandingFooterProps) {
           
           {/* Brand Info */}
           <div>
-            <Logo width={210} height={64} withText={false} imageScale={2.8} className="mb-3" />
+            <Logo width={210} height={64}  imageScale={2.8} className="mb-3" />
 
             <p style={{ fontSize: '13.5px', color: '#A9C5C1', lineHeight: '1.6', margin: 0, maxWidth: '280px' }}>
               Doctor-connected digital rehabilitation, guiding patients from referral to structured day-wise recovery.

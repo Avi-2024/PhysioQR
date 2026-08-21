@@ -8,10 +8,7 @@ interface LogoProps {
 }
 
 export function Logo({
-  width = 54,
-  height = 54,
-  className = "",
-  textClassName = "text-neutral-900",
+
 }: LogoProps) {
   return (
     <div
