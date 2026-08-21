@@ -7,6 +7,7 @@ const { getAgents } = require('../controllers/admin/agents.controller');
 const { getDoctors } = require('../controllers/admin/doctors.controller');
 const { getClinics, getClinicById, updateClinic } = require('../controllers/admin/clinics.controller');
 const { getReferrals, getReferralById } = require('../controllers/admin/referrals.controller');
+const { getClinicVisits, getClinicVisitById } = require('../controllers/admin/clinic-visits.controller');
 const {
   getAuditLogs,
   getAuditLogById,
@@ -44,6 +45,9 @@ router.get('/agents/:id', getAgentById);
 
 router.get('/doctors', getDoctors);
 router.get('/doctors/:id', getDoctorById);
+
+router.get('/clinic-visits', getClinicVisits);
+router.get('/clinic-visits/:id', getClinicVisitById);
 
 router.get('/clinics', getClinics);
 router.get('/clinics/:id', getClinicById);
