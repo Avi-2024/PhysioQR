@@ -83,10 +83,7 @@ const createAssessmentQuestion = asyncHandler(async (req, res) => {
   const payload = normalizePayload(req.body);
   const error = await validatePayload(payload);
   if (error) return res.status(400).json({ message: error });
-
-  // New questions always belong to the common assessment. The legacy
-  // painCategory field remains in the schema only for backward compatibility.
-  const question = await AssessmentQuestion.create({ ...payload, painCategory: null });
+  const question = await AssessmentQuestion.create(payload);
   await writeAuditLog({ req, action: 'assessment_question_created', module: 'AssessmentQuestion', recordId: question._id, newValue: question });
   res.status(201).json(question);
 });
@@ -101,7 +98,6 @@ const updateAssessmentQuestion = asyncHandler(async (req, res) => {
 
   const previousValue = question.toObject();
   Object.assign(question, payload);
-  question.painCategory = null;
   await question.save();
   await writeAuditLog({ req, action: 'assessment_question_updated', module: 'AssessmentQuestion', recordId: question._id, previousValue, newValue: question });
   res.json(question);
@@ -124,7 +120,6 @@ const reactivateAssessmentQuestion = asyncHandler(async (req, res) => {
   if (question.isActive) return res.status(409).json({ message: 'Assessment question is already active' });
   const previousValue = { isActive: question.isActive };
   question.isActive = true;
-  question.painCategory = null;
   await question.save();
   await writeAuditLog({ req, action: 'assessment_question_reactivated', module: 'AssessmentQuestion', recordId: question._id, previousValue, newValue: { isActive: true }, reason: req.body.reason });
   res.json({ message: 'Assessment question reactivated', question });
