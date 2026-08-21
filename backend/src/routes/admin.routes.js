@@ -6,13 +6,13 @@ const { getDashboard } = require('../controllers/admin/dashboard.controller');
 const { getAgents } = require('../controllers/admin/agents.controller');
 const { getDoctors } = require('../controllers/admin/doctors.controller');
 const { getClinics, getClinicById, updateClinic } = require('../controllers/admin/clinics.controller');
+const { getReferrals, getReferralById } = require('../controllers/admin/referrals.controller');
 const {
   getAuditLogs,
   getAuditLogById,
   exportAuditLogs,
   getAgentById,
   getDoctorById,
-  getReferrals,
   getRevenueModels,
   updateRevenueModel,
   getPatients,
@@ -63,6 +63,8 @@ router.patch('/clinics/:id', validateSchema({
 }), updateClinic);
 
 router.get('/referrals', getReferrals);
+router.get('/referrals/:id', getReferralById);
+
 router.get('/revenue-models', getRevenueModels);
 router.patch('/revenue-models/:doctorId', validateSchema({
   params: {
