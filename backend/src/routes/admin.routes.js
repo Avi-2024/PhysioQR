@@ -17,8 +17,8 @@ const {
   deactivateAssessmentQuestion,
   reactivateAssessmentQuestion,
 } = require('../controllers/admin/assessment-questions.controller');
-const { getRiskReviews, getRiskReviewById, updateRiskReview } = require('../controllers/admin/risk-reviews.controller');
 const { getPainCategories, getPainCategoryById, createPainCategory, updatePainCategory, setPainCategoryStatus } = require('../controllers/admin/pain-categories.controller');
+const { getRiskReviews, getRiskReviewById, updateRiskReview } = require('../controllers/admin/risk-reviews.controller');
 const {
   getAuditLogs,
   getAuditLogById,
@@ -62,16 +62,16 @@ router.patch('/patients/:id/status', validateSchema({ body: { status: { type: 'e
 
 router.get('/assessment-questions', getAssessmentQuestions);
 router.get('/assessment-questions/:id', getAssessmentQuestionById);
-router.post('/assessment-questions', validateSchema({ body: { questionText: { type: 'string', max: 1000, required: true }, questionTextHindi: { type: 'string', max: 1000 }, questionType: { type: 'enum', values: ['single_choice', 'multiple_choice', 'yes_no', 'pain_scale', 'number', 'text', 'date', 'image'], required: true }, painCategory: { type: 'objectId' }, isRedFlag: { type: 'boolean' }, redFlagOperator: { type: 'enum', values: ['any_answer', 'equals', 'not_equals', 'includes', 'gte', 'lte', 'between'] }, redFlagSafetyMessage: { type: 'string', max: 1000 }, displayOrder: { type: 'number', min: 0, max: 100000 } } }), createAssessmentQuestion);
+router.post('/assessment-questions', validateSchema({ body: { questionText: { type: 'string', max: 1000, required: true }, questionTextHindi: { type: 'string', max: 1000 }, questionType: { type: 'enum', values: ['single_choice', 'multiple_choice', 'yes_no', 'pain_scale', 'number', 'text', 'date', 'image'], required: true }, isRedFlag: { type: 'boolean' }, redFlagOperator: { type: 'enum', values: ['any_answer', 'equals', 'not_equals', 'includes', 'gte', 'lte', 'between'] }, redFlagSafetyMessage: { type: 'string', max: 1000 }, displayOrder: { type: 'number', min: 0, max: 100000 } } }), createAssessmentQuestion);
 router.patch('/assessment-questions/:id', updateAssessmentQuestion);
 router.post('/assessment-questions/:id/deactivate', validateSchema({ body: { reason: { type: 'string', max: 500, required: true } } }), deactivateAssessmentQuestion);
 router.post('/assessment-questions/:id/reactivate', validateSchema({ body: { reason: { type: 'string', max: 500, required: true } } }), reactivateAssessmentQuestion);
 
 router.get('/pain-categories', getPainCategories);
 router.get('/pain-categories/:id', getPainCategoryById);
-router.post('/pain-categories', validateSchema({ body: { name: { type: 'string', max: 160, required: true }, nameHindi: { type: 'string', max: 160 }, description: { type: 'string', max: 2000 } } }), createPainCategory);
-router.patch('/pain-categories/:id', validateSchema({ body: { name: { type: 'string', max: 160 }, nameHindi: { type: 'string', max: 160 }, description: { type: 'string', max: 2000 } } }), updatePainCategory);
-router.post('/pain-categories/:id/:action', validateSchema({ params: { action: { type: 'enum', values: ['deactivate', 'reactivate'], required: true } }, body: { reason: { type: 'string', max: 500, required: true } } }), setPainCategoryStatus);
+router.post('/pain-categories', validateSchema({ body: { name: { type: 'string', max: 160, required: true }, nameHindi: { type: 'string', max: 160 }, description: { type: 'string', max: 1000 } } }), createPainCategory);
+router.patch('/pain-categories/:id', validateSchema({ body: { name: { type: 'string', max: 160 }, nameHindi: { type: 'string', max: 160 }, description: { type: 'string', max: 1000 } } }), updatePainCategory);
+router.post('/pain-categories/:id/:action(deactivate|reactivate)', validateSchema({ body: { reason: { type: 'string', max: 500, required: true } } }), setPainCategoryStatus);
 
 router.get('/revenue-models', getRevenueModels);
 router.patch('/revenue-models/:doctorId', validateSchema({ params: { doctorId: { type: 'objectId', required: true } }, body: { revenueModel: { type: 'enum', values: ['split', 'platform_fee'] }, approvedPatientFee: { type: 'number', min: 0, max: 1000000 }, feeSharePercentage: { type: 'number', min: 0, max: 100 }, feeShareType: { type: 'enum', values: ['percentage', 'fixed', 'slab'] }, fixedFeeShareAmount: { type: 'number', min: 0, max: 1000000 }, feeShareCalculationBasis: { type: 'enum', values: ['gross', 'after_discount', 'net_after_charges'] }, feeShareHoldingDays: { type: 'number', min: 0, max: 365 }, minWithdrawal: { type: 'number', min: 0, max: 10000000 }, maxWithdrawal: { type: 'number', min: 0, max: 10000000 }, payoutCycle: { type: 'string', max: 80 }, reason: { type: 'string', max: 500 } } }), updateRevenueModel);
@@ -82,9 +82,11 @@ router.get('/withdrawals/:id', validateSchema({ params: { id: { type: 'objectId'
 router.get('/wallets', getWallets);
 router.get('/wallets/:doctorId/ledger', getWalletLedger);
 router.get('/fee-shares', getFeeShares);
+
 router.get('/risk-reviews', getRiskReviews);
 router.get('/risk-reviews/:id', getRiskReviewById);
 router.patch('/risk-reviews/:id', validateSchema({ body: { status: { type: 'enum', values: ['cleared', 'blocked'], required: true }, note: { type: 'string', max: 2000, required: true } } }), updateRiskReview);
+
 router.get('/fraud-cases', getFraudCases);
 router.get('/fraud-cases/:id', getFraudCaseById);
 router.patch('/fraud-cases/:id/review', requireFields('status'), reviewFraudCase);
