@@ -2,8 +2,8 @@ const express = require('express');
 const router = express.Router();
 const { protect, authorize } = require('../middlewares/auth.middleware');
 const { requireFields, validateSchema } = require('../middlewares/validate.middleware');
+const { getDashboard } = require('../controllers/admin/dashboard.controller');
 const {
-  getDashboard,
   getAuditLogs,
   getAuditLogById,
   exportAuditLogs,
