@@ -7,21 +7,22 @@ const {
   createPainCategory,
   updatePainCategory,
   deletePainCategory,
-  getQuestions,
   createQuestion,
   updateQuestion,
   deleteQuestion,
-  submitAssessment,
   listRedFlagAssessments,
   reviewAssessment,
 } = require('../controllers/assessment.controller');
+const { getCommonQuestions, submitCommonAssessment } = require('../controllers/common-assessment.controller');
 
 router.get('/categories', getPainCategories);
 router.post('/categories', protect, authorize('admin'), requireFields('name'), createPainCategory);
 router.put('/categories/:id', protect, authorize('admin'), updatePainCategory);
 router.delete('/categories/:id', protect, authorize('admin'), deletePainCategory);
 
-router.get('/questions', getQuestions);
+// Every patient receives the same active assessment question set. Pain category
+// selection is part of that assessment experience, not a question-set filter.
+router.get('/questions', getCommonQuestions);
 router.post(
   '/questions',
   protect,
@@ -33,7 +34,7 @@ router.post(
 router.put('/questions/:id', protect, authorize('admin'), updateQuestion);
 router.delete('/questions/:id', protect, authorize('admin'), deleteQuestion);
 
-router.post('/submit', protect, requireFields('patientId', 'painCategoryId', 'answers'), submitAssessment);
+router.post('/submit', protect, requireFields('patientId', 'painCategoryId', 'answers'), submitCommonAssessment);
 router.get('/red-flags', protect, authorize('admin'), listRedFlagAssessments);
 router.patch(
   '/:id/review',
