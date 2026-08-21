@@ -5,7 +5,6 @@ import { TrustFoundation } from './components/TrustFoundation';
 import { CareJourney } from './components/CareJourney';
 import { ExperienceSelector } from './components/ExperienceSelector';
 import { PatientExperienceSection } from './components/PatientExperienceSection';
-import { RehabProgramsShowcase } from './components/RehabProgramsShowcase';
 import { WhatsAppReminderSection } from './components/WhatsAppReminderSection';
 import { DoctorExperienceSection } from './components/DoctorExperienceSection';
 import { CapabilitiesSection } from './components/CapabilitiesSection';
@@ -60,32 +59,29 @@ export function LandingPage({ onNavigateToPortal }: LandingPageProps) {
         {/* 06 Patient Experience */}
         <PatientExperienceSection onOpenPortal={handleOpenPortalModal} />
 
-        {/* 07 Recovery programme carousel */}
-        <RehabProgramsShowcase />
-
-        {/* 08 WhatsApp Reminder Experience */}
+        {/* 07 WhatsApp Reminder Experience */}
         <WhatsAppReminderSection />
 
-        {/* 09 Doctor Experience */}
+        {/* 08 Doctor Experience */}
         <DoctorExperienceSection onOpenPortal={handleOpenPortalModal} />
 
-        {/* 10 Platform Capabilities */}
+        {/* 09 Platform Capabilities */}
         <CapabilitiesSection />
 
-        {/* 11 Revenue Models */}
+        {/* 10 Revenue Models */}
         {/* <RevenueModelsSection /> */}
 
-        {/* 12 Security & Safety */}
+        {/* 11 Security & Safety */}
         <SafetySection />
 
-        {/* 13 FAQ */}
+        {/* 12 FAQ */}
         <FAQSection />
 
-        {/* 14 Final Portal CTA */}
+        {/* 13 Final Portal CTA */}
         <FinalCTASection onOpenPortal={handleOpenPortalModal} />
       </main>
 
-      {/* 15 Enterprise Footer */}
+      {/* 14 Enterprise Footer */}
       <LandingFooter onOpenPortal={handleOpenPortalModal} />
 
       {/* Portal Access Selector Modal */}
