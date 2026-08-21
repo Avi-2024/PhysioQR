@@ -19,6 +19,7 @@ const AdminClinicDetailPage = lazy(() => import('@/features/admin/pages/clinics/
 const AdminReferralsPage = lazy(() => import('@/features/admin/pages/clinics/AdminReferralsPage'));
 const AdminReferralDetailPage = lazy(() => import('@/features/admin/pages/clinics/AdminReferralDetailPage'));
 const AdminAssessmentsPage = lazy(() => import('@/features/admin/pages/assessments/AdminAssessmentsPage'));
+const AdminAssessmentDetailPage = lazy(() => import('@/features/admin/pages/assessments/AdminAssessmentDetailPage'));
 const AdminRiskReviewsPage = lazy(() => import('@/features/admin/pages/risk/AdminRiskReviewsPage'));
 const AdminPainCategoriesPage = lazy(() => import('@/features/admin/pages/assessments/AdminPainCategoriesPage'));
 const AdminProgramsPage = lazy(() => import('@/features/admin/pages/content/AdminProgramsPage'));
@@ -70,6 +71,7 @@ export const adminRoutes: RouteObject = {
     { path: 'patients', element: withSuspense(<AdminPatientsPage />) },
     { path: 'patients/:patientId', element: withSuspense(<AdminPatientDetailPage />) },
     { path: 'assessments', element: withSuspense(<AdminAssessmentsPage />) },
+    { path: 'assessments/:assessmentId', element: withSuspense(<AdminAssessmentDetailPage />) },
     { path: 'risk-reviews', element: withSuspense(<AdminRiskReviewsPage />) },
     { path: 'pain-categories', element: withSuspense(<AdminPainCategoriesPage />) },
     { path: 'programs', element: withSuspense(<AdminProgramsPage />) },
