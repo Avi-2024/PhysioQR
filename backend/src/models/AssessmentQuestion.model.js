@@ -9,7 +9,6 @@ const assessmentQuestionSchema = new mongoose.Schema({
     required: true,
   },
   options: [{ label: String, labelHindi: String, value: String }],
-  painCategory: { type: mongoose.Schema.Types.ObjectId, ref: 'PainCategory' },
   isRedFlag: { type: Boolean, default: false },
   redFlagAnswerValues: [{ type: mongoose.Schema.Types.Mixed }],
   redFlagOperator: {
@@ -23,7 +22,8 @@ const assessmentQuestionSchema = new mongoose.Schema({
   displayOrder: { type: Number, default: 0 },
   isActive: { type: Boolean, default: true },
 
-  // Conditional logic controls when a question is visible after a prior answer.
+  // Conditional logic controls when a common-assessment question is visible
+  // after a prior answer. Questions are intentionally not pain-category scoped.
   showIfQuestion: { type: mongoose.Schema.Types.ObjectId, ref: 'AssessmentQuestion' },
   showIfAnswer: String,
   conditionalLogic: {
