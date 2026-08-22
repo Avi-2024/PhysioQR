@@ -3,10 +3,11 @@ const router = express.Router();
 const { protect, authorize } = require('../middlewares/auth.middleware');
 const { createRefund, getAllRefunds, getRefundById } = require('../controllers/refund.controller');
 const { validateSchema } = require('../middlewares/validate.middleware');
+const { requireRefundsEnabled } = require('../middlewares/financeFeatures.middleware');
 
 router.use(protect, authorize('admin'));
 
-router.post('/', validateSchema({
+router.post('/', requireRefundsEnabled, validateSchema({
   body: {
     paymentId: { type: 'objectId', required: true },
     refundType: { type: 'enum', values: ['full', 'partial', 'duplicate_payment', 'program_cancellation', 'manual', 'gateway'], required: true },
@@ -14,7 +15,7 @@ router.post('/', validateSchema({
     reason: { type: 'string', min: 3, max: 500, required: true },
   },
 }), createRefund);
-router.get('/',     getAllRefunds);
-router.get('/:id',  getRefundById);
+router.get('/', getAllRefunds);
+router.get('/:id', validateSchema({ params: { id: { type: 'objectId', required: true } } }), getRefundById);
 
 module.exports = router;
