@@ -1,5 +1,6 @@
 const WebPushSubscription = require('../models/WebPushSubscription.model');
 const asyncHandler = require('../utils/asyncHandler');
+const { getNotificationSettings } = require('../services/notification.service');
 
 const getRecipientRef = (req) => {
   const role = req.user.role;
@@ -10,7 +11,15 @@ const getRecipientRef = (req) => {
   return { recipientType: 'admin', adminUser: req.user._id };
 };
 
+const ensureWebPushEnabled = async () => {
+  const settings = await getNotificationSettings();
+  return settings.webPushEnabled !== false;
+};
+
 const getPublicKey = asyncHandler(async (_req, res) => {
+  if (!(await ensureWebPushEnabled())) {
+    return res.status(503).json({ message: 'Web push is disabled by platform settings' });
+  }
   if (!process.env.WEB_PUSH_VAPID_PUBLIC_KEY) {
     return res.status(503).json({ message: 'Web push is not configured' });
   }
@@ -18,6 +27,10 @@ const getPublicKey = asyncHandler(async (_req, res) => {
 });
 
 const subscribe = asyncHandler(async (req, res) => {
+  if (!(await ensureWebPushEnabled())) {
+    return res.status(503).json({ message: 'Web push is disabled by platform settings' });
+  }
+
   const { endpoint, expirationTime, keys } = req.body || {};
   if (!endpoint || !keys?.p256dh || !keys?.auth) {
     return res.status(400).json({ message: 'A valid web push subscription is required' });
