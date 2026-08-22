@@ -16,7 +16,8 @@ const { getRiskReviews, getRiskReviewById, updateRiskReview } = require('../cont
 const { getOrders, getOrderById } = require('../controllers/admin/orders.controller');
 const { getPayments, getPaymentById } = require('../controllers/admin/payments.controller');
 const { getRefunds, getRefundById } = require('../controllers/admin/refunds.controller');
-const { getAuditLogs, getAuditLogById, exportAuditLogs, getAgentById, getDoctorById, getRevenueModels, updateRevenueModel, getWithdrawals, getWithdrawalById, getWallets, getWalletLedger, getFeeShares, getFraudCases, getFraudCaseById, reviewFraudCase, getContentSummary } = require('../controllers/admin.controller');
+const { getRevenueModels, updateRevenueModel, getFeeShares, getFeeShareById } = require('../controllers/admin/revenue.controller');
+const { getAuditLogs, getAuditLogById, exportAuditLogs, getAgentById, getDoctorById, getWithdrawals, getWithdrawalById, getWallets, getWalletLedger, getFraudCases, getFraudCaseById, reviewFraudCase, getContentSummary } = require('../controllers/admin.controller');
 
 router.use(protect, authorize('admin'));
 router.get('/dashboard', getDashboard);
@@ -40,12 +41,14 @@ router.patch('/pain-categories/:id', validateSchema({body:{name:{type:'string',m
 router.post('/pain-categories/:id/:action(deactivate|reactivate)', validateSchema({body:{reason:{type:'string',max:500,required:true}}}), setPainCategoryStatus);
 router.get('/programs', getPrograms); router.get('/programs/:id', getProgramById);
 router.post('/programs', createProgram); router.patch('/programs/:id', updateProgram); router.post('/programs/:id/:action(deactivate|reactivate)', setProgramStatus);
-router.get('/revenue-models', getRevenueModels); router.patch('/revenue-models/:doctorId', updateRevenueModel);
+router.get('/revenue-models', getRevenueModels);
+router.patch('/revenue-models/:doctorId', validateSchema({ body: { revenueModel:{type:'enum',values:['split','platform_fee']}, approvedPatientFee:{type:'number',min:0,max:1000000}, feeSharePercentage:{type:'number',min:0,max:100}, feeShareType:{type:'enum',values:['percentage','fixed','slab']}, fixedFeeShareAmount:{type:'number',min:0,max:1000000}, feeShareCalculationBasis:{type:'enum',values:['gross','after_discount','net_after_charges']}, feeShareHoldingDays:{type:'number',min:0,max:365}, minWithdrawal:{type:'number',min:0,max:10000000}, maxWithdrawal:{type:'number',min:0,max:10000000}, payoutCycle:{type:'string',max:80}, reason:{type:'string',max:500} } }), updateRevenueModel);
 router.get('/orders', getOrders); router.get('/orders/:id', getOrderById);
 router.get('/payments', getPayments); router.get('/payments/:id', getPaymentById);
 router.get('/refunds', getRefunds); router.get('/refunds/:id', getRefundById);
+router.get('/fee-shares', getFeeShares); router.get('/fee-shares/:id', getFeeShareById);
 router.get('/withdrawals', getWithdrawals); router.get('/withdrawals/:id', validateSchema({params:{id:{type:'objectId',required:true}}}), getWithdrawalById);
-router.get('/wallets', getWallets); router.get('/wallets/:doctorId/ledger', getWalletLedger); router.get('/fee-shares', getFeeShares);
+router.get('/wallets', getWallets); router.get('/wallets/:doctorId/ledger', getWalletLedger);
 router.get('/risk-reviews', getRiskReviews); router.get('/risk-reviews/:id', getRiskReviewById); router.patch('/risk-reviews/:id', validateSchema({body:{status:{type:'enum',values:['cleared','blocked'],required:true},note:{type:'string',max:2000,required:true}}}), updateRiskReview);
 router.get('/fraud-cases', getFraudCases); router.get('/fraud-cases/:id', getFraudCaseById); router.patch('/fraud-cases/:id/review', requireFields('status'), reviewFraudCase);
 router.get('/content-summary', getContentSummary);
