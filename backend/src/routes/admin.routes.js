@@ -22,6 +22,7 @@ const { getWithdrawals, getWithdrawalById } = require('../controllers/admin/with
 const { getPayouts, getPayoutById } = require('../controllers/admin/payouts.controller');
 const { getReconciliation } = require('../controllers/admin/reconciliation.controller');
 const { getAdminNotifications, getAdminNotificationById, searchNotificationRecipients } = require('../controllers/admin/notifications.controller');
+const { getSupportTickets, getSupportTicketById } = require('../controllers/admin/support.controller');
 const { getAuditLogs, getAuditLogById, exportAuditLogs, getAgentById, getDoctorById, getFraudCases, getFraudCaseById, reviewFraudCase, getContentSummary } = require('../controllers/admin.controller');
 
 router.use(protect, authorize('admin'));
@@ -64,6 +65,8 @@ router.get('/reconciliation', getReconciliation);
 router.get('/notifications', getAdminNotifications);
 router.get('/notification-recipients', searchNotificationRecipients);
 router.get('/notifications/:id', getAdminNotificationById);
+router.get('/support', getSupportTickets);
+router.get('/support/:id', validateSchema({params:{id:{type:'objectId',required:true}}}), getSupportTicketById);
 
 router.get('/risk-reviews', getRiskReviews); router.get('/risk-reviews/:id', getRiskReviewById); router.patch('/risk-reviews/:id', validateSchema({body:{status:{type:'enum',values:['cleared','blocked'],required:true},note:{type:'string',max:2000,required:true}}}), updateRiskReview);
 router.get('/fraud-cases', getFraudCases); router.get('/fraud-cases/:id', getFraudCaseById); router.patch('/fraud-cases/:id/review', requireFields('status'), reviewFraudCase);
