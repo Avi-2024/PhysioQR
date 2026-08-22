@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const helmet = require('helmet');
 const mongoSanitize = require('express-mongo-sanitize');
 const Sentry = require('@sentry/node');
+const { maintenanceModeGuard } = require('./middlewares/platformSettings.middleware');
 
 require('dotenv').config();
 
@@ -34,7 +35,9 @@ if (process.env.SENTRY_DSN) app.use(Sentry.Handlers.requestHandler());
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin || !allowedOrigins.length || allowedOrigins.includes(origin)) return callback(null, true);
-    return callback(new Error('CORS origin is not allowed'));
+    const error = new Error('CORS origin is not allowed');
+    error.status = 403;
+    return callback(error);
   },
   credentials: true,
 }));
@@ -46,7 +49,7 @@ app.use((req, res, next) => {
 });
 app.use((req, res, next) => {
   if (process.env.ENFORCE_HTTPS === 'true' && req.headers['x-forwarded-proto'] !== 'https' && !req.secure) {
-    return res.status(403).json({ message: 'HTTPS is required' });
+    return res.status(403).json({ message: 'HTTPS is required', requestId: req.id });
   }
   next();
 });
@@ -60,6 +63,7 @@ app.use(rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 }));
+app.use(maintenanceModeGuard);
 
 app.use('/api/auth', require('./routes/auth.routes'));
 app.use('/api/admin', require('./routes/admin.routes'));
@@ -82,14 +86,14 @@ app.use('/api/progress', require('./routes/progress.routes'));
 app.use('/api/qr', require('./routes/qr.routes'));
 app.use('/api/patient-programs', require('./routes/patientProgram.routes'));
 
-app.get('/health', (req, res) => res.json({ status: 'PhysioQR API is running' }));
+app.get('/health', (req, res) => res.json({ status: 'PhysioQR API is running', requestId: req.id }));
 
-app.use((req, res) => res.status(404).json({ message: 'Route not found' }));
+app.use((req, res) => res.status(404).json({ message: 'Route not found', requestId: req.id }));
 
 if (process.env.SENTRY_DSN) app.use(Sentry.Handlers.errorHandler());
 
 app.use((err, req, res, next) => {
-  const status = err.status || 500;
+  const status = Number(err.status || err.statusCode || 500);
   if (process.env.SENTRY_DSN && status >= 500) Sentry.captureException(err);
   if (status >= 500) console.error(err.stack);
   else console.warn(`[${req.id}] ${status} ${err.message}`);
