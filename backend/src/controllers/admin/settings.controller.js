@@ -2,6 +2,7 @@ const AppSetting = require('../../models/AppSetting.model');
 const asyncHandler = require('../../utils/asyncHandler');
 const { writeAuditLog } = require('../../utils/auditLogger');
 const { invalidatePlatformSettingsCache } = require('../../middlewares/platformSettings.middleware');
+const { invalidateFinanceSettingsCache } = require('../../middlewares/financeFeatures.middleware');
 
 const DEFAULTS = {
   platform: {
@@ -15,6 +16,7 @@ const DEFAULTS = {
   },
   finance: {
     currency: 'INR',
+    paymentsEnabled: true,
     refundsEnabled: true,
     withdrawalsEnabled: true,
   },
@@ -80,6 +82,7 @@ const updateSettingsSection = asyncHandler(async (req, res) => {
   ).populate('updatedBy', 'email mobile role');
 
   if (section === 'platform') invalidatePlatformSettingsCache();
+  if (section === 'finance') invalidateFinanceSettingsCache();
 
   await writeAuditLog({
     req,
