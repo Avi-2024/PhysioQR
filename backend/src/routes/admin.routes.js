@@ -25,11 +25,12 @@ const { getAdminNotifications, getAdminNotificationById, searchNotificationRecip
 const { getSupportTickets, getSupportTicketById } = require('../controllers/admin/support.controller');
 const { getReports } = require('../controllers/admin/reports.controller');
 const { getFraudCases, getFraudCaseById, reviewFraudCase } = require('../controllers/admin/fraud-risk.controller');
-const { getAuditLogs, getAuditLogById, exportAuditLogs, getAgentById, getDoctorById, getContentSummary } = require('../controllers/admin.controller');
+const { getAuditLogs, getAuditLogById, exportAuditLogs } = require('../controllers/admin/audit-logs.controller');
+const { getAgentById, getDoctorById, getContentSummary } = require('../controllers/admin.controller');
 
 router.use(protect, authorize('admin'));
 router.get('/dashboard', getDashboard);
-router.get('/audit-logs', getAuditLogs); router.get('/audit-logs/export', exportAuditLogs); router.get('/audit-logs/:id', getAuditLogById);
+router.get('/audit-logs', getAuditLogs); router.get('/audit-logs/export', exportAuditLogs); router.get('/audit-logs/:id', validateSchema({params:{id:{type:'objectId',required:true}}}), getAuditLogById);
 router.get('/agents', getAgents); router.get('/agents/:id', getAgentById);
 router.get('/doctors', getDoctors); router.get('/doctors/:id', getDoctorById);
 router.get('/clinic-visits', getClinicVisits); router.get('/clinic-visits/:id', getClinicVisitById);
