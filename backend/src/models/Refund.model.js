@@ -14,9 +14,10 @@ const refundSchema = new mongoose.Schema({
   },
   refundAmount: { type: Number, required: true },
   gatewayRefundId: String,
+  idempotencyKey: { type: String, trim: true },
 
   // Fee share reversal linked to this refund
-  feeShareReversal: Number,     // amount reversed from doctor wallet
+  feeShareReversal: Number,
   feeShareAlreadyWithdrawn: { type: Boolean, default: false },
 
   reason: String,
@@ -29,5 +30,8 @@ const refundSchema = new mongoose.Schema({
   processedAt: Date,
   rejectionReason: String,
 }, { timestamps: true });
+
+refundSchema.index({ idempotencyKey: 1 }, { unique: true, sparse: true });
+refundSchema.index({ payment: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Refund', refundSchema);
