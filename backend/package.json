@@ -29,7 +29,8 @@
     "nodemailer": "^9.0.5",
     "qrcode": "^1.5.3",
     "razorpay": "^2.9.2",
-    "twilio": "^4.19.3"
+    "twilio": "^4.19.3",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"
