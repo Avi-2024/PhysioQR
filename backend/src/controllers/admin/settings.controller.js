@@ -1,6 +1,7 @@
 const AppSetting = require('../../models/AppSetting.model');
 const asyncHandler = require('../../utils/asyncHandler');
 const { writeAuditLog } = require('../../utils/auditLogger');
+const { invalidatePlatformSettingsCache } = require('../../middlewares/platformSettings.middleware');
 
 const DEFAULTS = {
   platform: {
@@ -77,6 +78,8 @@ const updateSettingsSection = asyncHandler(async (req, res) => {
     { $set: { value: nextValue, updatedBy: req.user._id } },
     { new: true, upsert: true, setDefaultsOnInsert: true },
   ).populate('updatedBy', 'email mobile role');
+
+  if (section === 'platform') invalidatePlatformSettingsCache();
 
   await writeAuditLog({
     req,
