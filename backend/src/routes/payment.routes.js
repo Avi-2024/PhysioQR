@@ -4,12 +4,15 @@ const { protect } = require('../middlewares/auth.middleware');
 const { createOrder, verifyPayment, razorpayWebhook, getPaymentById, getReceipt } = require('../controllers/payment.controller');
 const { validateSchema } = require('../middlewares/validate.middleware');
 const { paymentLimiter } = require('../middlewares/rateLimit.middleware');
+const { requirePaymentsEnabled } = require('../middlewares/financeFeatures.middleware');
 
+// Webhooks must remain available even when new payment initiation is disabled so
+// already-created gateway orders can still reconcile safely.
 router.post('/webhook/razorpay', razorpayWebhook);
 
 router.use(protect);
 
-router.post('/create-order', paymentLimiter, validateSchema({
+router.post('/create-order', requirePaymentsEnabled, paymentLimiter, validateSchema({
   body: {
     patientId: { type: 'objectId', required: true },
     programId: { type: 'objectId', required: true },
@@ -18,6 +21,9 @@ router.post('/create-order', paymentLimiter, validateSchema({
     idempotencyKey: { type: 'string', min: 8, max: 120 },
   },
 }), createOrder);
+
+// Verification intentionally remains available for payment attempts that were
+// initiated before the feature was disabled.
 router.post('/verify', paymentLimiter, validateSchema({
   body: {
     razorpay_order_id: { type: 'string', min: 6, max: 120, required: true },
