@@ -15,6 +15,7 @@ const { getPrograms, getProgramById, createProgram, updateProgram, setProgramSta
 const { getRiskReviews, getRiskReviewById, updateRiskReview } = require('../controllers/admin/risk-reviews.controller');
 const { getOrders, getOrderById } = require('../controllers/admin/orders.controller');
 const { getPayments, getPaymentById } = require('../controllers/admin/payments.controller');
+const { getRefunds, getRefundById } = require('../controllers/admin/refunds.controller');
 const { getAuditLogs, getAuditLogById, exportAuditLogs, getAgentById, getDoctorById, getRevenueModels, updateRevenueModel, getWithdrawals, getWithdrawalById, getWallets, getWalletLedger, getFeeShares, getFraudCases, getFraudCaseById, reviewFraudCase, getContentSummary } = require('../controllers/admin.controller');
 
 router.use(protect, authorize('admin'));
@@ -42,6 +43,7 @@ router.post('/programs', createProgram); router.patch('/programs/:id', updatePro
 router.get('/revenue-models', getRevenueModels); router.patch('/revenue-models/:doctorId', updateRevenueModel);
 router.get('/orders', getOrders); router.get('/orders/:id', getOrderById);
 router.get('/payments', getPayments); router.get('/payments/:id', getPaymentById);
+router.get('/refunds', getRefunds); router.get('/refunds/:id', getRefundById);
 router.get('/withdrawals', getWithdrawals); router.get('/withdrawals/:id', validateSchema({params:{id:{type:'objectId',required:true}}}), getWithdrawalById);
 router.get('/wallets', getWallets); router.get('/wallets/:doctorId/ledger', getWalletLedger); router.get('/fee-shares', getFeeShares);
 router.get('/risk-reviews', getRiskReviews); router.get('/risk-reviews/:id', getRiskReviewById); router.patch('/risk-reviews/:id', validateSchema({body:{status:{type:'enum',values:['cleared','blocked'],required:true},note:{type:'string',max:2000,required:true}}}), updateRiskReview);
