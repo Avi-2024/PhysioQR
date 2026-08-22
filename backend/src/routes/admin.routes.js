@@ -3,8 +3,8 @@ const router = express.Router();
 const { protect, authorize } = require('../middlewares/auth.middleware');
 const { requireFields, validateSchema } = require('../middlewares/validate.middleware');
 const { getDashboard } = require('../controllers/admin/dashboard.controller');
-const { getAgents } = require('../controllers/admin/agents.controller');
-const { getDoctors } = require('../controllers/admin/doctors.controller');
+const { getAgents, getAgentById } = require('../controllers/admin/agents.controller');
+const { getDoctors, getDoctorById } = require('../controllers/admin/doctors.controller');
 const { getClinics, getClinicById, updateClinic } = require('../controllers/admin/clinics.controller');
 const { getReferrals, getReferralById } = require('../controllers/admin/referrals.controller');
 const { getClinicVisits, getClinicVisitById } = require('../controllers/admin/clinic-visits.controller');
@@ -27,7 +27,7 @@ const { getReports } = require('../controllers/admin/reports.controller');
 const { getFraudCases, getFraudCaseById, reviewFraudCase } = require('../controllers/admin/fraud-risk.controller');
 const { getAuditLogs, getAuditLogById, exportAuditLogs } = require('../controllers/admin/audit-logs.controller');
 const { getSettings, updateSettingsSection } = require('../controllers/admin/settings.controller');
-const { getAgentById, getDoctorById, getContentSummary } = require('../controllers/admin.controller');
+const { getContentSummary } = require('../controllers/admin/content-summary.controller');
 
 const programBodySchema = {
   programCode:{type:'string',max:80}, name:{type:'string',max:180}, nameHindi:{type:'string',max:180},
