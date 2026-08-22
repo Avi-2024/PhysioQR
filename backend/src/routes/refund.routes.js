@@ -13,6 +13,7 @@ router.post('/', requireRefundsEnabled, validateSchema({
     refundType: { type: 'enum', values: ['full', 'partial', 'duplicate_payment', 'program_cancellation', 'manual', 'gateway'], required: true },
     refundAmount: { type: 'number', min: 1, required: true },
     reason: { type: 'string', min: 3, max: 500, required: true },
+    idempotencyKey: { type: 'string', min: 8, max: 120 },
   },
 }), createRefund);
 router.get('/', getAllRefunds);
