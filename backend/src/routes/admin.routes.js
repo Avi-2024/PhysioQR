@@ -29,6 +29,16 @@ const { getAuditLogs, getAuditLogById, exportAuditLogs } = require('../controlle
 const { getSettings, updateSettingsSection } = require('../controllers/admin/settings.controller');
 const { getAgentById, getDoctorById, getContentSummary } = require('../controllers/admin.controller');
 
+const programBodySchema = {
+  programCode:{type:'string',max:80}, name:{type:'string',max:180}, nameHindi:{type:'string',max:180},
+  painCategory:{type:'objectId'}, description:{type:'string',max:4000}, objective:{type:'string',max:2000},
+  difficultyLevel:{type:'enum',values:['beginner','intermediate','advanced','senior_friendly','post_operative','general_mobility','condition_specific']},
+  durationDays:{type:'number',min:1,max:365}, sessionsPerDay:{type:'number',min:1,max:10}, recommendedAgeGroup:{type:'string',max:120},
+  eligibleConditions:{type:'array',max:100}, excludedConditions:{type:'array',max:100}, instructions:{type:'string',max:5000},
+  precautions:{type:'string',max:5000}, requiredEquipment:{type:'array',max:100}, defaultPrice:{type:'number',min:0,max:1000000},
+  thumbnail:{type:'string',max:2000}, isActive:{type:'boolean'}
+};
+
 router.use(protect, authorize('admin'));
 router.get('/dashboard', getDashboard);
 router.get('/audit-logs', getAuditLogs); router.get('/audit-logs/export', exportAuditLogs); router.get('/audit-logs/:id', validateSchema({params:{id:{type:'objectId',required:true}}}), getAuditLogById);
@@ -50,7 +60,9 @@ router.post('/pain-categories', validateSchema({body:{name:{type:'string',max:16
 router.patch('/pain-categories/:id', validateSchema({body:{name:{type:'string',max:160},nameHindi:{type:'string',max:160},description:{type:'string',max:1000}}}), updatePainCategory);
 router.post('/pain-categories/:id/:action(deactivate|reactivate)', validateSchema({body:{reason:{type:'string',max:500,required:true}}}), setPainCategoryStatus);
 router.get('/programs', getPrograms); router.get('/programs/:id', getProgramById);
-router.post('/programs', createProgram); router.patch('/programs/:id', updateProgram); router.post('/programs/:id/:action(deactivate|reactivate)', setProgramStatus);
+router.post('/programs', validateSchema({body:{...programBodySchema,name:{type:'string',max:180,required:true},painCategory:{type:'objectId',required:true},durationDays:{type:'number',min:1,max:365,required:true}}}), createProgram);
+router.patch('/programs/:id', validateSchema({params:{id:{type:'objectId',required:true}},body:programBodySchema}), updateProgram);
+router.post('/programs/:id/:action(deactivate|reactivate)', validateSchema({params:{id:{type:'objectId',required:true}},body:{reason:{type:'string',max:500,required:true}}}), setProgramStatus);
 router.get('/revenue-models', getRevenueModels);
 router.patch('/revenue-models/:doctorId', validateSchema({ body: { revenueModel:{type:'enum',values:['split','platform_fee']}, approvedPatientFee:{type:'number',min:0,max:1000000}, feeSharePercentage:{type:'number',min:0,max:100}, feeShareType:{type:'enum',values:['percentage','fixed','slab']}, fixedFeeShareAmount:{type:'number',min:0,max:1000000}, feeShareCalculationBasis:{type:'enum',values:['gross','after_discount','net_after_charges']}, feeShareHoldingDays:{type:'number',min:0,max:365}, minWithdrawal:{type:'number',min:0,max:10000000}, maxWithdrawal:{type:'number',min:0,max:10000000}, payoutCycle:{type:'string',max:80}, reason:{type:'string',max:500} } }), updateRevenueModel);
 router.get('/orders', getOrders); router.get('/orders/:id', getOrderById);
