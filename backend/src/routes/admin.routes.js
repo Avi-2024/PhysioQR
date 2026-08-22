@@ -20,6 +20,7 @@ const {
 const { getPainCategories, getPainCategoryById, createPainCategory, updatePainCategory, setPainCategoryStatus } = require('../controllers/admin/pain-categories.controller');
 const { getPrograms, getProgramById, createProgram, updateProgram, setProgramStatus } = require('../controllers/admin/programs.controller');
 const { getRiskReviews, getRiskReviewById, updateRiskReview } = require('../controllers/admin/risk-reviews.controller');
+const { getOrders, getOrderById } = require('../controllers/admin/orders.controller');
 const {
   getAuditLogs,
   getAuditLogById,
@@ -29,7 +30,6 @@ const {
   getRevenueModels,
   updateRevenueModel,
   getPayments,
-  getOrders,
   getWithdrawals,
   getWithdrawalById,
   getWallets,
@@ -120,6 +120,7 @@ router.get('/revenue-models', getRevenueModels);
 router.patch('/revenue-models/:doctorId', validateSchema({ params: { doctorId: { type: 'objectId', required: true } }, body: { revenueModel: { type: 'enum', values: ['split', 'platform_fee'] }, approvedPatientFee: { type: 'number', min: 0, max: 1000000 }, feeSharePercentage: { type: 'number', min: 0, max: 100 }, feeShareType: { type: 'enum', values: ['percentage', 'fixed', 'slab'] }, fixedFeeShareAmount: { type: 'number', min: 0, max: 1000000 }, feeShareCalculationBasis: { type: 'enum', values: ['gross', 'after_discount', 'net_after_charges'] }, feeShareHoldingDays: { type: 'number', min: 0, max: 365 }, minWithdrawal: { type: 'number', min: 0, max: 10000000 }, maxWithdrawal: { type: 'number', min: 0, max: 10000000 }, payoutCycle: { type: 'string', max: 80 }, reason: { type: 'string', max: 500 } } }), updateRevenueModel);
 router.get('/payments', getPayments);
 router.get('/orders', getOrders);
+router.get('/orders/:id', getOrderById);
 router.get('/withdrawals', getWithdrawals);
 router.get('/withdrawals/:id', validateSchema({ params: { id: { type: 'objectId', required: true } } }), getWithdrawalById);
 router.get('/wallets', getWallets);
