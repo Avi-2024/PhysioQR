@@ -18,6 +18,7 @@ const {
   reactivateAssessmentQuestion,
 } = require('../controllers/admin/assessment-questions.controller');
 const { getPainCategories, getPainCategoryById, createPainCategory, updatePainCategory, setPainCategoryStatus } = require('../controllers/admin/pain-categories.controller');
+const { getPrograms, getProgramById, createProgram, updateProgram, setProgramStatus } = require('../controllers/admin/programs.controller');
 const { getRiskReviews, getRiskReviewById, updateRiskReview } = require('../controllers/admin/risk-reviews.controller');
 const {
   getAuditLogs,
@@ -72,6 +73,48 @@ router.get('/pain-categories/:id', getPainCategoryById);
 router.post('/pain-categories', validateSchema({ body: { name: { type: 'string', max: 160, required: true }, nameHindi: { type: 'string', max: 160 }, description: { type: 'string', max: 1000 } } }), createPainCategory);
 router.patch('/pain-categories/:id', validateSchema({ body: { name: { type: 'string', max: 160 }, nameHindi: { type: 'string', max: 160 }, description: { type: 'string', max: 1000 } } }), updatePainCategory);
 router.post('/pain-categories/:id/:action(deactivate|reactivate)', validateSchema({ body: { reason: { type: 'string', max: 500, required: true } } }), setPainCategoryStatus);
+
+router.get('/programs', getPrograms);
+router.get('/programs/:id', getProgramById);
+router.post('/programs', validateSchema({ body: {
+  programCode: { type: 'string', min: 2, max: 60 },
+  name: { type: 'string', min: 2, max: 150, required: true },
+  nameHindi: { type: 'string', max: 150 },
+  painCategory: { type: 'objectId', required: true },
+  description: { type: 'string', max: 3000 },
+  objective: { type: 'string', max: 3000 },
+  difficultyLevel: { type: 'enum', values: ['beginner', 'intermediate', 'advanced', 'senior_friendly', 'post_operative', 'general_mobility', 'condition_specific'] },
+  durationDays: { type: 'number', min: 1, max: 365, required: true },
+  sessionsPerDay: { type: 'number', min: 1, max: 10 },
+  defaultPrice: { type: 'number', min: 0, max: 1000000 },
+  recommendedAgeGroup: { type: 'string', max: 120 },
+  instructions: { type: 'string', max: 5000 },
+  precautions: { type: 'string', max: 5000 },
+  eligibleConditions: { type: 'array' },
+  excludedConditions: { type: 'array' },
+  requiredEquipment: { type: 'array' },
+  thumbnail: { type: 'string', max: 1000 },
+} }), createProgram);
+router.patch('/programs/:id', validateSchema({ params: { id: { type: 'objectId', required: true } }, body: {
+  programCode: { type: 'string', min: 2, max: 60 },
+  name: { type: 'string', min: 2, max: 150 },
+  nameHindi: { type: 'string', max: 150 },
+  painCategory: { type: 'objectId' },
+  description: { type: 'string', max: 3000 },
+  objective: { type: 'string', max: 3000 },
+  difficultyLevel: { type: 'enum', values: ['beginner', 'intermediate', 'advanced', 'senior_friendly', 'post_operative', 'general_mobility', 'condition_specific'] },
+  durationDays: { type: 'number', min: 1, max: 365 },
+  sessionsPerDay: { type: 'number', min: 1, max: 10 },
+  defaultPrice: { type: 'number', min: 0, max: 1000000 },
+  recommendedAgeGroup: { type: 'string', max: 120 },
+  instructions: { type: 'string', max: 5000 },
+  precautions: { type: 'string', max: 5000 },
+  eligibleConditions: { type: 'array' },
+  excludedConditions: { type: 'array' },
+  requiredEquipment: { type: 'array' },
+  thumbnail: { type: 'string', max: 1000 },
+} }), updateProgram);
+router.post('/programs/:id/:action(deactivate|reactivate)', validateSchema({ params: { id: { type: 'objectId', required: true } }, body: { reason: { type: 'string', max: 500, required: true } } }), setProgramStatus);
 
 router.get('/revenue-models', getRevenueModels);
 router.patch('/revenue-models/:doctorId', validateSchema({ params: { doctorId: { type: 'objectId', required: true } }, body: { revenueModel: { type: 'enum', values: ['split', 'platform_fee'] }, approvedPatientFee: { type: 'number', min: 0, max: 1000000 }, feeSharePercentage: { type: 'number', min: 0, max: 100 }, feeShareType: { type: 'enum', values: ['percentage', 'fixed', 'slab'] }, fixedFeeShareAmount: { type: 'number', min: 0, max: 1000000 }, feeShareCalculationBasis: { type: 'enum', values: ['gross', 'after_discount', 'net_after_charges'] }, feeShareHoldingDays: { type: 'number', min: 0, max: 365 }, minWithdrawal: { type: 'number', min: 0, max: 10000000 }, maxWithdrawal: { type: 'number', min: 0, max: 10000000 }, payoutCycle: { type: 'string', max: 80 }, reason: { type: 'string', max: 500 } } }), updateRevenueModel);
