@@ -26,6 +26,7 @@ const { getSupportTickets, getSupportTicketById } = require('../controllers/admi
 const { getReports } = require('../controllers/admin/reports.controller');
 const { getFraudCases, getFraudCaseById, reviewFraudCase } = require('../controllers/admin/fraud-risk.controller');
 const { getAuditLogs, getAuditLogById, exportAuditLogs } = require('../controllers/admin/audit-logs.controller');
+const { getSettings, updateSettingsSection } = require('../controllers/admin/settings.controller');
 const { getAgentById, getDoctorById, getContentSummary } = require('../controllers/admin.controller');
 
 router.use(protect, authorize('admin'));
@@ -70,5 +71,7 @@ router.get('/risk-reviews', getRiskReviews); router.get('/risk-reviews/:id', get
 router.get('/fraud-cases', getFraudCases);
 router.get('/fraud-cases/:id', validateSchema({params:{id:{type:'objectId',required:true}}}), getFraudCaseById);
 router.patch('/fraud-cases/:id/review', validateSchema({body:{status:{type:'enum',values:['reviewing','resolved','dismissed'],required:true},note:{type:'string',max:2000,required:true}}}), reviewFraudCase);
+router.get('/settings', getSettings);
+router.patch('/settings/:section', validateSchema({params:{section:{type:'enum',values:['platform','patient','finance','notifications'],required:true}},body:{supportEmail:{type:'string',max:160},supportPhone:{type:'string',max:30},maintenanceMode:{type:'boolean'},assessmentRequired:{type:'boolean'},redFlagReviewRequired:{type:'boolean'},currency:{type:'enum',values:['INR']},refundsEnabled:{type:'boolean'},withdrawalsEnabled:{type:'boolean'},inAppEnabled:{type:'boolean'},webPushEnabled:{type:'boolean'},emailEnabled:{type:'boolean'},smsEnabled:{type:'boolean'},whatsappEnabled:{type:'boolean'},reason:{type:'string',max:500}}}), updateSettingsSection);
 router.get('/content-summary', getContentSummary);
 module.exports = router;
