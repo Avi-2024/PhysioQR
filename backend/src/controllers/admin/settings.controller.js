@@ -63,9 +63,18 @@ const updateSettingsSection = asyncHandler(async (req, res) => {
 
   const allowedKeys = Object.keys(DEFAULTS[section]);
   const updates = {};
-  allowedKeys.forEach((key) => {
-    if (req.body[key] !== undefined) updates[key] = req.body[key];
-  });
+  for (const key of allowedKeys) {
+    if (req.body[key] === undefined) continue;
+
+    const expectedType = typeof DEFAULTS[section][key];
+    if (typeof req.body[key] !== expectedType) {
+      return res.status(400).json({ message: `${key} must be a ${expectedType}` });
+    }
+    if (section === 'finance' && key === 'currency' && req.body[key] !== 'INR') {
+      return res.status(400).json({ message: 'currency must be INR' });
+    }
+    updates[key] = req.body[key];
+  }
 
   if (!Object.keys(updates).length) {
     return res.status(400).json({ message: 'No supported settings supplied' });
