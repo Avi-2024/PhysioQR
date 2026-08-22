@@ -6,6 +6,9 @@ const { writeAuditLog } = require('../../utils/auditLogger');
 const { buildSearchFilter, getPagination } = require('../../utils/queryHelpers');
 const asyncHandler = require('../../utils/asyncHandler');
 
+const VERIFIED_PAYMENT_STATUSES = ['successful', 'manually_verified'];
+const HISTORICALLY_VERIFIED_STATUSES = ['refunded', 'partially_refunded', 'disputed', 'chargeback'];
+
 const getRevenueModels = asyncHandler(async (req, res) => {
   const { page, limit, skip } = getPagination(req.query);
   const filter = {};
@@ -49,7 +52,7 @@ const getFeeShares = asyncHandler(async (req, res) => {
     FeeShare.find(filter)
       .populate('doctor', 'doctorId fullName clinicName revenueModel')
       .populate('patient', 'patientId fullName mobile')
-      .populate('payment', 'invoiceNumber paidAmount refundAmount doctorFeeShare platformShare status gatewayTransactionId')
+      .populate('payment', 'invoiceNumber paidAmount refundAmount doctorFeeShare platformShare status verifiedAt gatewayTransactionId')
       .sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
     FeeShare.countDocuments(filter),
     FeeShare.aggregate([{ $group: { _id: '$status', count: { $sum: 1 }, amount: { $sum: '$amount' } } }]),
@@ -57,7 +60,7 @@ const getFeeShares = asyncHandler(async (req, res) => {
   ]);
   const byStatus = Object.fromEntries(summaryRows.map((row) => [row._id, row]));
   const totalAmount = summaryRows.reduce((sum,row)=>sum+row.amount,0);
-  res.json({ items, meta: { page, limit, total, totalPages: Math.ceil(total / limit) || 1 }, summary: { total: summaryRows.reduce((sum,row)=>sum+row.count,0), totalAmount, pendingAmount: (byStatus.pending?.amount||0)+(byStatus.on_hold?.amount||0), availableAmount: byStatus.available?.amount||0, paidAmount: byStatus.paid?.amount||0, reversedAmount: reversalRows[0]?.amount||0 } });
+  res.json({ items, meta: { page, limit, total, totalPages: Math.ceil(total / limit) || 1 }, summary: { total: summaryRows.reduce((sum,row)=>sum+row.count,0), totalAmount, pendingAmount: (byStatus.pending?.amount||0)+(byStatus.on_hold?.amount||0)+(byStatus.estimated?.amount||0), availableAmount: byStatus.available?.amount||0, paidAmount: byStatus.paid?.amount||0, reversedAmount: reversalRows[0]?.amount||0 } });
 });
 
 const getFeeShareById = asyncHandler(async (req, res) => {
@@ -65,11 +68,13 @@ const getFeeShareById = asyncHandler(async (req, res) => {
   const feeShare = await FeeShare.findById(req.params.id)
     .populate('doctor', 'doctorId fullName clinicName revenueModel feeShareType feeSharePercentage fixedFeeShareAmount feeShareCalculationBasis feeShareHoldingDays')
     .populate('patient', 'patientId fullName mobile')
-    .populate('payment', 'invoiceNumber paidAmount refundAmount doctorFeeShare platformShare status gatewayTransactionId createdAt')
+    .populate('payment', 'invoiceNumber paidAmount refundAmount doctorFeeShare platformShare status verifiedAt gatewayTransactionId createdAt')
     .lean();
   if (!feeShare) return res.status(404).json({ message: 'Fee share not found' });
   const refunds = feeShare.payment?._id ? await Refund.find({ payment: feeShare.payment._id }).select('refundType refundAmount feeShareReversal feeShareAlreadyWithdrawn status reason createdAt').sort({ createdAt: -1 }).lean() : [];
-  res.json({ feeShare, refunds, integrity: { paymentSuccessful: ['successful','manually_verified'].includes(feeShare.payment?.status), holdingComplete: Boolean(feeShare.availableDate && new Date(feeShare.availableDate) <= new Date()), reversedAmount: refunds.reduce((sum,r)=>sum+(r.feeShareReversal||0),0) } });
+  const payment = feeShare.payment;
+  const paymentWasVerified = Boolean(payment?.verifiedAt) || VERIFIED_PAYMENT_STATUSES.includes(payment?.status) || HISTORICALLY_VERIFIED_STATUSES.includes(payment?.status);
+  res.json({ feeShare, refunds, integrity: { paymentSuccessful: paymentWasVerified, holdingComplete: Boolean(feeShare.availableDate && new Date(feeShare.availableDate) <= new Date()), reversedAmount: refunds.reduce((sum,r)=>sum+(r.feeShareReversal||0),0) } });
 });
 
 module.exports = { getRevenueModels, updateRevenueModel, getFeeShares, getFeeShareById };
