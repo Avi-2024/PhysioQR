@@ -20,6 +20,7 @@ const { getRevenueModels, updateRevenueModel, getFeeShares, getFeeShareById } = 
 const { getWallets, getWalletByDoctor, getWalletLedger } = require('../controllers/admin/wallets.controller');
 const { getWithdrawals, getWithdrawalById } = require('../controllers/admin/withdrawals.controller');
 const { getPayouts, getPayoutById } = require('../controllers/admin/payouts.controller');
+const { getReconciliation } = require('../controllers/admin/reconciliation.controller');
 const { getAuditLogs, getAuditLogById, exportAuditLogs, getAgentById, getDoctorById, getFraudCases, getFraudCaseById, reviewFraudCase, getContentSummary } = require('../controllers/admin.controller');
 router.use(protect, authorize('admin'));
 router.get('/dashboard', getDashboard);
@@ -38,6 +39,7 @@ router.get('/orders', getOrders); router.get('/orders/:id', getOrderById); route
 router.get('/wallets', getWallets); router.get('/wallets/:doctorId', getWalletByDoctor); router.get('/wallets/:doctorId/ledger', getWalletLedger);
 router.get('/withdrawals', getWithdrawals); router.get('/withdrawals/:id', validateSchema({params:{id:{type:'objectId',required:true}}}), getWithdrawalById);
 router.get('/payouts', getPayouts); router.get('/payouts/:id', validateSchema({params:{id:{type:'objectId',required:true}}}), getPayoutById);
+router.get('/reconciliation', getReconciliation);
 router.get('/risk-reviews', getRiskReviews); router.get('/risk-reviews/:id', getRiskReviewById); router.patch('/risk-reviews/:id', validateSchema({body:{status:{type:'enum',values:['cleared','blocked'],required:true},note:{type:'string',max:2000,required:true}}}), updateRiskReview);
 router.get('/fraud-cases', getFraudCases); router.get('/fraud-cases/:id', getFraudCaseById); router.patch('/fraud-cases/:id/review', requireFields('status'), reviewFraudCase); router.get('/content-summary', getContentSummary);
 module.exports = router;
