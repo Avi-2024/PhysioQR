@@ -3,9 +3,8 @@ const notificationService = require('../services/notification.service');
 const { buildSort, paginateModel } = require('../utils/queryHelpers');
 const asyncHandler = require('../utils/asyncHandler');
 
-const CHANNELS = ['in_app', 'email', 'sms', 'whatsapp'];
+const CHANNELS = ['in_app', 'email', 'sms', 'whatsapp', 'web_push'];
 
-// Builds a recipient-scoped notification filter for the authenticated user.
 const getRecipientFilter = (req) => {
   const filter = {};
   if (req.user.role === 'patient') filter.patient = req.user._id;
@@ -15,7 +14,6 @@ const getRecipientFilter = (req) => {
   return filter;
 };
 
-// Adds query filters allowed for notification listing.
 const buildNotificationFilter = (req) => {
   const filter = req.user.role === 'admin' && req.query.all === 'true' ? {} : getRecipientFilter(req);
   if (req.query.channel) filter.channel = req.query.channel;
@@ -25,23 +23,19 @@ const buildNotificationFilter = (req) => {
   return filter;
 };
 
-// Validates requested notification channels.
 const normalizeChannels = (payload) => {
   const channels = Array.isArray(payload.channels) && payload.channels.length
     ? payload.channels
     : [payload.channel || 'in_app'];
-
   const invalid = channels.find((channel) => !CHANNELS.includes(channel));
   if (invalid) {
     const error = new Error(`channel must be one of: ${CHANNELS.join(', ')}`);
     error.status = 400;
     throw error;
   }
-
   return [...new Set(channels)];
 };
 
-// GET /api/notifications
 const getNotifications = asyncHandler(async (req, res) => {
   const result = await paginateModel({
     model: Notification,
@@ -58,7 +52,6 @@ const getNotifications = asyncHandler(async (req, res) => {
   res.json(result);
 });
 
-// PUT /api/notifications/:id/read
 const markRead = asyncHandler(async (req, res) => {
   const filter = { _id: req.params.id, ...getRecipientFilter(req), channel: 'in_app' };
   const notification = await Notification.findOneAndUpdate(filter, { isRead: true }, { new: true });
@@ -66,7 +59,6 @@ const markRead = asyncHandler(async (req, res) => {
   res.json({ message: 'Marked as read', notification });
 });
 
-// PUT /api/notifications/read-all
 const markAllRead = asyncHandler(async (req, res) => {
   const result = await Notification.updateMany(
     { ...getRecipientFilter(req), channel: 'in_app', isRead: false },
@@ -75,7 +67,6 @@ const markAllRead = asyncHandler(async (req, res) => {
   res.json({ message: 'Notifications marked as read', modifiedCount: result.modifiedCount });
 });
 
-// POST /api/notifications
 const createNotification = asyncHandler(async (req, res) => {
   const channels = normalizeChannels(req.body);
   const notifications = await notificationService.createNotificationsForChannels(
@@ -94,17 +85,14 @@ const createNotification = asyncHandler(async (req, res) => {
     channels,
     { deliverNow: req.body.deliverNow !== false }
   );
-
   res.status(201).json({ notifications });
 });
 
-// POST /api/notifications/:id/deliver
 const deliverNotification = asyncHandler(async (req, res) => {
   const notification = await notificationService.deliverNotification(req.params.id);
   res.json({ message: 'Notification delivery attempted', notification });
 });
 
-// POST /api/notifications/process-pending
 const processPendingNotifications = asyncHandler(async (req, res) => {
   const notifications = await notificationService.processPendingNotifications({
     limit: req.body.limit,
@@ -113,11 +101,4 @@ const processPendingNotifications = asyncHandler(async (req, res) => {
   res.json({ processed: notifications.length, notifications });
 });
 
-module.exports = {
-  getNotifications,
-  markRead,
-  markAllRead,
-  createNotification,
-  deliverNotification,
-  processPendingNotifications,
-};
+module.exports = { getNotifications, markRead, markAllRead, createNotification, deliverNotification, processPendingNotifications };
