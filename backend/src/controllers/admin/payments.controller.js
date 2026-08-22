@@ -6,6 +6,8 @@ const { getPagination } = require('../../utils/queryHelpers');
 const asyncHandler = require('../../utils/asyncHandler');
 
 const VERIFIED = ['successful', 'manually_verified'];
+const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const SAFE_PAYMENT_SELECT = '-gatewaySignature -rawGatewayPayload';
 
 const buildFilter = (query = {}) => {
   const filter = {};
@@ -14,12 +16,14 @@ const buildFilter = (query = {}) => {
   if (query.patient) filter.patient = query.patient;
   if (query.program) filter.program = query.program;
   if (query.search) {
-    const value = String(query.search).trim();
-    filter.$or = [
-      { invoiceNumber: { $regex: value, $options: 'i' } },
-      { gatewayTransactionId: { $regex: value, $options: 'i' } },
-      { gatewayOrderId: { $regex: value, $options: 'i' } },
-    ];
+    const value = escapeRegex(String(query.search).trim());
+    if (value) {
+      filter.$or = [
+        { invoiceNumber: { $regex: value, $options: 'i' } },
+        { gatewayTransactionId: { $regex: value, $options: 'i' } },
+        { gatewayOrderId: { $regex: value, $options: 'i' } },
+      ];
+    }
   }
   return filter;
 };
@@ -29,6 +33,7 @@ const getPayments = asyncHandler(async (req, res) => {
   const filter = buildFilter(req.query);
   const [items, total, summaryRows] = await Promise.all([
     Payment.find(filter)
+      .select(SAFE_PAYMENT_SELECT)
       .populate('patient', 'patientId fullName mobile city referralLocked')
       .populate('doctor', 'doctorId fullName clinicName')
       .populate('agent', 'agentId fullName')
@@ -47,6 +52,7 @@ const getPayments = asyncHandler(async (req, res) => {
 const getPaymentById = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid payment id' });
   const payment = await Payment.findById(req.params.id)
+    .select(SAFE_PAYMENT_SELECT)
     .populate('patient', 'patientId fullName mobile email city state referralLocked referringDoctor')
     .populate('doctor', 'doctorId fullName clinicName city revenueModel')
     .populate('agent', 'agentId fullName assignedRegion')
