@@ -1,6 +1,29 @@
-import { AdminResourceListPage } from '@/features/admin/components/AdminResourceListPage';
+import { useDeferredValue, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
+import { AlertTriangle, RefreshCw, Search, ShieldAlert } from 'lucide-react';
+import apiClient from '@/lib/api-client';
+import ErrorState from '@/components/feedback/ErrorState';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { cn } from '@/lib/cn';
+import { formatCurrency } from '@/lib/formatters';
 
-// Renders the backend-backed admin fraud risk list page.
-export default function AdminFraudRiskPage() {
-  return <AdminResourceListPage moduleKey="fraudRisk" />;
+type FraudCase = { _id:string; rule:string; severity:'low'|'medium'|'high'|'critical'; status:'open'|'reviewing'|'resolved'|'dismissed'; summary?:string; relatedRecord?:string; createdAt:string; doctor?:{doctorId?:string;fullName?:string;clinicName?:string}; patient?:{patientId?:string;fullName?:string}; payment?:{invoiceNumber?:string;paidAmount?:number;status?:string} };
+type Response = { items:FraudCase[]; meta:{page:number;total:number;totalPages:number}; summary:{total:number;open:number;reviewing:number;critical:number;high:number;resolved:number;dismissed:number}; rules:string[] };
+const label=(value:string)=>value.replace(/_/g,' ');
+
+export default function AdminFraudRiskPage(){
+  const nav=useNavigate();
+  const [search,setSearch]=useState(''); const dq=useDeferredValue(search.trim());
+  const [status,setStatus]=useState(''); const [severity,setSeverity]=useState(''); const [rule,setRule]=useState(''); const [page,setPage]=useState(1);
+  const q=useQuery<Response>({queryKey:['admin-fraud-risk',page,dq,status,severity,rule],queryFn:()=>apiClient.get('/admin/fraud-cases',{params:{page,limit:20,...(dq?{search:dq}:{}),...(status?{status}:{}),...(severity?{severity}:{}),...(rule?{rule}:{})}}).then(r=>r.data)});
+  const s=q.data?.summary;
+  return <div className="space-y-6">
+    <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div><p className="text-xs font-bold uppercase tracking-[.16em] text-primary-700">Risk & Controls</p><h1 className="mt-2 text-2xl font-bold sm:text-3xl">Fraud Risk</h1><p className="mt-1 text-sm text-neutral-500">Review rule-triggered cases using recorded evidence and linked operational records.</p></div><button onClick={()=>q.refetch()} className="inline-flex min-h-11 items-center gap-2 self-start rounded-lg border bg-white px-4 text-sm font-semibold"><RefreshCw className={cn('h-4 w-4',q.isFetching&&'animate-spin')}/>Refresh</button></header>
+    <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{[[ShieldAlert,'Total cases',s?.total],[AlertTriangle,'Open',s?.open],[AlertTriangle,'Critical',s?.critical],[Search,'Reviewing',s?.reviewing]].map(([I,l,v]:any)=><div key={l} className="rounded-xl border bg-white p-4"><I className="h-5 w-5 text-neutral-500"/><p className="mt-3 text-xs font-semibold uppercase text-neutral-500">{l}</p><p className="mt-1 text-2xl font-bold">{v??'—'}</p></div>)}</section>
+    <section className="overflow-hidden rounded-xl border bg-white"><div className="grid gap-3 border-b p-4 lg:grid-cols-[1fr_170px_170px_220px]"><div className="relative"><Search className="absolute left-3 top-3.5 h-4 w-4 text-neutral-400"/><input value={search} onChange={e=>{setSearch(e.target.value);setPage(1)}} placeholder="Rule, summary or related record" className="min-h-11 w-full rounded-lg border pl-9 pr-3 text-sm"/></div><Select value={status} onChange={v=>{setStatus(v);setPage(1)}} label="All statuses" options={['open','reviewing','resolved','dismissed']}/><Select value={severity} onChange={v=>{setSeverity(v);setPage(1)}} label="All severities" options={['low','medium','high','critical']}/><Select value={rule} onChange={v=>{setRule(v);setPage(1)}} label="All rules" options={q.data?.rules||[]}/></div>
+      {q.isError?<div className="p-5"><ErrorState title="Fraud cases could not load" message="Check the API and retry." onRetry={()=>q.refetch()}/></div>:q.isLoading?<div className="space-y-3 p-5">{Array.from({length:7}).map((_,i)=><Skeleton key={i} className="h-16"/>)}</div>:!q.data?.items.length?<div className="p-12 text-center text-sm text-neutral-500">No fraud cases match these filters.</div>:<div className="overflow-x-auto"><table className="w-full min-w-[1080px] text-left text-sm"><thead className="bg-neutral-50 text-xs uppercase text-neutral-500"><tr><th className="px-5 py-3">Case</th><th className="px-4 py-3">Linked record</th><th className="px-4 py-3">Severity</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Created</th><th className="px-5 py-3 text-right">Action</th></tr></thead><tbody className="divide-y">{q.data.items.map(item=><tr key={item._id}><td className="px-5 py-4"><div className="font-semibold">{label(item.rule)}</div><div className="mt-1 max-w-[360px] truncate text-xs text-neutral-500">{item.summary||'No summary recorded'}</div></td><td className="px-4 py-4"><div className="font-medium">{item.doctor?.fullName||item.patient?.fullName||item.payment?.invoiceNumber||item.relatedRecord||'—'}</div><div className="text-xs text-neutral-500">{item.doctor?.doctorId||item.patient?.patientId||(item.payment?.paidAmount!=null?formatCurrency(item.payment.paidAmount):'')}</div></td><td className="px-4 py-4"><span className={cn('rounded-full px-2.5 py-1 text-xs font-semibold',item.severity==='critical'?'bg-red-100 text-red-800':item.severity==='high'?'bg-orange-100 text-orange-800':item.severity==='medium'?'bg-amber-50 text-amber-700':'bg-neutral-100 text-neutral-700')}>{item.severity}</span></td><td className="px-4 py-4"><span className="rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-semibold">{label(item.status)}</span></td><td className="px-4 py-4 text-neutral-600">{new Date(item.createdAt).toLocaleString()}</td><td className="px-5 py-4 text-right"><button onClick={()=>nav(`/admin/fraud-risk/${item._id}`)} className="rounded-lg border px-3 py-2 text-xs font-semibold">Review</button></td></tr>)}</tbody></table></div>}
+    </section>
+  </div>
 }
+function Select({value,onChange,label:placeholder,options}:{value:string;onChange:(v:string)=>void;label:string;options:string[]}){return <select value={value} onChange={e=>onChange(e.target.value)} className="min-h-11 rounded-lg border px-3 text-sm"><option value="">{placeholder}</option>{options.map(x=><option key={x} value={x}>{label(x)}</option>)}</select>}
