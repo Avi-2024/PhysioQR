@@ -30,6 +30,7 @@ const AdminExercisesPage = lazy(() => import('@/features/admin/pages/content/Adm
 const AdminExerciseDetailPage = lazy(() => import('@/features/admin/pages/content/AdminExerciseDetailPage'));
 const AdminVideosPage = lazy(() => import('@/features/admin/pages/content/AdminVideosPage'));
 const AdminOrdersPage = lazy(() => import('@/features/admin/pages/payments/AdminOrdersPage'));
+const AdminOrderDetailPage = lazy(() => import('@/features/admin/pages/payments/AdminOrderDetailPage'));
 const AdminPaymentsPage = lazy(() => import('@/features/admin/pages/payments/AdminPaymentsPage'));
 const AdminPaymentDetailPage = lazy(() => import('@/features/admin/pages/payments/AdminPaymentDetailPage'));
 const AdminRefundsPage = lazy(() => import('@/features/admin/pages/payments/AdminRefundsPage'));
@@ -63,7 +64,7 @@ export const adminRoutes: RouteObject = { path: '/admin', element: <ProtectedRou
   { path: 'pain-categories', element: withSuspense(<AdminPainCategoriesPage />) }, { path: 'pain-categories/:categoryId', element: withSuspense(<AdminPainCategoryDetailPage />) },
   { path: 'programs', element: withSuspense(<AdminProgramsPage />) }, { path: 'programs/:programId', element: withSuspense(<AdminProgramDetailPage />) },
   { path: 'exercises', element: withSuspense(<AdminExercisesPage />) }, { path: 'exercises/:exerciseId', element: withSuspense(<AdminExerciseDetailPage />) }, { path: 'videos', element: withSuspense(<AdminVideosPage />) },
-  { path: 'orders', element: withSuspense(<AdminOrdersPage />) }, { path: 'payments', element: withSuspense(<AdminPaymentsPage />) }, { path: 'payments/:paymentId', element: withSuspense(<AdminPaymentDetailPage />) }, { path: 'refunds', element: withSuspense(<AdminRefundsPage />) }, { path: 'coupons', element: withSuspense(<AdminCouponsPage />) },
+  { path: 'orders', element: withSuspense(<AdminOrdersPage />) }, { path: 'orders/:orderId', element: withSuspense(<AdminOrderDetailPage />) }, { path: 'payments', element: withSuspense(<AdminPaymentsPage />) }, { path: 'payments/:paymentId', element: withSuspense(<AdminPaymentDetailPage />) }, { path: 'refunds', element: withSuspense(<AdminRefundsPage />) }, { path: 'coupons', element: withSuspense(<AdminCouponsPage />) },
   { path: 'revenue-models', element: withSuspense(<AdminRevenueModelsPage />) }, { path: 'fee-shares', element: withSuspense(<AdminFeeSharesPage />) }, { path: 'wallets', element: withSuspense(<AdminWalletsPage />) }, { path: 'withdrawals', element: withSuspense(<AdminWithdrawalsPage />) }, { path: 'withdrawals/:withdrawalId', element: withSuspense(<AdminWithdrawalDetailPage />) }, { path: 'payouts', element: withSuspense(<AdminPayoutsPage />) }, { path: 'reconciliation', element: withSuspense(<AdminReconciliationPage />) },
   { path: 'notifications', element: withSuspense(<AdminNotificationsPage />) }, { path: 'support', element: withSuspense(<AdminSupportPage />) }, { path: 'support/:ticketId', element: withSuspense(<AdminSupportTicketDetailPage />) }, { path: 'reports', element: withSuspense(<AdminReportsPage />) }, { path: 'fraud-risk', element: withSuspense(<AdminFraudRiskPage />) }, { path: 'audit-logs', element: withSuspense(<AdminAuditLogsPage />) }, { path: 'settings', element: withSuspense(<AdminSettingsPage />) },
 ] };
