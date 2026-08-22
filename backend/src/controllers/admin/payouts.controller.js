@@ -4,6 +4,8 @@ const { WalletTransaction } = require('../../models/Wallet.model');
 const { getPagination } = require('../../utils/queryHelpers');
 const asyncHandler = require('../../utils/asyncHandler');
 
+const escapeRegex = (value = '') => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 const getPayouts = asyncHandler(async (req, res) => {
   const { page, limit, skip } = getPagination(req.query);
   const filter = {};
@@ -14,15 +16,16 @@ const getPayouts = asyncHandler(async (req, res) => {
   const search = String(req.query.search || '').trim();
   if (search) {
     const Doctor = require('../../models/Doctor.model');
+    const safe = escapeRegex(search);
     const doctorIds = (await Doctor.find({
       $or: [
-        { doctorId: { $regex: search, $options: 'i' } },
-        { fullName: { $regex: search, $options: 'i' } },
-        { clinicName: { $regex: search, $options: 'i' } },
+        { doctorId: { $regex: safe, $options: 'i' } },
+        { fullName: { $regex: safe, $options: 'i' } },
+        { clinicName: { $regex: safe, $options: 'i' } },
       ],
     }).select('_id').lean()).map((item) => item._id);
     filter.$or = [
-      { transactionReference: { $regex: search, $options: 'i' } },
+      { transactionReference: { $regex: safe, $options: 'i' } },
       { doctor: { $in: doctorIds } },
     ];
   }
