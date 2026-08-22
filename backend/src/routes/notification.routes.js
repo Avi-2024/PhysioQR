@@ -11,10 +11,14 @@ const {
   deliverNotification,
   processPendingNotifications,
 } = require('../controllers/notification.controller');
+const { getPublicKey, subscribe, unsubscribe } = require('../controllers/web-push.controller');
 
 router.use(protect);
 
 router.get('/', getNotifications);
+router.get('/web-push/public-key', getPublicKey);
+router.post('/web-push/subscribe', subscribe);
+router.delete('/web-push/unsubscribe', unsubscribe);
 router.put('/read-all', markAllRead);
 router.put('/:id/read', markRead);
 router.post('/', authorize('admin'), requireFields('recipientType', 'title', 'message'), createNotification);
