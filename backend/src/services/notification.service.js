@@ -3,6 +3,7 @@ const twilio = require('twilio');
 const webPush = require('web-push');
 const Notification = require('../models/Notification.model');
 const WebPushSubscription = require('../models/WebPushSubscription.model');
+const AppSetting = require('../models/AppSetting.model');
 const Patient = require('../models/Patient.model');
 const Doctor = require('../models/Doctor.model');
 const Agent = require('../models/Agent.model');
@@ -12,6 +13,42 @@ const serviceError = (message, status = 400) => {
   const error = new Error(message);
   error.status = status;
   return error;
+};
+
+const DEFAULT_CHANNEL_SETTINGS = {
+  inAppEnabled: true,
+  webPushEnabled: true,
+  emailEnabled: true,
+  smsEnabled: true,
+  whatsappEnabled: true,
+};
+
+const CHANNEL_SETTING_KEYS = {
+  in_app: 'inAppEnabled',
+  web_push: 'webPushEnabled',
+  email: 'emailEnabled',
+  sms: 'smsEnabled',
+  whatsapp: 'whatsappEnabled',
+};
+
+let notificationSettingsCache = null;
+let notificationSettingsCachedAt = 0;
+const NOTIFICATION_SETTINGS_CACHE_MS = 30 * 1000;
+
+const getNotificationSettings = async () => {
+  const now = Date.now();
+  if (notificationSettingsCache && now - notificationSettingsCachedAt < NOTIFICATION_SETTINGS_CACHE_MS) return notificationSettingsCache;
+  const record = await AppSetting.findOne({ key: 'notifications' }).select('value').lean();
+  notificationSettingsCache = { ...DEFAULT_CHANNEL_SETTINGS, ...(record?.value || {}) };
+  notificationSettingsCachedAt = now;
+  return notificationSettingsCache;
+};
+
+const assertChannelEnabled = async (channel) => {
+  const settingKey = CHANNEL_SETTING_KEYS[channel];
+  if (!settingKey) throw serviceError(`Unsupported notification channel: ${channel}`);
+  const settings = await getNotificationSettings();
+  if (settings[settingKey] === false) throw serviceError(`${channel.replace(/_/g, ' ')} notifications are disabled by platform settings`, 503);
 };
 
 const toE164Mobile = (mobile) => {
@@ -142,6 +179,7 @@ const deliverNotification = async (notificationOrId) => {
   if (!notification) throw serviceError('Notification not found', 404);
   if (notification.status === 'sent') return notification;
   try {
+    await assertChannelEnabled(notification.channel);
     const contact = await resolveRecipientContact(notification);
     notification.recipientContact = contact || notification.recipientContact;
     notification.lastAttemptAt = new Date();
@@ -194,4 +232,4 @@ const processPendingNotifications = async ({ limit = 25, includeFailed = false }
   return results;
 };
 
-module.exports = { createNotification, createNotificationsForChannels, deliverNotification, processPendingNotifications };
+module.exports = { createNotification, createNotificationsForChannels, deliverNotification, processPendingNotifications, getNotificationSettings };
