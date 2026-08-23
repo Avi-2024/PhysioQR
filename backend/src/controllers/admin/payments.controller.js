@@ -39,6 +39,7 @@ const getPayments = asyncHandler(async (req, res) => {
       .populate('agent', 'agentId fullName')
       .populate('program', 'programCode name')
       .populate('order', 'orderId finalAmount status')
+      .populate('duplicateOf', 'invoiceNumber gatewayTransactionId status')
       .sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
     Payment.countDocuments(filter),
     Payment.aggregate([{ $group: { _id: '$status', count: { $sum: 1 }, amount: { $sum: { $ifNull: ['$paidAmount', 0] } }, refunds: { $sum: { $ifNull: ['$refundAmount', 0] } } } }]),
@@ -46,7 +47,20 @@ const getPayments = asyncHandler(async (req, res) => {
   const byStatus = Object.fromEntries(summaryRows.map((row) => [row._id, row]));
   const verifiedCount = VERIFIED.reduce((sum, status) => sum + (byStatus[status]?.count || 0), 0);
   const verifiedAmount = VERIFIED.reduce((sum, status) => sum + (byStatus[status]?.amount || 0), 0);
-  res.json({ items, meta: { page, limit, total, totalPages: Math.ceil(total / limit) }, summary: { total: summaryRows.reduce((s,r)=>s+r.count,0), verified: verifiedCount, verifiedAmount, failed: byStatus.failed?.count || 0, refunded: (byStatus.refunded?.count || 0) + (byStatus.partially_refunded?.count || 0), refundAmount: summaryRows.reduce((s,r)=>s+r.refunds,0) } });
+  res.json({
+    items,
+    meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    summary: {
+      total: summaryRows.reduce((s,r)=>s+r.count,0),
+      verified: verifiedCount,
+      verifiedAmount,
+      failed: byStatus.failed?.count || 0,
+      duplicateCaptured: byStatus.duplicate_captured?.count || 0,
+      duplicateCapturedAmount: byStatus.duplicate_captured?.amount || 0,
+      refunded: (byStatus.refunded?.count || 0) + (byStatus.partially_refunded?.count || 0),
+      refundAmount: summaryRows.reduce((s,r)=>s+r.refunds,0),
+    },
+  });
 });
 
 const getPaymentById = asyncHandler(async (req, res) => {
@@ -58,13 +72,24 @@ const getPaymentById = asyncHandler(async (req, res) => {
     .populate('agent', 'agentId fullName assignedRegion')
     .populate('program', 'programCode name durationDays sessionsPerDay')
     .populate('order', 'orderId originalAmount discountAmount taxAmount gatewayCharges finalAmount currency couponCode status paidAt createdAt')
+    .populate('duplicateOf', 'invoiceNumber gatewayTransactionId paidAmount status verifiedAt')
     .lean();
   if (!payment) return res.status(404).json({ message: 'Payment not found' });
   const [patientProgram, refunds] = await Promise.all([
-    PatientProgram.findOne({ payment: payment._id }).select('status startDate expiryDate currentDay completionPercentage unlockMethod').lean(),
+    payment.status === 'duplicate_captured' ? null : PatientProgram.findOne({ payment: payment._id }).select('status startDate expiryDate currentDay completionPercentage unlockMethod').lean(),
     Refund.find({ payment: payment._id }).sort({ createdAt: -1 }).lean(),
   ]);
-  res.json({ payment, patientProgram, refunds, integrity: { paymentVerified: VERIFIED.includes(payment.status), programActivated: patientProgram?.status === 'active', referralLocked: Boolean(payment.patient?.referralLocked) } });
+  res.json({
+    payment,
+    patientProgram,
+    refunds,
+    integrity: {
+      paymentVerified: VERIFIED.includes(payment.status),
+      duplicateCaptured: payment.status === 'duplicate_captured',
+      programActivated: patientProgram?.status === 'active',
+      referralLocked: Boolean(payment.patient?.referralLocked),
+    },
+  });
 });
 
 module.exports = { getPayments, getPaymentById };
