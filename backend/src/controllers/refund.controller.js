@@ -120,6 +120,8 @@ const createRefund = asyncHandler(async (req, res) => {
             doctor: lockedPayment.doctor,
             wallet: wallet._id,
             relatedPayment: lockedPayment._id,
+            relatedRefund: refund._id,
+            eventKey: `refund:${refund._id}:fee-share-reversal`,
             type: 'refund_reversal',
             amount: -reversalAmount,
             previousBalance,
@@ -147,6 +149,14 @@ const createRefund = asyncHandler(async (req, res) => {
         );
       }
     });
+  } catch (error) {
+    if (error?.code === 11000 && idempotencyKey) {
+      const existingRefund = await Refund.findOne({ idempotencyKey }).lean();
+      if (existingRefund && String(existingRefund.payment) === String(paymentId) && money2(existingRefund.refundAmount) === refundAmount) {
+        return res.status(200).json({ message: 'Refund already processed', refund: existingRefund, idempotent: true });
+      }
+    }
+    throw error;
   } finally {
     await session.endSession();
   }
