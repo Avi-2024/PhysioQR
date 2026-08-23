@@ -19,7 +19,6 @@ const patientProgramSchema = new mongoose.Schema({
     default: 'pending_payment',
   },
 
-  // Video unlock method
   unlockMethod: {
     type: String,
     enum: ['all_at_once', 'every_24_hours', 'after_completion', 'calendar_dates', 'manual'],
@@ -30,5 +29,9 @@ const patientProgramSchema = new mongoose.Schema({
   pausedAt: Date,
   pauseReason: String,
 }, { timestamps: true });
+
+patientProgramSchema.index({ patient: 1, program: 1 }, { unique: true });
+patientProgramSchema.index({ payment: 1 }, { unique: true, sparse: true });
+patientProgramSchema.index({ doctor: 1, status: 1, createdAt: -1 });
 
 module.exports = mongoose.model('PatientProgram', patientProgramSchema);
