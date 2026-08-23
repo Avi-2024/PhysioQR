@@ -18,6 +18,7 @@ const fraudService = require('../services/fraud.service');
 const asyncHandler = require('../utils/asyncHandler');
 
 let razorpayClient;
+const VERIFIED_LIFECYCLE_STATUSES = ['successful', 'manually_verified', 'refunded', 'partially_refunded', 'disputed', 'chargeback'];
 
 const paymentError = (message, status = 400) => {
   const error = new Error(message);
@@ -190,10 +191,65 @@ const activatePatientProgram = async ({ order, payment, doctor, session }) => {
   );
 };
 
+const findPrimaryPaymentForOrder = (orderId, session) => {
+  const query = Payment.findOne({ order: orderId, status: { $in: VERIFIED_LIFECYCLE_STATUSES } }).sort({ verifiedAt: 1, createdAt: 1 });
+  return session ? query.session(session) : query;
+};
+
+const createDuplicateCapturedIncident = async ({ order, primaryPayment, doctor, gatewayTransactionId, signature, rawGatewayPayload, session }) => {
+  let query = Payment.findOne({ gatewayTransactionId });
+  if (session) query = query.session(session);
+  const existing = await query;
+  if (existing) {
+    if (existing.order.toString() !== order._id.toString()) {
+      throw paymentError('Gateway transaction is already linked to another order', 409);
+    }
+    if (existing.status === 'duplicate_captured' && existing.isDuplicate) return { duplicatePayment: existing, created: false };
+    if (existing._id.toString() === primaryPayment._id.toString()) return { duplicatePayment: null, created: false };
+    throw paymentError('Gateway transaction is already linked to another payment record', 409);
+  }
+
+  const payload = {
+    order: order._id,
+    patient: order.patient,
+    doctor: order.doctor,
+    agent: doctor.agent || null,
+    program: order.program,
+    gatewayProvider: order.gatewayProvider,
+    gatewayOrderId: order.gatewayOrderId,
+    gatewayTransactionId,
+    gatewaySignature: signature,
+    rawGatewayPayload,
+    paidAmount: order.finalAmount,
+    discountAmount: order.discountAmount,
+    taxAmount: order.taxAmount,
+    gatewayCharges: order.gatewayCharges,
+    status: 'duplicate_captured',
+    isDuplicate: true,
+    duplicateOf: primaryPayment._id,
+    failureReason: 'Second captured gateway transaction for an order that already has a verified payment',
+  };
+
+  try {
+    const docs = await Payment.create([payload], session ? { session } : undefined);
+    return { duplicatePayment: docs[0], created: true };
+  } catch (error) {
+    if (error?.code === 11000) {
+      const raced = await Payment.findOne({ gatewayTransactionId });
+      if (raced && raced.order.toString() === order._id.toString() && raced.status === 'duplicate_captured') {
+        return { duplicatePayment: raced, created: false };
+      }
+    }
+    throw error;
+  }
+};
+
 const processSuccessfulPayment = async ({ order, doctor, gatewayTransactionId, signature, rawGatewayPayload, req }) => {
   const session = await mongoose.startSession();
   let payment;
   let newlyProcessed = false;
+  let duplicatePayment = null;
+  let duplicateIncidentCreated = false;
 
   try {
     await session.withTransaction(async () => {
@@ -202,16 +258,38 @@ const processSuccessfulPayment = async ({ order, doctor, gatewayTransactionId, s
 
       const existingPayment = await Payment.findOne({ gatewayTransactionId }).session(session);
       if (existingPayment) {
-        if (existingPayment.order.toString() === lockedOrder._id.toString() && existingPayment.verifiedAt) {
+        if (existingPayment.order.toString() !== lockedOrder._id.toString()) {
+          throw paymentError('Gateway transaction is already linked to another payment', 409);
+        }
+        if (existingPayment.status === 'duplicate_captured' && existingPayment.isDuplicate) {
+          duplicatePayment = existingPayment;
+          payment = await Payment.findById(existingPayment.duplicateOf).session(session);
+          if (!payment) throw paymentError('Primary payment for duplicate charge could not be found', 409);
+          return;
+        }
+        if (existingPayment.verifiedAt) {
           payment = existingPayment;
           return;
         }
-        throw paymentError('Gateway transaction is already linked to another payment', 409);
+        throw paymentError('Gateway transaction is already linked to an unresolved payment record', 409);
       }
 
-      const alreadyVerified = await Payment.findOne({ order: lockedOrder._id, verifiedAt: { $ne: null } }).session(session);
+      const alreadyVerified = await findPrimaryPaymentForOrder(lockedOrder._id, session);
       if (alreadyVerified) {
         payment = alreadyVerified;
+        if (alreadyVerified.gatewayTransactionId === gatewayTransactionId) return;
+
+        const incident = await createDuplicateCapturedIncident({
+          order: lockedOrder,
+          primaryPayment: alreadyVerified,
+          doctor,
+          gatewayTransactionId,
+          signature,
+          rawGatewayPayload,
+          session,
+        });
+        duplicatePayment = incident.duplicatePayment;
+        duplicateIncidentCreated = incident.created;
         return;
       }
 
@@ -259,13 +337,34 @@ const processSuccessfulPayment = async ({ order, doctor, gatewayTransactionId, s
     });
   } catch (error) {
     if (error?.code === 11000) {
-      const existing = await Payment.findOne({ gatewayTransactionId });
-      if (existing && existing.order.toString() === order._id.toString() && existing.verifiedAt) {
-        payment = existing;
-        newlyProcessed = false;
-      } else {
-        throw error;
+      const existingTxn = await Payment.findOne({ gatewayTransactionId });
+      if (existingTxn && existingTxn.order.toString() === order._id.toString()) {
+        if (existingTxn.status === 'duplicate_captured') {
+          duplicatePayment = existingTxn;
+          payment = await Payment.findById(existingTxn.duplicateOf);
+        } else if (existingTxn.verifiedAt) {
+          payment = existingTxn;
+        }
       }
+
+      if (!payment) {
+        const primary = await findPrimaryPaymentForOrder(order._id);
+        if (primary && primary.gatewayTransactionId !== gatewayTransactionId) {
+          payment = primary;
+          const incident = await createDuplicateCapturedIncident({
+            order,
+            primaryPayment: primary,
+            doctor,
+            gatewayTransactionId,
+            signature,
+            rawGatewayPayload,
+          });
+          duplicatePayment = incident.duplicatePayment;
+          duplicateIncidentCreated = incident.created;
+        }
+      }
+
+      if (!payment) throw error;
     } else {
       throw error;
     }
@@ -274,6 +373,43 @@ const processSuccessfulPayment = async ({ order, doctor, gatewayTransactionId, s
   }
 
   if (!payment) throw paymentError('Payment processing did not produce a verified payment', 409);
+
+  if (duplicatePayment) {
+    if (duplicateIncidentCreated) {
+      await fraudService.createFraudCase({
+        rule: 'duplicate_captured_payment_same_order',
+        severity: 'critical',
+        doctor: order.doctor,
+        patient: order.patient,
+        payment: payment._id,
+        relatedRecord: gatewayTransactionId,
+        summary: `A second captured payment was detected for order ${order.gatewayOrderId}`,
+        evidence: {
+          order: order._id,
+          primaryPayment: payment._id,
+          primaryTransactionId: payment.gatewayTransactionId,
+          duplicatePayment: duplicatePayment._id,
+          duplicateTransactionId: gatewayTransactionId,
+          amount: duplicatePayment.paidAmount,
+        },
+      });
+      await writeAuditLog({
+        req,
+        action: 'duplicate_payment_captured',
+        module: 'Payment',
+        recordId: duplicatePayment._id,
+        newValue: {
+          orderId: order._id,
+          primaryPaymentId: payment._id,
+          primaryTransactionId: payment.gatewayTransactionId,
+          duplicateTransactionId: gatewayTransactionId,
+          amount: duplicatePayment.paidAmount,
+        },
+        reason: 'Second captured gateway transaction quarantined without fee-share, wallet, coupon, referral, or program side effects',
+      });
+    }
+    return { payment, idempotent: !duplicateIncidentCreated, duplicateCharge: true, duplicatePayment };
+  }
 
   if (newlyProcessed) {
     await writeAuditLog({
@@ -286,7 +422,7 @@ const processSuccessfulPayment = async ({ order, doctor, gatewayTransactionId, s
     await fraudService.evaluatePaymentRisk({ payment });
   }
 
-  return { payment, idempotent: !newlyProcessed };
+  return { payment, idempotent: !newlyProcessed, duplicateCharge: false };
 };
 
 const createOrder = asyncHandler(async (req, res) => {
@@ -372,6 +508,17 @@ const verifyPayment = asyncHandler(async (req, res) => {
 
   const result = await processSuccessfulPayment({ order, doctor, gatewayTransactionId: razorpay_payment_id, signature: razorpay_signature, rawGatewayPayload: req.body, req });
 
+  if (result.duplicateCharge) {
+    return res.json({
+      message: 'Your program is already active. A second captured payment was detected and has been flagged for admin review.',
+      invoiceNumber: result.payment.invoiceNumber,
+      paymentId: result.payment._id,
+      duplicatePaymentId: result.duplicatePayment?._id,
+      duplicateCharge: true,
+      idempotent: result.idempotent,
+    });
+  }
+
   res.json({ message: result.idempotent ? 'Payment already verified' : 'Payment verified and program activated', invoiceNumber: result.payment.invoiceNumber, paymentId: result.payment._id, idempotent: result.idempotent });
 });
 
@@ -391,11 +538,11 @@ const razorpayWebhook = asyncHandler(async (req, res) => {
   if (!doctor) return res.status(404).json({ message: 'Doctor not found' });
 
   const result = await processSuccessfulPayment({ order, doctor, gatewayTransactionId: entity.id, rawGatewayPayload: payload, req });
-  res.json({ received: true, idempotent: result.idempotent });
+  res.json({ received: true, idempotent: result.idempotent, duplicateCharge: result.duplicateCharge, duplicatePaymentId: result.duplicatePayment?._id });
 });
 
 const getPaymentById = asyncHandler(async (req, res) => {
-  const payment = await Payment.findById(req.params.id).populate('patient', 'fullName mobile').populate('doctor', 'fullName').populate('program', 'name').select('-gatewaySignature -rawGatewayPayload');
+  const payment = await Payment.findById(req.params.id).populate('patient', 'fullName mobile').populate('doctor', 'fullName').populate('program', 'name').populate('duplicateOf', 'invoiceNumber gatewayTransactionId paidAmount status').select('-gatewaySignature -rawGatewayPayload');
   if (!payment) return res.status(404).json({ message: 'Payment not found' });
 
   if (req.user.role === 'patient' && payment.patient?._id?.toString() !== req.user._id.toString()) return res.status(403).json({ message: 'Cannot access another patient payment' });
@@ -416,6 +563,7 @@ const getReceipt = asyncHandler(async (req, res) => {
     .populate('program', 'programCode name')
     .populate('order');
   if (!payment) return res.status(404).json({ message: 'Payment not found' });
+  if (payment.status === 'duplicate_captured') return res.status(409).json({ message: 'Duplicate captured payments do not receive a second invoice. Use the original payment receipt.' });
 
   if (req.user.role === 'patient' && payment.patient?._id?.toString() !== req.user._id.toString()) return res.status(403).json({ message: 'Cannot access another patient receipt' });
 
