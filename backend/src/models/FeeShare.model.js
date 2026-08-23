@@ -17,6 +17,9 @@ const feeShareSchema = new mongoose.Schema({
   },
 }, { timestamps: true });
 
+feeShareSchema.index({ payment: 1 }, { unique: true });
+feeShareSchema.index({ doctor: 1, status: 1, availableDate: 1 });
+
 const withdrawalRequestSchema = new mongoose.Schema({
   doctor: { type: mongoose.Schema.Types.ObjectId, ref: 'Doctor', required: true },
   wallet: { type: mongoose.Schema.Types.ObjectId, ref: 'DoctorWallet' },
@@ -36,8 +39,6 @@ const withdrawalRequestSchema = new mongoose.Schema({
   processedAt: Date,
 }, { timestamps: true });
 
-// The controller check gives a friendly error, while this partial unique index is
-// the database-level race guard that prevents two concurrent active requests.
 withdrawalRequestSchema.index(
   { doctor: 1 },
   {
