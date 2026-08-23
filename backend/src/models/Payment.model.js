@@ -58,7 +58,7 @@ const paymentSchema = new mongoose.Schema({
 
   status: {
     type: String,
-    enum: ['created', 'pending', 'successful', 'failed', 'cancelled', 'refunded', 'partially_refunded', 'disputed', 'chargeback', 'manually_verified'],
+    enum: ['created', 'pending', 'successful', 'failed', 'cancelled', 'refunded', 'partially_refunded', 'disputed', 'chargeback', 'manually_verified', 'duplicate_captured'],
     default: 'pending',
   },
   failureReason: String,
@@ -72,8 +72,8 @@ orderSchema.index({ patient: 1, program: 1, status: 1, createdAt: -1 });
 orderSchema.index({ gatewayOrderId: 1 }, { unique: true, sparse: true });
 orderSchema.index({ patient: 1, idempotencyKey: 1 }, { unique: true, sparse: true });
 paymentSchema.index({ gatewayTransactionId: 1 }, { unique: true, sparse: true });
-// One checkout order can produce only one financially verified payment. Statuses
-// after refund/dispute remain inside the same uniqueness set.
+// One checkout order can produce only one financially verified payment. A second
+// captured gateway charge is stored as duplicate_captured and never enters this set.
 paymentSchema.index(
   { order: 1 },
   {
@@ -87,6 +87,7 @@ paymentSchema.index({ order: 1, status: 1 });
 paymentSchema.index({ patient: 1, createdAt: -1 });
 paymentSchema.index({ doctor: 1, createdAt: -1 });
 paymentSchema.index({ invoiceNumber: 1 }, { unique: true, sparse: true });
+paymentSchema.index({ duplicateOf: 1, status: 1, createdAt: -1 });
 
 const Order = mongoose.model('Order', orderSchema);
 const Payment = mongoose.model('Payment', paymentSchema);
