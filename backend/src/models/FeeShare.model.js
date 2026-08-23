@@ -36,6 +36,19 @@ const withdrawalRequestSchema = new mongoose.Schema({
   processedAt: Date,
 }, { timestamps: true });
 
+// The controller check gives a friendly error, while this partial unique index is
+// the database-level race guard that prevents two concurrent active requests.
+withdrawalRequestSchema.index(
+  { doctor: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      status: { $in: ['requested', 'under_review', 'approved', 'processing'] },
+    },
+  },
+);
+withdrawalRequestSchema.index({ doctor: 1, createdAt: -1 });
+
 const FeeShare = mongoose.model('FeeShare', feeShareSchema);
 const WithdrawalRequest = mongoose.model('WithdrawalRequest', withdrawalRequestSchema);
 
