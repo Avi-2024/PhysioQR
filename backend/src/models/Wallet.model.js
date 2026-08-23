@@ -16,6 +16,9 @@ const walletTransactionSchema = new mongoose.Schema({
   doctor: { type: mongoose.Schema.Types.ObjectId, ref: 'Doctor', required: true },
   wallet: { type: mongoose.Schema.Types.ObjectId, ref: 'DoctorWallet', required: true },
   relatedPayment: { type: mongoose.Schema.Types.ObjectId, ref: 'Payment' },
+  relatedWithdrawal: { type: mongoose.Schema.Types.ObjectId, ref: 'WithdrawalRequest' },
+  relatedRefund: { type: mongoose.Schema.Types.ObjectId, ref: 'Refund' },
+  eventKey: { type: String, trim: true },
   type: {
     type: String,
     enum: [
@@ -34,6 +37,12 @@ const walletTransactionSchema = new mongoose.Schema({
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   notes: String,
 }, { timestamps: true });
+
+// Financial side effects use deterministic event keys so retries cannot create
+// duplicate immutable ledger rows even if a request is replayed after a timeout.
+walletTransactionSchema.index({ eventKey: 1 }, { unique: true, sparse: true });
+walletTransactionSchema.index({ relatedWithdrawal: 1, createdAt: -1 });
+walletTransactionSchema.index({ relatedRefund: 1, createdAt: -1 });
 
 const DoctorWallet = mongoose.model('DoctorWallet', doctorWalletSchema);
 const WalletTransaction = mongoose.model('WalletTransaction', walletTransactionSchema);
