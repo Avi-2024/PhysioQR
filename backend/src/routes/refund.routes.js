@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { protect, authorize } = require('../middlewares/auth.middleware');
 const { createRefund, getAllRefunds, getRefundById } = require('../controllers/refund.controller');
+const { processDuplicateRefund } = require('../controllers/admin/refund-processing.controller');
 const { validateSchema } = require('../middlewares/validate.middleware');
 const { requireRefundsEnabled } = require('../middlewares/financeFeatures.middleware');
 
@@ -16,6 +17,7 @@ router.post('/', requireRefundsEnabled, validateSchema({
     idempotencyKey: { type: 'string', min: 8, max: 120 },
   },
 }), createRefund);
+router.post('/:id/process', requireRefundsEnabled, validateSchema({ params: { id: { type: 'objectId', required: true } } }), processDuplicateRefund);
 router.get('/', getAllRefunds);
 router.get('/:id', validateSchema({ params: { id: { type: 'objectId', required: true } } }), getRefundById);
 
