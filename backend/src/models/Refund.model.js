@@ -26,6 +26,7 @@ const refundSchema = new mongoose.Schema({
     enum: ['requested', 'approved', 'processing', 'completed', 'rejected', 'failed'],
     default: 'requested',
   },
+  requestedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   processedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   processedAt: Date,
   rejectionReason: String,
@@ -33,5 +34,6 @@ const refundSchema = new mongoose.Schema({
 
 refundSchema.index({ idempotencyKey: 1 }, { unique: true, sparse: true });
 refundSchema.index({ payment: 1, createdAt: -1 });
+refundSchema.index({ payment: 1, refundType: 1, status: 1 });
 
 module.exports = mongoose.model('Refund', refundSchema);
