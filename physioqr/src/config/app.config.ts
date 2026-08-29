@@ -7,7 +7,7 @@ export const APP_CONFIG = {
   copyrightYear: 2026,
   navLinks: [
     { label: 'For Patients', href: '/patients' },
-    { label: 'For Doctors', href: '#doctors' },
+    { label: 'For Doctors', href: '/doctors' },
     { label: 'How It Works', href: '#how-it-works' },
     { label: 'Safety', href: '#safety' },
     { label: 'Support', href: '#faq' },
