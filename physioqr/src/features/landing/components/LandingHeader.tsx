@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { Menu } from 'lucide-react';
 import { APP_CONFIG } from '../../../config/app.config';
 import { Logo } from '../../../components/brand/Logo';
@@ -48,33 +49,35 @@ export function LandingHeader({ onOpenPortal }: LandingHeaderProps) {
             gap: '12px',
           }}
         >
-          {/* Logo */}
-          <a href="#" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', minWidth: 0, justifySelf: 'start' }}>
-            <Logo width={210} height={60}  imageScale={2.8} />
-          </a>
+          <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', minWidth: 0, justifySelf: 'start' }}>
+            <Logo width={210} height={60} imageScale={2.8} />
+          </Link>
 
-          {/* Desktop Navigation Links */}
           <nav className="hidden lg:flex items-center justify-center gap-5 xl:gap-7">
-            {APP_CONFIG.navLinks.map((link) => (
-              <a
-                key={link.href}
-                href={link.href}
-                style={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--text-secondary)', textDecoration: 'none', transition: 'color 150ms', whiteSpace: 'nowrap' }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--teal-600)')}
-                onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-secondary)')}
-              >
-                {link.label}
-              </a>
-            ))}
+            {APP_CONFIG.navLinks.map((link) => {
+              const sharedStyle = { fontSize: '14.5px', fontWeight: 600, color: 'var(--text-secondary)', textDecoration: 'none', transition: 'color 150ms', whiteSpace: 'nowrap' } as React.CSSProperties;
+              const handlers = {
+                onMouseEnter: (e: React.MouseEvent<HTMLAnchorElement>) => (e.currentTarget.style.color = 'var(--teal-600)'),
+                onMouseLeave: (e: React.MouseEvent<HTMLAnchorElement>) => (e.currentTarget.style.color = 'var(--text-secondary)'),
+              };
+
+              return link.href.startsWith('/') ? (
+                <Link key={link.href} to={link.href} style={sharedStyle} {...handlers}>
+                  {link.label}
+                </Link>
+              ) : (
+                <a key={link.href} href={link.href} style={sharedStyle} {...handlers}>
+                  {link.label}
+                </a>
+              );
+            })}
           </nav>
 
-          {/* Right Action: Sign In Button */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px', flexShrink: 0 }}>
             <button className="rc-btn-primary rc-header-signin" onClick={() => onOpenPortal()}>
               Sign In
             </button>
 
-            {/* Mobile Menu Trigger */}
             <button
               onClick={() => setMobileDrawerOpen(true)}
               className="lg:hidden"
@@ -87,7 +90,6 @@ export function LandingHeader({ onOpenPortal }: LandingHeaderProps) {
         </div>
       </header>
 
-      {/* Mobile Drawer */}
       <MobileNavigationDrawer
         isOpen={mobileDrawerOpen}
         onClose={() => setMobileDrawerOpen(false)}
