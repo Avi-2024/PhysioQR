@@ -54,6 +54,7 @@ const getTwilioVerifyConfig = () => {
   return {
     client: twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN),
     serviceSid: TWILIO_VERIFY_SERVICE_SID,
+    friendlyName: process.env.TWILIO_VERIFY_FRIENDLY_NAME?.trim() || 'PhysioQR',
   };
 };
 
@@ -113,12 +114,16 @@ const verifyDbOtp = async ({ mobile, purpose, otp }) => {
 const sendTwilioOtp = async ({ mobile }) => {
   const to = toE164Mobile(mobile);
   const channel = process.env.TWILIO_VERIFY_CHANNEL || 'sms';
-  const { client, serviceSid } = getTwilioVerifyConfig();
+  const { client, serviceSid, friendlyName } = getTwilioVerifyConfig();
 
   const verification = await client.verify.v2
     .services(serviceSid)
     .verifications
-    .create({ to, channel });
+    .create({
+      to,
+      channel,
+      customFriendlyName: friendlyName,
+    });
 
   return { channel, status: verification.status };
 };
