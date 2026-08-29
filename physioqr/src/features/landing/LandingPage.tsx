@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { LandingHeader } from './components/LandingHeader';
 import { HeroSection } from './components/HeroSection';
 import { TrustFoundation } from './components/TrustFoundation';
@@ -9,7 +10,6 @@ import { RehabProgramsShowcase } from './components/RehabProgramsShowcase';
 import { WhatsAppReminderSection } from './components/WhatsAppReminderSection';
 import { DoctorExperienceSection } from './components/DoctorExperienceSection';
 import { CapabilitiesSection } from './components/CapabilitiesSection';
-// import { RevenueModelsSection } from './components/RevenueModelsSection';
 import { SafetySection } from './components/SafetySection';
 import { FAQSection } from './components/FAQSection';
 import { FinalCTASection } from './components/FinalCTASection';
@@ -17,85 +17,34 @@ import { LandingFooter } from './components/LandingFooter';
 import { PortalAccessModal } from './components/PortalAccessModal';
 import { UserRole } from './types/landing.types';
 
-interface LandingPageProps {
-  onNavigateToPortal?: (role: UserRole) => void;
-}
+interface LandingPageProps { onNavigateToPortal?: (role: UserRole) => void; }
 
 export function LandingPage({ onNavigateToPortal }: LandingPageProps) {
   const [portalModalOpen, setPortalModalOpen] = useState(false);
+  const navigate = useNavigate();
+  const goToPortal = (role: UserRole) => onNavigateToPortal ? onNavigateToPortal(role) : navigate(`/login?role=${role}`);
+  const handleOpenPortalModal = (role?: UserRole) => role ? goToPortal(role) : setPortalModalOpen(true);
+  const handleSelectRoleFromModal = (role: UserRole) => { setPortalModalOpen(false); goToPortal(role); };
 
-  const handleOpenPortalModal = (role?: UserRole) => {
-    if (role && onNavigateToPortal) {
-      onNavigateToPortal(role);
-    } else {
-      setPortalModalOpen(true);
-    }
-  };
-
-  const handleSelectRoleFromModal = (role: UserRole) => {
-    setPortalModalOpen(false);
-    if (onNavigateToPortal) {
-      onNavigateToPortal(role);
-    }
-  };
-
-  return (
-    <div style={{ background: 'var(--bg-page)', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      {/* 01 Global Header */}
-      <LandingHeader onOpenPortal={handleOpenPortalModal} />
-
-      <main style={{ flex: 1 }}>
-        {/* 02 Shared Hero */}
-        <HeroSection onOpenPortal={handleOpenPortalModal} />
-
-        {/* 03 Trust Foundation */}
-        <TrustFoundation />
-
-        {/* 04 Connected Doctor -> Patient Journey */}
-        <CareJourney />
-
-        {/* 05 Choose Your Experience */}
-        <ExperienceSelector onOpenPortal={handleOpenPortalModal} />
-
-        {/* 06 Patient Experience */}
-        <PatientExperienceSection onOpenPortal={handleOpenPortalModal} />
-
-        {/* 07 Recovery programme carousel */}
-        <RehabProgramsShowcase />
-
-        {/* 08 WhatsApp Reminder Experience */}
-        <WhatsAppReminderSection />
-
-        {/* 09 Doctor Experience */}
-        <DoctorExperienceSection onOpenPortal={handleOpenPortalModal} />
-
-        {/* 10 Platform Capabilities */}
-        <CapabilitiesSection />
-
-        {/* 11 Revenue Models */}
-        {/* <RevenueModelsSection /> */}
-
-        {/* 12 Security & Safety */}
-        <SafetySection />
-
-        {/* 13 FAQ */}
-        <FAQSection />
-
-        {/* 14 Final Portal CTA */}
-        <FinalCTASection onOpenPortal={handleOpenPortalModal} />
-      </main>
-
-      {/* 15 Enterprise Footer */}
-      <LandingFooter onOpenPortal={handleOpenPortalModal} />
-
-      {/* Portal Access Selector Modal */}
-      <PortalAccessModal
-        isOpen={portalModalOpen}
-        onClose={() => setPortalModalOpen(false)}
-        onSelectRole={handleSelectRoleFromModal}
-      />
-    </div>
-  );
+  return <div style={{ background: 'var(--bg-page)', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <LandingHeader onOpenPortal={handleOpenPortalModal} />
+    <main style={{ flex: 1 }}>
+      <HeroSection onOpenPortal={handleOpenPortalModal} />
+      <TrustFoundation />
+      <CareJourney />
+      <ExperienceSelector onOpenPortal={handleOpenPortalModal} />
+      <PatientExperienceSection onOpenPortal={handleOpenPortalModal} />
+      <RehabProgramsShowcase />
+      <WhatsAppReminderSection />
+      <DoctorExperienceSection onOpenPortal={handleOpenPortalModal} />
+      <CapabilitiesSection />
+      <SafetySection />
+      <FAQSection />
+      <FinalCTASection onOpenPortal={handleOpenPortalModal} />
+    </main>
+    <LandingFooter onOpenPortal={handleOpenPortalModal} />
+    <PortalAccessModal isOpen={portalModalOpen} onClose={() => setPortalModalOpen(false)} onSelectRole={handleSelectRoleFromModal} />
+  </div>;
 }
 
 export default LandingPage;
