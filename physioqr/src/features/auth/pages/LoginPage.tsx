@@ -2,240 +2,99 @@ import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useNavigate } from 'react-router-dom';
-import { ShieldCheck, UserCheck, Stethoscope, ArrowRight, Lock } from 'lucide-react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { ArrowRight, HeartPulse, Lock, ShieldCheck, Stethoscope, UserCheck } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth.store';
 import { Logo } from '@/components/brand/Logo';
 import { UserRole } from '@/types';
 import { getRedirectPathForRole } from '@/lib/permissions';
 import apiClient from '@/lib/api-client';
 
-const loginSchema = z.object({
-  identifier: z.string().optional(),
-  password: z.string().optional(),
-  role: z.enum(['admin', 'agent', 'doctor', 'patient'] as const),
-}).superRefine((value, context) => {
-  if (value.role === 'patient') return;
-  if (!value.identifier?.trim()) {
-    context.addIssue({ code: z.ZodIssueCode.custom, path: ['identifier'], message: 'Email or mobile is required' });
-  }
-  if (!value.password || value.password.length < 4) {
-    context.addIssue({ code: z.ZodIssueCode.custom, path: ['password'], message: 'Password must be at least 4 characters' });
-  }
-});
-
-type LoginFormValues = z.infer<typeof loginSchema>;
+const staffSchema = z.object({ identifier: z.string().min(1, 'Email or mobile is required'), password: z.string().min(4, 'Password must be at least 4 characters') });
+const patientSchema = z.object({ mobile: z.string().regex(/^[6-9]\d{9}$/, 'Enter a valid 10-digit mobile number'), otp: z.string().min(4, 'Enter the OTP').max(10, 'OTP is too long') });
+type StaffForm = z.infer<typeof staffSchema>;
+type PatientForm = z.infer<typeof patientSchema>;
 type ApiRecord = Record<string, unknown>;
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { login } = useAuthStore();
-  const [selectedRole, setSelectedRole] = useState<UserRole>('admin');
+  const initialRole = searchParams.get('role') === 'patient' ? 'patient' : 'doctor';
+  const [selectedRole, setSelectedRole] = useState<'patient' | 'doctor'>(initialRole);
   const [submitError, setSubmitError] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
 
-  const form = useForm<LoginFormValues>({
-    resolver: zodResolver(loginSchema),
-    defaultValues: {
-      identifier: '',
-      password: '',
-      role: 'admin',
-    },
-  });
+  const staffForm = useForm<StaffForm>({ resolver: zodResolver(staffSchema), defaultValues: { identifier: '', password: '' } });
+  const patientForm = useForm<PatientForm>({ resolver: zodResolver(patientSchema), defaultValues: { mobile: '', otp: '' } });
 
-  const handleRoleChange = (role: UserRole) => {
-    setSelectedRole(role);
-    form.setValue('role', role);
+  const changeRole = (role: 'patient' | 'doctor') => { setSelectedRole(role); setSearchParams({ role }); setSubmitError(''); setOtpSent(false); };
+
+  const doctorLogin = async (data: StaffForm) => {
     setSubmitError('');
-  };
-
-  const onSubmit = async (data: LoginFormValues) => {
-    setSubmitError('');
-    if (data.role === 'patient') {
-      navigate('/register');
-      return;
-    }
-
     try {
-      const identifier = (data.identifier || '').trim();
-      const payload = identifier.includes('@')
-        ? { email: identifier, password: data.password || '' }
-        : { mobile: identifier, password: data.password || '' };
-      const response = await apiClient.post('/auth/login', payload);
-      const auth = asRecord(response.data);
-      const apiUser = asRecord(auth.user);
-      const role = text(auth.role || apiUser.role) as UserRole;
-
-      if (role !== data.role) {
-        setSubmitError(`This account is ${role}. Please select the correct portal.`);
-        return;
-      }
-
-      const token = text(auth.token || auth.accessToken);
-      if (!token) {
-        setSubmitError('Login succeeded but access token was not returned.');
-        return;
-      }
-
-      login({
-        id: text(apiUser.id || apiUser._id),
-        name: text(apiUser.name || apiUser.fullName || apiUser.email || apiUser.mobile, roleLabel(role)),
-        email: text(apiUser.email),
-        mobile: text(apiUser.mobile),
-        role,
-      }, token);
+      const identifier = data.identifier.trim();
+      const response = await apiClient.post('/auth/login', identifier.includes('@') ? { email: identifier, password: data.password } : { mobile: identifier, password: data.password });
+      const auth = asRecord(response.data); const apiUser = asRecord(auth.user); const role = text(auth.role || apiUser.role) as UserRole;
+      if (role !== 'doctor') { setSubmitError('This account is not a Doctor account.'); return; }
+      const token = text(auth.token || auth.accessToken); if (!token) { setSubmitError('Login succeeded but access token was not returned.'); return; }
+      login({ id: text(apiUser.id || apiUser._id), name: text(apiUser.name || apiUser.fullName || apiUser.email || apiUser.mobile, 'Doctor'), email: text(apiUser.email), mobile: text(apiUser.mobile), role }, token);
       navigate(getRedirectPathForRole(role));
-    } catch (error) {
-      setSubmitError(errorMessage(error));
-    }
+    } catch (error) { setSubmitError(errorMessage(error)); }
   };
 
-  return (
-    <div className="min-h-screen bg-neutral-50 flex items-center justify-center p-4 sm:p-6 lg:p-8">
-      <div className="max-w-4xl w-full bg-white rounded-2xl shadow-modal overflow-hidden grid grid-cols-1 lg:grid-cols-2 border border-neutral-200">
-        {/* Left Hero Panel */}
-        <div className="bg-gradient-to-br from-primary-900 via-primary-800 to-neutral-900 p-8 text-white  flex-col justify-between  sm:flex">
-          <div>
-            <div className="flex items-center gap-3 mb-8">
-              <Logo width={210} height={40}  />
-              <div>
-                <h1 className="font-bold text-xl leading-none">physioqr</h1>
-                <span className="text-xs text-primary-300 font-medium">Rehabilitation Platform</span>
-              </div>
-            </div>
+  const sendPatientOtp = async () => {
+    setSubmitError('');
+    if (!(await patientForm.trigger('mobile'))) return;
+    try { await apiClient.post('/auth/send-otp', { mobile: patientForm.getValues('mobile'), purpose: 'login' }); setOtpSent(true); }
+    catch (error) { setSubmitError(errorMessage(error)); }
+  };
 
-            <div className="space-y-4 my-8">
-              <h2 className="text-2xl font-bold leading-tight">Smarter Rehabilitation.<br />Better Clinical Outcomes.</h2>
-              <p className="text-sm text-primary-200 leading-relaxed">
-                Connect doctors, agents, and patients on a single unified platform. Day-wise video exercises, automatic fee shares, and real-time recovery analytics.
-              </p>
-            </div>
-          </div>
+  const patientLogin = async (data: PatientForm) => {
+    setSubmitError('');
+    try {
+      const response = await apiClient.post('/auth/verify-otp', { mobile: data.mobile, otp: data.otp, purpose: 'login' });
+      const auth = asRecord(response.data); const patient = asRecord(auth.patient);
+      if (!auth.registered || !patient.id) { setSubmitError('Patient account not found. Please register first.'); return; }
+      const token = text(auth.token || auth.accessToken); if (!token) { setSubmitError('OTP verified but access token was not returned.'); return; }
+      login({ id: text(patient.id), name: text(patient.fullName, 'Patient'), email: text(patient.email), mobile: text(patient.mobile), role: 'patient' }, token);
+      navigate(getRedirectPathForRole('patient'));
+    } catch (error) { setSubmitError(errorMessage(error)); }
+  };
 
-          <div className="space-y-3 pt-6 border-t border-primary-700/50">
-            <div className="flex items-center gap-3 text-xs text-primary-200">
-              <ShieldCheck className="w-4 h-4 text-success-400 flex-shrink-0" />
-              <span>Doctor-referral based rehabilitation programs</span>
-            </div>
-            <div className="flex items-center gap-3 text-xs text-primary-200">
-              <UserCheck className="w-4 h-4 text-success-400 flex-shrink-0" />
-              <span>Role-based access for Admin, Agent, Doctor & Patient</span>
-            </div>
-            <div className="flex items-center gap-3 text-xs text-primary-200">
-              <Stethoscope className="w-4 h-4 text-success-400 flex-shrink-0" />
-              <span>Split Model & Platform Fee Model earnings calculation</span>
-            </div>
-          </div>
+  return <div className="min-h-screen bg-neutral-50 flex items-center justify-center p-4 sm:p-6 lg:p-8">
+    <div className="max-w-4xl w-full bg-white rounded-2xl shadow-modal overflow-hidden grid grid-cols-1 lg:grid-cols-2 border border-neutral-200">
+      <div className="bg-gradient-to-br from-primary-900 via-primary-800 to-neutral-900 p-8 text-white flex-col justify-between sm:flex">
+        <div><Link to="/" className="flex items-center gap-3 mb-8 no-underline text-white"><Logo width={210} height={40} /><div><h1 className="font-bold text-xl leading-none">physioqr</h1><span className="text-xs text-primary-300 font-medium">Rehabilitation Platform</span></div></Link><div className="space-y-4 my-8"><h2 className="text-2xl font-bold leading-tight">Your rehabilitation journey,<br />securely connected.</h2><p className="text-sm text-primary-200 leading-relaxed">Patients sign in with mobile OTP. Doctors sign in with their registered account credentials.</p></div></div>
+        <div className="space-y-3 pt-6 border-t border-primary-700/50"><Info icon={<ShieldCheck className="w-4 h-4"/>} text="Secure role-based portal access"/><Info icon={<UserCheck className="w-4 h-4"/>} text="Patient access through verified mobile OTP"/><Info icon={<Stethoscope className="w-4 h-4"/>} text="Dedicated doctor portal credentials"/></div>
+      </div>
+
+      <div className="p-8 sm:p-10 flex flex-col justify-center">
+        <div className="mb-6"><h2 className="text-xl font-bold text-neutral-900">Sign in to PhysioQR</h2><p className="text-xs text-neutral-500 mt-1">Choose Patient or Doctor access</p></div>
+        <div className="grid grid-cols-2 gap-2 p-1 bg-neutral-100 rounded-xl border border-neutral-200 mb-6">
+          <button type="button" onClick={() => changeRole('patient')} className={`flex items-center justify-center gap-2 py-2.5 text-sm font-bold rounded-lg transition-all ${selectedRole === 'patient' ? 'bg-primary-600 text-white shadow-sm' : 'text-neutral-600'}`}><HeartPulse className="w-4 h-4"/>Patient</button>
+          <button type="button" onClick={() => changeRole('doctor')} className={`flex items-center justify-center gap-2 py-2.5 text-sm font-bold rounded-lg transition-all ${selectedRole === 'doctor' ? 'bg-primary-600 text-white shadow-sm' : 'text-neutral-600'}`}><Stethoscope className="w-4 h-4"/>Doctor</button>
         </div>
+        {submitError && <div className="mb-4 rounded-lg border border-danger-200 bg-danger-50 px-4 py-3 text-sm font-semibold text-danger-700">{submitError}</div>}
 
-        {/* Right Form Panel */}
-        <div className="p-8 sm:p-10 flex flex-col justify-center">
-          <div className="mb-6">
-            <h2 className="text-xl font-bold text-neutral-900">Sign in to physioqr</h2>
-            <p className="text-xs text-neutral-500 mt-1">Use your registered email/mobile and password</p>
-          </div>
-
-          {/* Role selector pill tabs */}
-          <div className="mb-6">
-            <label className="block text-xs font-semibold text-neutral-600 mb-2 uppercase tracking-wider">Select Portal</label>
-            <div className="grid grid-cols-4 gap-1.5 p-1 bg-neutral-100 rounded-xl border border-neutral-200">
-              {(['admin', 'agent', 'doctor', 'patient'] as const).map((r) => (
-                <button
-                  key={r}
-                  type="button"
-                  onClick={() => handleRoleChange(r)}
-                  className={`py-2 text-xs font-bold rounded-lg capitalize transition-all ${
-                    selectedRole === r
-                      ? 'bg-primary-600 text-white shadow-sm'
-                      : 'text-neutral-600 hover:text-neutral-900'
-                  }`}
-                >
-                  {r}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {submitError && (
-            <div className="mb-4 rounded-lg border border-danger-200 bg-danger-50 px-4 py-3 text-sm font-semibold text-danger-700">
-              {submitError}
-            </div>
-          )}
-
-          {selectedRole === 'patient' && (
-            <div className="mb-4 rounded-lg border border-primary-100 bg-primary-50 px-4 py-3 text-sm text-primary-800">
-              Patients use mobile OTP from the doctor QR/referral flow. Continue to patient registration instead of password login.
-            </div>
-          )}
-
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-neutral-700 mb-1">Email or Mobile</label>
-              <input
-                {...form.register('identifier')}
-                type="text"
-                disabled={selectedRole === 'patient'}
-                placeholder="admin@physioqr.in or 9876543210"
-                className="w-full px-3.5 py-2.5 rounded-lg border border-neutral-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-              />
-              {form.formState.errors.identifier && (
-                <p className="mt-1 text-xs text-danger-600">{form.formState.errors.identifier.message}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-neutral-700 mb-1">Password</label>
-              <input
-                {...form.register('password')}
-                type="password"
-                disabled={selectedRole === 'patient'}
-                className="w-full px-3.5 py-2.5 rounded-lg border border-neutral-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-              />
-              {form.formState.errors.password && (
-                <p className="mt-1 text-xs text-danger-600">{form.formState.errors.password.message}</p>
-              )}
-            </div>
-
-            <button
-              type="submit"
-              disabled={form.formState.isSubmitting}
-              className="w-full mt-2 py-3 px-4 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-all flex items-center justify-center gap-2 shadow-sm text-sm disabled:opacity-60"
-            >
-              <Lock className="w-4 h-4" />
-              {form.formState.isSubmitting ? 'Signing in...' : selectedRole === 'patient' ? 'Continue with Patient OTP' : `Access ${selectedRole.toUpperCase()} Portal`}
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </form>
-
-          <div className="mt-6 pt-4 border-t border-neutral-100 text-center text-xs text-neutral-400">
-            Admin, Agent, and Doctor use password login. Patients use OTP only.
-          </div>
-        </div>
+        {selectedRole === 'patient' ? <form onSubmit={patientForm.handleSubmit(patientLogin)} className="space-y-4">
+          <div><label className="block text-xs font-semibold text-neutral-700 mb-1">Mobile Number</label><div className="flex gap-2"><input {...patientForm.register('mobile')} type="tel" placeholder="10-digit mobile number" className={inputClass}/><button type="button" onClick={sendPatientOtp} className="shrink-0 rounded-lg bg-neutral-100 px-4 text-sm font-semibold text-neutral-700">{otpSent ? 'Resend' : 'Send OTP'}</button></div>{patientForm.formState.errors.mobile && <p className="mt-1 text-xs text-danger-600">{patientForm.formState.errors.mobile.message}</p>}</div>
+          {otpSent && <div><label className="block text-xs font-semibold text-neutral-700 mb-1">OTP</label><input {...patientForm.register('otp')} placeholder="Enter OTP" className={inputClass}/>{patientForm.formState.errors.otp && <p className="mt-1 text-xs text-danger-600">{patientForm.formState.errors.otp.message}</p>}</div>}
+          <button type="submit" disabled={!otpSent || patientForm.formState.isSubmitting} className={primaryButton}><Lock className="w-4 h-4"/>{patientForm.formState.isSubmitting ? 'Signing in...' : 'Patient Sign In'}<ArrowRight className="w-4 h-4"/></button>
+        </form> : <form onSubmit={staffForm.handleSubmit(doctorLogin)} className="space-y-4">
+          <div><label className="block text-xs font-semibold text-neutral-700 mb-1">Email or Mobile</label><input {...staffForm.register('identifier')} placeholder="doctor@example.com or mobile" className={inputClass}/>{staffForm.formState.errors.identifier && <p className="mt-1 text-xs text-danger-600">{staffForm.formState.errors.identifier.message}</p>}</div>
+          <div><label className="block text-xs font-semibold text-neutral-700 mb-1">Password</label><input {...staffForm.register('password')} type="password" className={inputClass}/>{staffForm.formState.errors.password && <p className="mt-1 text-xs text-danger-600">{staffForm.formState.errors.password.message}</p>}</div>
+          <button type="submit" disabled={staffForm.formState.isSubmitting} className={primaryButton}><Lock className="w-4 h-4"/>{staffForm.formState.isSubmitting ? 'Signing in...' : 'Doctor Sign In'}<ArrowRight className="w-4 h-4"/></button>
+        </form>}
+        <div className="mt-6 pt-5 border-t border-neutral-100 text-center text-sm text-neutral-600">New patient? <Link to="/register" className="font-bold text-primary-700">Register here</Link></div>
       </div>
     </div>
-  );
+  </div>;
 }
 
-function asRecord(value: unknown): ApiRecord {
-  return value && typeof value === 'object' ? value as ApiRecord : {};
-}
-
-function text(value: unknown, fallback = '') {
-  if (value === undefined || value === null || value === '') return fallback;
-  return String(value);
-}
-
-function roleLabel(role: UserRole) {
-  const labels: Record<UserRole, string> = {
-    admin: 'Admin',
-    agent: 'Agent',
-    doctor: 'Doctor',
-    patient: 'Patient',
-  };
-  return labels[role];
-}
-
-function errorMessage(error: unknown) {
-  const response = asRecord(asRecord(error).response);
-  const data = asRecord(response.data);
-  return text(data.message || asRecord(error).message, 'Login failed. Check your credentials and backend connection.');
-}
+const inputClass = 'w-full min-w-0 px-3.5 py-2.5 rounded-lg border border-neutral-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500';
+const primaryButton = 'w-full mt-2 py-3 px-4 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-all flex items-center justify-center gap-2 shadow-sm text-sm disabled:opacity-60';
+function Info({ icon, text: value }: { icon: React.ReactNode; text: string }) { return <div className="flex items-center gap-3 text-xs text-primary-200"><span className="text-success-400">{icon}</span><span>{value}</span></div>; }
+function asRecord(value: unknown): ApiRecord { return value && typeof value === 'object' ? value as ApiRecord : {}; }
+function text(value: unknown, fallback = '') { return value === undefined || value === null || value === '' ? fallback : String(value); }
+function errorMessage(error: unknown) { const response = asRecord(asRecord(error).response); const data = asRecord(response.data); return text(data.message || asRecord(error).message, 'Sign in failed. Please try again.'); }
