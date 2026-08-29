@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { APP_CONFIG } from '../../../config/app.config';
 import { Logo } from '../../../components/brand/Logo';
@@ -44,9 +45,9 @@ export function MobileNavigationDrawer({ isOpen, onClose, onOpenPortal }: Mobile
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', paddingBottom: '16px', borderBottom: '1px solid var(--border-default)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-            <Logo width={210} height={56}  imageScale={2.8} />
-          </div>
+          <Link to="/" onClick={onClose} style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, textDecoration: 'none' }}>
+            <Logo width={210} height={56} imageScale={2.8} />
+          </Link>
 
           <button onClick={onClose} style={{ border: 'none', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', minWidth: '44px', minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <X className="w-5 h-5" />
@@ -56,13 +57,23 @@ export function MobileNavigationDrawer({ isOpen, onClose, onOpenPortal }: Mobile
         <ul style={{ listStyle: 'none', padding: '24px 0', display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {APP_CONFIG.navLinks.map((link) => (
             <li key={link.href}>
-              <a
-                href={link.href}
-                onClick={onClose}
-                style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)', textDecoration: 'none', display: 'flex', alignItems: 'center', minHeight: '44px' }}
-              >
-                {link.label}
-              </a>
+              {link.href.startsWith('/') ? (
+                <Link
+                  to={link.href}
+                  onClick={onClose}
+                  style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)', textDecoration: 'none', display: 'flex', alignItems: 'center', minHeight: '44px' }}
+                >
+                  {link.label}
+                </Link>
+              ) : (
+                <a
+                  href={link.href}
+                  onClick={onClose}
+                  style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)', textDecoration: 'none', display: 'flex', alignItems: 'center', minHeight: '44px' }}
+                >
+                  {link.label}
+                </a>
+              )}
             </li>
           ))}
         </ul>
