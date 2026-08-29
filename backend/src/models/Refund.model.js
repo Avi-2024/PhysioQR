@@ -14,6 +14,11 @@ const refundSchema = new mongoose.Schema({
   },
   refundAmount: { type: Number, required: true },
   gatewayRefundId: String,
+  gatewayStatus: String,
+  gatewayAmount: Number,
+  gatewayProcessedAt: Date,
+  lastGatewayEvent: String,
+  lastGatewayEventAt: Date,
   idempotencyKey: { type: String, trim: true },
 
   // Fee share reversal linked to this refund
@@ -33,6 +38,7 @@ const refundSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 refundSchema.index({ idempotencyKey: 1 }, { unique: true, sparse: true });
+refundSchema.index({ gatewayRefundId: 1 }, { unique: true, sparse: true });
 refundSchema.index({ payment: 1, createdAt: -1 });
 refundSchema.index({ payment: 1, refundType: 1, status: 1 });
 
