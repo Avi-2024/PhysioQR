@@ -12,6 +12,7 @@ const PaymentFailedPage = lazy(() => import('@/features/payments/pages/results/P
 const ForgotPasswordPage = lazy(() => import('@/features/common/pages/ForgotPasswordPage'));
 const LandingPage = lazy(() => import('@/features/landing/LandingPage'));
 const PatientPage = lazy(() => import('@/features/landing/PatientPage'));
+const DoctorPage = lazy(() => import('@/features/landing/DoctorPage'));
 
 export const publicRoutes: RouteObject = {
   element: <PublicLayout />,
@@ -19,6 +20,7 @@ export const publicRoutes: RouteObject = {
     { path: '/', element: withSuspense(<LandingPage />) },
     { path: '/home', element: withSuspense(<LandingPage />) },
     { path: '/patients', element: withSuspense(<PatientPage />) },
+    { path: '/doctors', element: withSuspense(<DoctorPage />) },
     {
       path: '/login',
       element: <PublicRoute>{withSuspense(<LoginPage />)}</PublicRoute>,
