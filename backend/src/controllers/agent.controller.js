@@ -191,50 +191,103 @@ const deleteAgent = asyncHandler(async (req, res) => {
 // GET /api/agents/me/dashboard - Agent dashboard stats.
 const getMyDashboard = asyncHandler(async (req, res) => {
   const agent = await getCurrentAgent(req);
-
-  const [totalDoctors, pendingApproval, approved, rejected, recentVisits] = await Promise.all([
-    Doctor.countDocuments({ agent: agent._id }),
-    Doctor.countDocuments({ agent: agent._id, status: 'submitted' }),
-    Doctor.countDocuments({ agent: agent._id, status: 'approved' }),
-    Doctor.countDocuments({ agent: agent._id, status: 'rejected' }),
-    ClinicVisit.find({ agent: agent._id })
-      .populate('doctor', 'doctorId fullName clinicName')
-      .sort({ visitDate: -1, createdAt: -1 })
-      .limit(5),
-  ]);
-
-  const agentDoctorIds = (await Doctor.find({ agent: agent._id }, '_id')).map((doctor) => doctor._id);
-  const totalPatients = await Patient.countDocuments({ referringDoctor: { $in: agentDoctorIds } });
-  const totalPaidPatients = await Payment.countDocuments({ doctor: { $in: agentDoctorIds }, status: 'successful' });
-
-  const revenueResult = await Payment.aggregate([
-    { $match: { doctor: { $in: agentDoctorIds }, status: 'successful' } },
-    { $group: { _id: null, total: { $sum: '$paidAmount' } } },
-  ]);
-
   const now = new Date();
-  const pendingFollowUps = await ClinicVisit.countDocuments({
-    agent: agent._id,
-    followUpStatus: 'scheduled',
-    followUpDate: { $lte: now },
-  });
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const tomorrowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
-  const upcomingFollowUps = await ClinicVisit.countDocuments({
-    agent: agent._id,
-    followUpStatus: 'scheduled',
-    followUpDate: { $gt: now },
-  });
+  const agentDoctorIds = (await Doctor.find({ agent: agent._id }, '_id').lean()).map((doctor) => doctor._id);
+  const verifiedPaymentStatuses = ['successful', 'manually_verified', 'partially_refunded', 'refunded'];
 
-  res.json({
+  const [
     totalDoctors,
     pendingApproval,
     approved,
     rejected,
+    activeDoctors,
+    monthlyOnboarded,
     totalPatients,
-    totalPaidPatients,
+    paidPatientIds,
+    revenueResult,
+    pendingFollowUps,
+    upcomingFollowUps,
+    recentVisits,
+    todaysVisits,
+    dueFollowUps,
+    recentApprovedDoctors,
+  ] = await Promise.all([
+    Doctor.countDocuments({ agent: agent._id }),
+    Doctor.countDocuments({ agent: agent._id, status: { $in: ['submitted', 'under_review', 'documents_required'] } }),
+    Doctor.countDocuments({ agent: agent._id, status: 'approved' }),
+    Doctor.countDocuments({ agent: agent._id, status: 'rejected' }),
+    Doctor.countDocuments({ agent: agent._id, status: 'approved', qrCodeActive: true }),
+    Doctor.countDocuments({ agent: agent._id, createdAt: { $gte: monthStart, $lt: nextMonthStart } }),
+    Patient.countDocuments({ referringDoctor: { $in: agentDoctorIds } }),
+    Payment.distinct('patient', { doctor: { $in: agentDoctorIds }, status: { $in: verifiedPaymentStatuses } }),
+    Payment.aggregate([
+      { $match: { doctor: { $in: agentDoctorIds }, status: { $in: verifiedPaymentStatuses } } },
+      {
+        $group: {
+          _id: null,
+          paid: { $sum: { $ifNull: ['$paidAmount', 0] } },
+          refunded: { $sum: { $ifNull: ['$refundAmount', 0] } },
+        },
+      },
+      { $project: { _id: 0, total: { $max: [{ $subtract: ['$paid', '$refunded'] }, 0] } } },
+    ]),
+    ClinicVisit.countDocuments({ agent: agent._id, followUpStatus: 'scheduled', followUpDate: { $lte: now } }),
+    ClinicVisit.countDocuments({ agent: agent._id, followUpStatus: 'scheduled', followUpDate: { $gt: now } }),
+    ClinicVisit.find({ agent: agent._id })
+      .populate('doctor', 'doctorId fullName clinicName status')
+      .sort({ visitDate: -1, createdAt: -1 })
+      .limit(5)
+      .lean(),
+    ClinicVisit.find({ agent: agent._id, visitDate: { $gte: todayStart, $lt: tomorrowStart } })
+      .populate('doctor', 'doctorId fullName clinicName status')
+      .sort({ visitDate: 1, visitTime: 1 })
+      .limit(8)
+      .lean(),
+    ClinicVisit.find({ agent: agent._id, followUpStatus: 'scheduled', followUpDate: { $lte: now } })
+      .populate('doctor', 'doctorId fullName clinicName status')
+      .sort({ followUpDate: 1 })
+      .limit(5)
+      .lean(),
+    Doctor.find({ agent: agent._id, status: 'approved' })
+      .select('doctorId fullName clinicName approvalDate qrCodeActive updatedAt')
+      .sort({ approvalDate: -1, updatedAt: -1 })
+      .limit(5)
+      .lean(),
+  ]);
+
+  const monthlyTarget = Number.isFinite(agent.monthlyOnboardingTarget) ? agent.monthlyOnboardingTarget : null;
+  const targetAchievementPercentage = monthlyTarget && monthlyTarget > 0
+    ? Math.min(100, Math.round((monthlyOnboarded / monthlyTarget) * 100))
+    : null;
+
+  res.json({
+    agent: {
+      agentId: agent.agentId,
+      fullName: agent.fullName,
+      assignedRegion: agent.assignedRegion,
+      status: agent.status,
+    },
+    totalDoctors,
+    pendingApproval,
+    approved,
+    rejected,
+    activeDoctors,
+    monthlyOnboarded,
+    monthlyTarget,
+    targetAchievementPercentage,
+    totalPatients,
+    totalPaidPatients: paidPatientIds.length,
     revenueGenerated: revenueResult[0]?.total || 0,
     pendingFollowUps,
     upcomingFollowUps,
+    todaysVisits,
+    dueFollowUps,
+    recentApprovedDoctors,
     recentVisits,
   });
 });
