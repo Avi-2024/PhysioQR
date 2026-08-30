@@ -15,6 +15,7 @@ const agentSchema = new mongoose.Schema({
   reportingPerson: String,
   profilePhoto: String,
   identityProof: String,
+  monthlyOnboardingTarget: { type: Number, min: 0 },
   status: {
     type: String,
     enum: ['active', 'inactive', 'suspended', 'terminated'],
