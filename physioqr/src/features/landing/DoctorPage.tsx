@@ -9,8 +9,9 @@ import { UserRole } from './types/landing.types';
 export default function DoctorPage() {
   const [portalModalOpen, setPortalModalOpen] = useState(false);
   const navigate = useNavigate();
-  const handleOpenPortal = (role?: UserRole) => role ? navigate(`/login?role=${role}`) : setPortalModalOpen(true);
-  const handleSelectRole = (role: UserRole) => { setPortalModalOpen(false); navigate(`/login?role=${role}`); };
+  const goToLogin = (role: UserRole) => navigate('/login', { state: { preferredRole: role } });
+  const handleOpenPortal = (role?: UserRole) => role ? goToLogin(role) : setPortalModalOpen(true);
+  const handleSelectRole = (role: UserRole) => { setPortalModalOpen(false); goToLogin(role); };
 
   return <div style={{ background: 'var(--bg-page)', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
     <LandingHeader onOpenPortal={handleOpenPortal} />
