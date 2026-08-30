@@ -35,7 +35,7 @@ const registerDoctorSecure = asyncHandler(async (req, res) => {
 
   if (duplicateClauses.length) {
     const duplicate = await Doctor.findOne({ $or: duplicateClauses })
-      .select('_id doctorId fullName')
+      .select('_id doctorId fullName mobile email medicalRegNumber')
       .lean();
     if (duplicate) {
       return res.status(409).json({
@@ -50,7 +50,10 @@ const registerDoctorSecure = asyncHandler(async (req, res) => {
     if (agent.status !== 'active') return res.status(403).json({ message: 'Inactive agent cannot register doctors' });
     payload.agent = agent._id;
   } else if (req.user?.role === 'admin' && req.body.agent) {
-    payload.agent = req.body.agent;
+    const assignedAgent = await Agent.findById(req.body.agent).select('_id status');
+    if (!assignedAgent) return res.status(400).json({ message: 'Assigned agent does not exist' });
+    if (assignedAgent.status === 'terminated') return res.status(400).json({ message: 'Cannot assign a doctor to a terminated agent' });
+    payload.agent = assignedAgent._id;
   }
 
   const doctor = await Doctor.create(payload);
