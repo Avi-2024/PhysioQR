@@ -2,10 +2,12 @@ const Doctor = require('../../models/Doctor.model');
 const Patient = require('../../models/Patient.model');
 const QrScan = require('../../models/QrScan.model');
 const { Payment } = require('../../models/Payment.model');
+const { FeeShare } = require('../../models/FeeShare.model');
 const { DoctorWallet } = require('../../models/Wallet.model');
 const { buildSearchFilter, buildSort, paginateModel } = require('../../utils/queryHelpers');
 const asyncHandler = require('../../utils/asyncHandler');
 
+const VERIFIED_PAYMENT_STATUSES = ['successful', 'manually_verified', 'partially_refunded', 'refunded'];
 const isObjectId = (value) => /^[a-f\d]{24}$/i.test(String(value));
 
 const getDoctors = asyncHandler(async (req, res) => {
@@ -15,7 +17,6 @@ const getDoctors = asyncHandler(async (req, res) => {
       'doctorId', 'fullName', 'mobile', 'email', 'clinicName', 'city', 'state', 'specialization', 'medicalRegNumber',
     ]),
   };
-
   if (status) filter.status = status;
   if (agent) filter.agent = agent;
   if (revenueModel) filter.revenueModel = revenueModel;
@@ -37,11 +38,7 @@ const getDoctors = asyncHandler(async (req, res) => {
     Doctor.countDocuments({ status: 'suspended' }),
   ]);
 
-  res.json({
-    items: result.items.map((doctor) => ({ ...doctor, id: doctor.doctorId || doctor._id })),
-    meta: result.meta,
-    summary: { total, approved, pendingApproval, documentsRequired, suspended },
-  });
+  res.json({ items: result.items.map((doctor) => ({ ...doctor, id: doctor.doctorId || doctor._id })), meta: result.meta, summary: { total, approved, pendingApproval, documentsRequired, suspended } });
 });
 
 const getDoctorById = asyncHandler(async (req, res) => {
@@ -53,7 +50,6 @@ const getDoctorById = asyncHandler(async (req, res) => {
   }).populate('agent', 'agentId fullName assignedRegion mobile').lean();
 
   if (!doctor) return res.status(404).json({ message: 'Doctor not found' });
-
   if (doctor.bankAccountNumber) doctor.bankAccountNumber = `XXXXXX${doctor.bankAccountNumber.slice(-4)}`;
   if (doctor.panNumber) doctor.panNumber = `XXXXXX${doctor.panNumber.slice(-4)}`;
   delete doctor.identityProof;
@@ -61,13 +57,18 @@ const getDoctorById = asyncHandler(async (req, res) => {
   delete doctor.medicalRegDoc;
   delete doctor.cancelledCheque;
 
-  const [patients, paidPatients, wallet, revenue, qrScans] = await Promise.all([
+  const [patients, paidPatientIds, wallet, revenue, feeShare, qrScans] = await Promise.all([
     Patient.countDocuments({ referringDoctor: doctor._id }),
-    Payment.countDocuments({ doctor: doctor._id, status: { $in: ['successful', 'manually_verified'] } }),
+    Payment.distinct('patient', { doctor: doctor._id, status: { $in: VERIFIED_PAYMENT_STATUSES } }),
     DoctorWallet.findOne({ doctor: doctor._id }).lean(),
     Payment.aggregate([
-      { $match: { doctor: doctor._id, status: { $in: ['successful', 'manually_verified'] } } },
-      { $group: { _id: null, total: { $sum: '$paidAmount' }, feeShare: { $sum: '$doctorFeeShare' } } },
+      { $match: { doctor: doctor._id, status: { $in: VERIFIED_PAYMENT_STATUSES } } },
+      { $group: { _id: null, paid: { $sum: { $ifNull: ['$paidAmount', 0] } }, refunded: { $sum: { $ifNull: ['$refundAmount', 0] } } } },
+      { $project: { _id: 0, total: { $max: [{ $subtract: ['$paid', '$refunded'] }, 0] } } },
+    ]),
+    FeeShare.aggregate([
+      { $match: { doctor: doctor._id, status: { $in: ['pending', 'available', 'withdrawn', 'adjusted'] } } },
+      { $group: { _id: null, total: { $sum: { $ifNull: ['$amount', 0] } } } },
     ]),
     QrScan.countDocuments({ doctor: doctor._id }),
   ]);
@@ -78,9 +79,9 @@ const getDoctorById = asyncHandler(async (req, res) => {
     metrics: {
       qrScans,
       patients,
-      paidPatients,
+      paidPatients: paidPatientIds.length,
       revenueGenerated: revenue[0]?.total || 0,
-      feeShareGenerated: revenue[0]?.feeShare || 0,
+      feeShareGenerated: feeShare[0]?.total || 0,
     },
     wallet,
   });
