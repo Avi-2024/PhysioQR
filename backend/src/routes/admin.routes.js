@@ -3,7 +3,7 @@ const router = express.Router();
 const { protect, authorize } = require('../middlewares/auth.middleware');
 const { requireFields, validateSchema } = require('../middlewares/validate.middleware');
 const { getDashboard } = require('../controllers/admin/dashboard.controller');
-const { getAgents, getAgentById } = require('../controllers/admin/agents.controller');
+const { getAgents, getAgentById, updateAgentTarget } = require('../controllers/admin/agents.controller');
 const { getDoctors, getDoctorById } = require('../controllers/admin/doctors.controller');
 const { getClinics, getClinicById, updateClinic } = require('../controllers/admin/clinics.controller');
 const { getReferrals, getReferralById } = require('../controllers/admin/referrals.controller');
@@ -42,7 +42,7 @@ const programBodySchema = {
 router.use(protect, authorize('admin'));
 router.get('/dashboard', getDashboard);
 router.get('/audit-logs', getAuditLogs); router.get('/audit-logs/export', exportAuditLogs); router.get('/audit-logs/:id', validateSchema({params:{id:{type:'objectId',required:true}}}), getAuditLogById);
-router.get('/agents', getAgents); router.get('/agents/:id', getAgentById);
+router.get('/agents', getAgents); router.get('/agents/:id', getAgentById); router.patch('/agents/:id/target', validateSchema({body:{monthlyOnboardingTarget:{type:'number',min:0,max:10000}}}), updateAgentTarget);
 router.get('/doctors', getDoctors); router.get('/doctors/:id', getDoctorById);
 router.get('/clinic-visits', getClinicVisits); router.get('/clinic-visits/:id', getClinicVisitById);
 router.get('/clinics', getClinics); router.get('/clinics/:id', getClinicById);
