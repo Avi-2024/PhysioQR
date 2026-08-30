@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ArrowRight, HeartPulse, Lock, ShieldCheck, Stethoscope, UserCheck } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth.store';
 import { Logo } from '@/components/brand/Logo';
@@ -19,10 +19,10 @@ type LoginMode = 'patient' | 'credentials';
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
   const { login } = useAuthStore();
-  const requestedRole = searchParams.get('role');
-  const initialMode: LoginMode = requestedRole === 'patient' ? 'patient' : 'credentials';
+  const preferredRole = asRecord(location.state).preferredRole;
+  const initialMode: LoginMode = preferredRole === 'patient' ? 'patient' : 'credentials';
   const [mode, setMode] = useState<LoginMode>(initialMode);
   const [submitError, setSubmitError] = useState('');
   const [otpSent, setOtpSent] = useState(false);
@@ -30,14 +30,8 @@ export default function LoginPage() {
   const credentialForm = useForm<CredentialForm>({ resolver: zodResolver(credentialSchema), defaultValues: { identifier: '', password: '' } });
   const patientForm = useForm<PatientForm>({ resolver: zodResolver(patientSchema), defaultValues: { mobile: '', otp: '' } });
 
-  const isDoctorEntry = requestedRole === 'doctor';
-  const credentialLabel = isDoctorEntry ? 'Doctor' : 'Account';
-
   const changeMode = (nextMode: LoginMode) => {
     setMode(nextMode);
-    if (nextMode === 'patient') setSearchParams({ role: 'patient' });
-    else if (isDoctorEntry || requestedRole === 'patient') setSearchParams({ role: 'doctor' });
-    else setSearchParams({});
     setSubmitError('');
     setOtpSent(false);
   };
@@ -53,10 +47,6 @@ export default function LoginPage() {
 
       if (!['admin', 'agent', 'doctor'].includes(role)) {
         setSubmitError(role === 'patient' ? 'Patients sign in with mobile OTP.' : 'This account cannot use password sign in.');
-        return;
-      }
-      if (isDoctorEntry && role !== 'doctor') {
-        setSubmitError('This account is not a Doctor account.');
         return;
       }
 
@@ -123,7 +113,7 @@ export default function LoginPage() {
         <div className="mb-6"><h2 className="text-xl font-bold text-neutral-900">Sign in to PhysioQR</h2><p className="text-xs text-neutral-500 mt-1">Use the sign-in method for your account</p></div>
         <div className="grid grid-cols-2 gap-2 p-1 bg-neutral-100 rounded-xl border border-neutral-200 mb-6">
           <button type="button" onClick={() => changeMode('patient')} className={`flex items-center justify-center gap-2 py-2.5 text-sm font-bold rounded-lg transition-all ${mode === 'patient' ? 'bg-primary-600 text-white shadow-sm' : 'text-neutral-600'}`}><HeartPulse className="w-4 h-4"/>Patient</button>
-          <button type="button" onClick={() => changeMode('credentials')} className={`flex items-center justify-center gap-2 py-2.5 text-sm font-bold rounded-lg transition-all ${mode === 'credentials' ? 'bg-primary-600 text-white shadow-sm' : 'text-neutral-600'}`}><Stethoscope className="w-4 h-4"/>{credentialLabel}</button>
+          <button type="button" onClick={() => changeMode('credentials')} className={`flex items-center justify-center gap-2 py-2.5 text-sm font-bold rounded-lg transition-all ${mode === 'credentials' ? 'bg-primary-600 text-white shadow-sm' : 'text-neutral-600'}`}><Stethoscope className="w-4 h-4"/>Account</button>
         </div>
         {submitError && <div className="mb-4 rounded-lg border border-danger-200 bg-danger-50 px-4 py-3 text-sm font-semibold text-danger-700">{submitError}</div>}
 
@@ -134,7 +124,7 @@ export default function LoginPage() {
         </form> : <form onSubmit={credentialForm.handleSubmit(credentialLogin)} className="space-y-4">
           <div><label className="block text-xs font-semibold text-neutral-700 mb-1">Email or Mobile</label><input {...credentialForm.register('identifier')} placeholder="Email address or mobile number" className={inputClass}/>{credentialForm.formState.errors.identifier && <p className="mt-1 text-xs text-danger-600">{credentialForm.formState.errors.identifier.message}</p>}</div>
           <div><label className="block text-xs font-semibold text-neutral-700 mb-1">Password</label><input {...credentialForm.register('password')} type="password" className={inputClass}/>{credentialForm.formState.errors.password && <p className="mt-1 text-xs text-danger-600">{credentialForm.formState.errors.password.message}</p>}</div>
-          <button type="submit" disabled={credentialForm.formState.isSubmitting} className={primaryButton}><Lock className="w-4 h-4"/>{credentialForm.formState.isSubmitting ? 'Signing in...' : `${credentialLabel} Sign In`}<ArrowRight className="w-4 h-4"/></button>
+          <button type="submit" disabled={credentialForm.formState.isSubmitting} className={primaryButton}><Lock className="w-4 h-4"/>{credentialForm.formState.isSubmitting ? 'Signing in...' : 'Sign In'}<ArrowRight className="w-4 h-4"/></button>
         </form>}
         <div className="mt-6 pt-5 border-t border-neutral-100 text-center text-sm text-neutral-600">New patient? <Link to="/register" className="font-bold text-primary-700">Register here</Link></div>
       </div>

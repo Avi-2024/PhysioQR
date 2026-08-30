@@ -22,7 +22,7 @@ interface LandingPageProps { onNavigateToPortal?: (role: UserRole) => void; }
 export function LandingPage({ onNavigateToPortal }: LandingPageProps) {
   const [portalModalOpen, setPortalModalOpen] = useState(false);
   const navigate = useNavigate();
-  const goToPortal = (role: UserRole) => onNavigateToPortal ? onNavigateToPortal(role) : navigate(`/login?role=${role}`);
+  const goToPortal = (role: UserRole) => onNavigateToPortal ? onNavigateToPortal(role) : navigate('/login', { state: { preferredRole: role } });
   const handleOpenPortalModal = (role?: UserRole) => role ? goToPortal(role) : setPortalModalOpen(true);
   const handleSelectRoleFromModal = (role: UserRole) => { setPortalModalOpen(false); goToPortal(role); };
 
