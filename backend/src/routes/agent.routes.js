@@ -18,11 +18,13 @@ const {
   updateMyFollowUp,
   getAllClinicVisits,
 } = require('../controllers/agent.controller');
+const { getMyDoctorById } = require('../controllers/agentDoctor.controller');
 
 router.use(protect);
 
 router.get('/me/dashboard', authorize('agent'), getMyDashboard);
 router.get('/me/doctors', authorize('agent'), getMyDoctors);
+router.get('/me/doctors/:doctorId', authorize('agent'), getMyDoctorById);
 router.get('/me/follow-ups', authorize('agent'), getMyFollowUps);
 router.get('/me/visits', authorize('agent'), getMyVisits);
 router.post('/me/visits', authorize('agent'), requireFields('visitDate', 'outcome'), addClinicVisit);
