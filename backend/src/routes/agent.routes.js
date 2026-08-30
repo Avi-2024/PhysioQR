@@ -3,24 +3,20 @@ const router = express.Router();
 const { protect, authorize } = require('../middlewares/auth.middleware');
 const { requireFields } = require('../middlewares/validate.middleware');
 const {
-  createAgent,
-  getAllAgents,
-  getAgentById,
-  updateAgent,
-  deleteAgent,
-  getMyDashboard,
-  addClinicVisit,
-  getMyVisits,
-  getMyVisitById,
-  updateMyVisit,
-  getAllClinicVisits,
+  createAgent, getAllAgents, getAgentById, updateAgent, deleteAgent, getMyDashboard,
+  addClinicVisit, getMyVisits, getMyVisitById, updateMyVisit, getAllClinicVisits,
 } = require('../controllers/agent.controller');
 const { getMyDoctors, getMyDoctorById } = require('../controllers/agentDoctor.controller');
 const { getMyFollowUps, updateMyFollowUp } = require('../controllers/agentFollowUp.controller');
+const { getMyPerformance, getMyProfile, getMyNotifications, markMyNotificationRead, markAllMyNotificationsRead } = require('../controllers/agentWorkspace.controller');
 
 router.use(protect);
-
 router.get('/me/dashboard', authorize('agent'), getMyDashboard);
+router.get('/me/performance', authorize('agent'), getMyPerformance);
+router.get('/me/profile', authorize('agent'), getMyProfile);
+router.get('/me/notifications', authorize('agent'), getMyNotifications);
+router.patch('/me/notifications/read-all', authorize('agent'), markAllMyNotificationsRead);
+router.patch('/me/notifications/:notificationId/read', authorize('agent'), markMyNotificationRead);
 router.get('/me/doctors', authorize('agent'), getMyDoctors);
 router.get('/me/doctors/:doctorId', authorize('agent'), getMyDoctorById);
 router.get('/me/follow-ups', authorize('agent'), getMyFollowUps);
@@ -29,13 +25,10 @@ router.post('/me/visits', authorize('agent'), requireFields('visitDate', 'outcom
 router.get('/me/visits/:visitId', authorize('agent'), getMyVisitById);
 router.patch('/me/visits/:visitId', authorize('agent'), updateMyVisit);
 router.patch('/me/visits/:visitId/follow-up', authorize('agent'), requireFields('followUpStatus'), updateMyFollowUp);
-
 router.get('/visits', authorize('admin'), getAllClinicVisits);
-
 router.post('/', authorize('admin'), requireFields('fullName', 'mobile'), createAgent);
 router.get('/', authorize('admin'), getAllAgents);
 router.get('/:id', authorize('admin'), getAgentById);
 router.put('/:id', authorize('admin'), updateAgent);
 router.delete('/:id', authorize('admin'), deleteAgent);
-
 module.exports = router;
