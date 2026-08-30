@@ -6,6 +6,42 @@ const { Payment } = require('../models/Payment.model');
 const asyncHandler = require('../utils/asyncHandler');
 
 const VERIFIED_PAYMENT_STATUSES = ['successful', 'manually_verified', 'partially_refunded', 'refunded'];
+const AGENT_DOCTOR_FIELDS = [
+  'doctorId',
+  'fullName',
+  'mobile',
+  'whatsapp',
+  'email',
+  'gender',
+  'dateOfBirth',
+  'profilePhoto',
+  'qualification',
+  'specialization',
+  'medicalRegNumber',
+  'registrationCouncil',
+  'yearsOfExperience',
+  'languagesSpoken',
+  'clinicName',
+  'clinicAddress',
+  'city',
+  'state',
+  'postalCode',
+  'clinicContact',
+  'clinicEmail',
+  'clinicWorkingHours',
+  'googleMapsLink',
+  'clinicBranches',
+  'registrationDate',
+  'approvalDate',
+  'status',
+  'rejectionReason',
+  'suspensionReason',
+  'referralCode',
+  'qrCodeActive',
+  'kycStatus',
+  'createdAt',
+  'updatedAt',
+].join(' ');
 
 const getCurrentAgent = async (req) => {
   const agent = await Agent.findOne({ user: req.user._id }).select('_id');
@@ -17,6 +53,17 @@ const getCurrentAgent = async (req) => {
   return agent;
 };
 
+// GET /api/agents/me/doctors
+// Lists only operational doctor onboarding data for the authenticated agent.
+const getMyDoctors = asyncHandler(async (req, res) => {
+  const agent = await getCurrentAgent(req);
+  const doctors = await Doctor.find({ agent: agent._id })
+    .select(AGENT_DOCTOR_FIELDS)
+    .sort({ createdAt: -1 })
+    .lean();
+  res.json(doctors);
+});
+
 // GET /api/agents/me/doctors/:doctorId
 // Returns only operational onboarding information for a doctor assigned to the
 // authenticated agent. Financial, banking, KYC-document, and medical data are
@@ -25,42 +72,7 @@ const getMyDoctorById = asyncHandler(async (req, res) => {
   const agent = await getCurrentAgent(req);
 
   const doctor = await Doctor.findOne({ _id: req.params.doctorId, agent: agent._id })
-    .select([
-      'doctorId',
-      'fullName',
-      'mobile',
-      'whatsapp',
-      'email',
-      'gender',
-      'dateOfBirth',
-      'profilePhoto',
-      'qualification',
-      'specialization',
-      'medicalRegNumber',
-      'registrationCouncil',
-      'yearsOfExperience',
-      'languagesSpoken',
-      'clinicName',
-      'clinicAddress',
-      'city',
-      'state',
-      'postalCode',
-      'clinicContact',
-      'clinicEmail',
-      'clinicWorkingHours',
-      'googleMapsLink',
-      'clinicBranches',
-      'registrationDate',
-      'approvalDate',
-      'status',
-      'rejectionReason',
-      'suspensionReason',
-      'referralCode',
-      'qrCodeActive',
-      'kycStatus',
-      'createdAt',
-      'updatedAt',
-    ].join(' '))
+    .select(AGENT_DOCTOR_FIELDS)
     .lean();
 
   if (!doctor) return res.status(404).json({ message: 'Doctor not found' });
@@ -88,4 +100,4 @@ const getMyDoctorById = asyncHandler(async (req, res) => {
   });
 });
 
-module.exports = { getMyDoctorById };
+module.exports = { getMyDoctors, getMyDoctorById };
