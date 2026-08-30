@@ -9,7 +9,6 @@ const {
   updateAgent,
   deleteAgent,
   getMyDashboard,
-  getMyDoctors,
   addClinicVisit,
   getMyVisits,
   getMyFollowUps,
@@ -18,7 +17,7 @@ const {
   updateMyFollowUp,
   getAllClinicVisits,
 } = require('../controllers/agent.controller');
-const { getMyDoctorById } = require('../controllers/agentDoctor.controller');
+const { getMyDoctors, getMyDoctorById } = require('../controllers/agentDoctor.controller');
 
 router.use(protect);
 
