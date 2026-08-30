@@ -6,6 +6,7 @@ import { withSuspense } from './route-utils';
 
 const AgentDashboardPage = lazy(() => import('@/features/agents/pages/dashboard/AgentDashboardPage'));
 const AgentDoctorsPage = lazy(() => import('@/features/agents/pages/doctors/AgentDoctorsPage'));
+const AgentDoctorDetailPage = lazy(() => import('@/features/agents/pages/doctors/AgentDoctorDetailPage'));
 const AgentRegisterDoctorPage = lazy(() => import('@/features/agents/pages/doctors/AgentRegisterDoctorPage'));
 const AgentClinicVisitsPage = lazy(() => import('@/features/agents/pages/clinic-visits/AgentClinicVisitsPage'));
 const AgentPerformancePage = lazy(() => import('@/features/agents/pages/performance/AgentPerformancePage'));
@@ -24,6 +25,7 @@ export const agentRoutes: RouteObject = {
     { path: 'dashboard', element: withSuspense(<AgentDashboardPage />) },
     { path: 'doctors', element: withSuspense(<AgentDoctorsPage />) },
     { path: 'doctors/new', element: withSuspense(<AgentRegisterDoctorPage />) },
+    { path: 'doctors/:doctorId', element: withSuspense(<AgentDoctorDetailPage />) },
     { path: 'clinic-visits', element: withSuspense(<AgentClinicVisitsPage />) },
     { path: 'performance', element: withSuspense(<AgentPerformancePage />) },
   ],
