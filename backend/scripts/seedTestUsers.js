@@ -108,11 +108,11 @@ async function run() {
   doctorUser.profileRef = doctor._id;
   await doctorUser.save();
 
-  let patient = await Patient.findOne({ mobile: '9300000091' });
-  if (!patient) patient = new Patient({ mobile: '9300000091' });
+  let patient = await Patient.findOne({ mobile: '7470562824' });
+  if (!patient) patient = new Patient({ mobile: '7470562824' });
   Object.assign(patient, {
     fullName: 'Ravi Test Patient',
-    whatsapp: '9300000091',
+    whatsapp: '7470562824',
     email: 'patient.test@physioqr.local',
     age: 35,
     gender: 'male',
@@ -136,7 +136,7 @@ async function run() {
   console.log('Doctor mobile: 9200000091');
   console.log(`Agent   : agent.test@physioqr.local / ${TEST_PASSWORD}`);
   console.log('Agent mobile : 9100000091');
-  console.log('Patient : 9300000091 (OTP login; use OTP returned by /auth/send-otp in development DB mode)');
+  console.log('Patient : 7470562824 (OTP login; use OTP returned by /auth/send-otp in development DB mode)');
   console.log(`Doctor referral code: ${doctor.referralCode}`);
   console.log('Admin   : existing admin account was left unchanged.');
 }

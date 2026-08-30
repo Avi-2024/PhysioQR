@@ -132,7 +132,7 @@ export function AdminLayout() {
         <div className="h-20 flex items-center gap-4 px-6 border-b border-neutral-800">
           <Logo width={56} height={56}  />
           <div>
-            <h1 className="font-bold text-white leading-none text-lg">Admin Portal</h1>
+            {/* <h1 className="font-bold text-white leading-none text-lg">Admin Portal</h1> */}
           </div>
         </div>
 
@@ -164,7 +164,7 @@ export function AdminLayout() {
               <div className="flex items-center gap-3 min-w-0">
                 <Logo width={48} height={48}  />
                 <div className="min-w-0">
-                  <h1 className="font-bold text-white leading-none text-base truncate">Admin Portal</h1>
+                  {/* <h1 className="font-bold text-white leading-none text-base truncate">Admin Portal</h1> */}
                 </div>
               </div>
               <button onClick={() => setMobileOpen(false)} className="p-2 rounded-lg text-neutral-300 hover:bg-neutral-800 hover:text-white" aria-label="Close menu">
