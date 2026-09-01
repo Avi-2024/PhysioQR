@@ -3,17 +3,14 @@ const Otp = require('../models/Otp.model');
 
 const PATIENT_OTP_PURPOSES = new Set(['registration', 'login']);
 
-// Creates an HTTP-aware error for controller middleware.
 const httpError = (message, status = 400) => {
   const error = new Error(message);
   error.status = status;
   return error;
 };
 
-// Normalizes mobile input for local DB matching.
 const normalizeMobile = (mobile) => mobile?.trim();
 
-// Converts common Indian mobile formats into Twilio-required E.164 format.
 const toE164Mobile = (mobile) => {
   const normalized = normalizeMobile(mobile);
   if (!normalized) throw httpError('mobile is required');
@@ -30,21 +27,21 @@ const toE164Mobile = (mobile) => {
   throw httpError('Invalid mobile number');
 };
 
-// Resolves the OTP provider based on environment configuration.
 const getOtpProvider = () => {
   const configured = process.env.OTP_PROVIDER?.trim().toLowerCase();
   if (configured) return configured;
   return process.env.NODE_ENV === 'production' ? 'twilio' : 'db';
 };
 
-// Ensures OTP endpoints are restricted to patient registration and login.
 const assertPatientOtpPurpose = (purpose) => {
   if (!PATIENT_OTP_PURPOSES.has(purpose)) {
     throw httpError('OTP is only supported for patient registration and login');
   }
 };
 
-// Returns a configured Twilio client and Verify service ID.
+// Twilio Verify owns OTP generation, delivery, expiry and verification.
+// Branding/friendly-name is configured on the Verify Service in Twilio Console.
+// Do not send customFriendlyName per request: some accounts/regions reject it with 403.
 const getTwilioVerifyConfig = () => {
   const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_VERIFY_SERVICE_SID } = process.env;
   if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_VERIFY_SERVICE_SID) {
@@ -54,11 +51,9 @@ const getTwilioVerifyConfig = () => {
   return {
     client: twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN),
     serviceSid: TWILIO_VERIFY_SERVICE_SID,
-    friendlyName: process.env.TWILIO_VERIFY_FRIENDLY_NAME?.trim() || 'PhysioQR',
   };
 };
 
-// Sends an OTP through the development database provider.
 const sendDbOtp = async ({ mobile, purpose }) => {
   const normalizedMobile = normalizeMobile(mobile);
   const todayStart = new Date();
@@ -92,7 +87,6 @@ const sendDbOtp = async ({ mobile, purpose }) => {
   return response;
 };
 
-// Verifies an OTP through the development database provider.
 const verifyDbOtp = async ({ mobile, purpose, otp }) => {
   const normalizedMobile = normalizeMobile(mobile);
   const record = await Otp.findOne({ mobile: normalizedMobile, purpose, verified: false }).sort({ createdAt: -1 });
@@ -110,25 +104,19 @@ const verifyDbOtp = async ({ mobile, purpose, otp }) => {
   return { mobile: normalizedMobile };
 };
 
-// Sends a patient OTP through Twilio Verify.
 const sendTwilioOtp = async ({ mobile }) => {
   const to = toE164Mobile(mobile);
   const channel = process.env.TWILIO_VERIFY_CHANNEL || 'sms';
-  const { client, serviceSid, friendlyName } = getTwilioVerifyConfig();
+  const { client, serviceSid } = getTwilioVerifyConfig();
 
   const verification = await client.verify.v2
     .services(serviceSid)
     .verifications
-    .create({
-      to,
-      channel,
-      customFriendlyName: friendlyName,
-    });
+    .create({ to, channel });
 
   return { channel, status: verification.status };
 };
 
-// Verifies a patient OTP through Twilio Verify.
 const verifyTwilioOtp = async ({ mobile, otp }) => {
   const to = toE164Mobile(mobile);
   const { client, serviceSid } = getTwilioVerifyConfig();
@@ -145,7 +133,6 @@ const verifyTwilioOtp = async ({ mobile, otp }) => {
   return { mobile: normalizeMobile(mobile) };
 };
 
-// Sends a patient OTP using the configured provider.
 const sendOtp = async ({ mobile, purpose }) => {
   assertPatientOtpPurpose(purpose);
   const provider = getOtpProvider();
@@ -156,7 +143,6 @@ const sendOtp = async ({ mobile, purpose }) => {
   throw httpError(`Unsupported OTP provider: ${provider}`, 503);
 };
 
-// Verifies a patient OTP using the configured provider.
 const verifyOtp = async ({ mobile, purpose, otp }) => {
   assertPatientOtpPurpose(purpose);
   const provider = getOtpProvider();
