@@ -40,8 +40,8 @@ export function LandingHeader({ onOpenPortal }: LandingHeaderProps) {
           </nav>
 
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px', flexShrink: 0 }}>
-            <Link to="/register" className="hidden lg:inline-flex rc-btn-outline" style={{ minHeight: '42px', textDecoration: 'none', alignItems: 'center', justifyContent: 'center' }}>
-              Register
+            <Link to="/register" className="hidden lg:inline-flex rc-btn-outline" style={{ minHeight: '42px', textDecoration: 'none', alignItems: 'center', justifyContent: 'center' }} title="Register as a patient">
+              Patient Register
             </Link>
             <button className="rc-btn-primary rc-header-signin" onClick={() => onOpenPortal()}>
               Sign In
