@@ -6,13 +6,13 @@ const {
   registerPatient,
   verifyPatientMobile,
   recordConsent,
+  getOnboardingStatus,
   getOnboardingQuote,
   getMyProgram,
   getMyProgress,
   getMyPayments,
 } = require('../controllers/patient.controller');
 
-// Public patient registration from a doctor QR code.
 router.post('/register', validateSchema({
   body: {
     fullName: { type: 'string', min: 2, max: 100, required: true },
@@ -25,10 +25,10 @@ router.post('/register', validateSchema({
 }), registerPatient);
 router.post('/verify-mobile', validateSchema({ body: { mobile: { type: 'mobile', required: true } } }), verifyPatientMobile);
 
-// Protected patient self-service APIs require an OTP-backed patient session.
 router.use(protect);
 router.use(authorize('patient'));
 router.post('/consent', recordConsent);
+router.get('/me/onboarding-status', getOnboardingStatus);
 router.get('/me/onboarding-quote', getOnboardingQuote);
 router.get('/me/program', getMyProgram);
 router.get('/me/progress', getMyProgress);
