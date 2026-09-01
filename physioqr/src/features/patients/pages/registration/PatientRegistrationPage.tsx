@@ -1,6 +1,6 @@
-import PatientRegistrationWorkspacePage from '@/features/patients/pages/PatientRegistrationPage';
+import PatientRegistrationWorkspacePage from '@/features/patients/pages/PatientRegistrationPageV2';
 
-// Renders the patient registration route from the existing form page.
+// Renders the improved patient registration experience.
 export default function PatientRegistrationPage() {
   return <PatientRegistrationWorkspacePage />;
 }
