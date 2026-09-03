@@ -22,6 +22,27 @@
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 
+  /* Keep multiline form controls visibly editable across browsers. */
+  textarea {
+    display: block;
+    width: 100%;
+    min-height: 96px;
+    padding: 10px 14px;
+    border: 1px solid #d4d4d8;
+    border-radius: 8px;
+    background: #ffffff;
+    color: #171717;
+    resize: vertical;
+  }
+
+  textarea::placeholder {
+    color: #a3a3a3;
+  }
+
+  textarea:focus {
+    border-color: #0f766e;
+  }
+
   /* Focus visible only on keyboard */
   :focus-visible {
     @apply outline-none ring-2 ring-primary-500 ring-offset-2;
