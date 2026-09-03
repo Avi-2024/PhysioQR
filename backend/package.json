@@ -9,6 +9,7 @@
     "seed:admin": "node scripts/seedAdmin.js",
     "seed:demo": "node scripts/seedDemoData.js",
     "seed:test-users": "node scripts/seedTestUsers.js",
+    "reset:all-except-admin": "node scripts/resetAllExceptAdmin.js",
     "test:integration": "node scripts/integrationSmoke.js",
     "worker:notifications": "node scripts/notificationWorker.js"
   },
