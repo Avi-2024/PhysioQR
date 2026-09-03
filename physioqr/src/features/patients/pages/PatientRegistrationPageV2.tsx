@@ -60,6 +60,7 @@ export default function PatientRegistrationPageV2() {
   const [otpVerified, setOtpVerified] = useState(false);
   const [consentAccepted, setConsentAccepted] = useState(false);
   const [error, setError] = useState('');
+  const [resumeNotice, setResumeNotice] = useState('');
 
   const basicForm = useForm<BasicForm>({ resolver: zodResolver(basicSchema) });
   const otpForm = useForm<OtpForm>({ resolver: zodResolver(otpSchema) });
@@ -113,26 +114,6 @@ export default function PatientRegistrationPageV2() {
 
   const verifyOtpMutation = useMutation({
     mutationFn: async (values: OtpForm) => apiClient.post('/auth/verify-otp', { mobile: values.mobile, otp: values.otp, purpose: 'registration' }),
-    onSuccess: (response) => {
-      const data = asRecord(response.data);
-      const patientPayload = asRecord(data.patient);
-      const token = text(data.accessToken || data.token);
-      if (!token || !patientPayload.id) {
-        setError('OTP verified, but the patient account could not be started. Please try again.');
-        return;
-      }
-      const authUser: AuthUser = {
-        id: text(patientPayload.id),
-        name: text(patientPayload.fullName, 'Patient'),
-        email: text(patientPayload.email),
-        mobile: text(patientPayload.mobile),
-        role: 'patient',
-      };
-      login(authUser, token);
-      setPatient(patientPayload);
-      setOtpVerified(true);
-      setError('');
-    },
   });
 
   const consentMutation = useMutation({
@@ -192,21 +173,96 @@ export default function PatientRegistrationPageV2() {
 
   const handleBasicSubmit = async () => {
     setError('');
+    setResumeNotice('');
     nextStep();
   };
 
   const handleSendOtp = async () => {
     setError('');
+    setResumeNotice('');
     if (!(await otpForm.trigger('mobile'))) return;
     await sendOtpMutation.mutateAsync(otpForm.getValues('mobile'));
   };
 
+  const startPatientSession = (payload: ApiRecord) => {
+    const patientPayload = asRecord(payload.patient);
+    const token = text(payload.accessToken || payload.token);
+    if (!token || !patientPayload.id) throw new Error('OTP verified, but the patient account could not be started. Please try again.');
+
+    const authUser: AuthUser = {
+      id: text(patientPayload.id),
+      name: text(patientPayload.fullName, 'Patient'),
+      email: text(patientPayload.email),
+      mobile: text(patientPayload.mobile),
+      role: 'patient',
+    };
+    login(authUser, token);
+    setPatient(patientPayload);
+    setOtpVerified(true);
+  };
+
+  const resumeExistingOnboarding = async () => {
+    const response = await apiClient.get('/patients/me/onboarding-status');
+    const status = asRecord(response.data);
+    const savedPatient = asRecord(status.patient);
+    if (savedPatient.id) setPatient(savedPatient);
+
+    const nextAction = text(status.nextAction);
+    if (nextAction === 'dashboard') {
+      navigate('/patient/dashboard');
+      return;
+    }
+
+    const savedStep = Number(status.nextStep || 3);
+    const safeStep = Math.min(6, Math.max(3, Number.isFinite(savedStep) ? savedStep : 3));
+    setConsentAccepted(Boolean(status.consentCompleted));
+
+    const savedAssessment = asRecord(status.assessment);
+    const painCategory = asRecord(savedAssessment.painCategory);
+    if (painCategory._id || painCategory.id) setSelectedCategory(painCategory);
+    if (Boolean(status.assessmentCompleted)) setAssessmentResult({ hasRedFlag: Boolean(savedAssessment.hasRedFlag), assessment: savedAssessment });
+
+    setResumeNotice('This mobile number already has a patient account. You are signed in and your saved registration has been resumed.');
+    setStep(safeStep);
+  };
+
   const handleVerifyOtp = async () => {
     setError('');
+    setResumeNotice('');
     if (!(await otpForm.trigger(['mobile', 'otp']))) return;
+
+    const mobile = otpForm.getValues('mobile');
     const basicValues = basicForm.getValues();
-    if (!patientId) await registerMutation.mutateAsync({ ...basicValues, mobile: otpForm.getValues('mobile') });
-    await verifyOtpMutation.mutateAsync(otpForm.getValues());
+    let existingPatient = false;
+
+    if (!patientId) {
+      try {
+        await registerMutation.mutateAsync({ ...basicValues, mobile });
+      } catch (registrationError) {
+        const response = asRecord(asRecord(registrationError).response);
+        const data = asRecord(response.data);
+        if (Number(response.status) === 409 && text(data.code) === 'PATIENT_ALREADY_REGISTERED') {
+          existingPatient = true;
+          registerMutation.reset();
+        } else {
+          throw registrationError;
+        }
+      }
+    }
+
+    const verifyResponse = await verifyOtpMutation.mutateAsync(otpForm.getValues());
+    const verifyData = asRecord(verifyResponse.data);
+    if (!Boolean(verifyData.registered)) {
+      setError('OTP verified, but no patient account was found. Please restart registration with this mobile number.');
+      return;
+    }
+
+    startPatientSession(verifyData);
+    if (existingPatient) {
+      await resumeExistingOnboarding();
+    } else {
+      setError('');
+    }
   };
 
   const handleCategoryChange = (categoryId: string) => {
@@ -236,7 +292,7 @@ export default function PatientRegistrationPageV2() {
     await apiClient.post('/payments/verify', payload);
   };
 
-  const requestError = error || mutationError(registerMutation.error || sendOtpMutation.error || verifyOtpMutation.error || consentMutation.error || assessmentMutation.error || quoteQuery.error || paymentMutation.error);
+  const requestError = error || mutationError(sendOtpMutation.error || verifyOtpMutation.error || consentMutation.error || assessmentMutation.error || quoteQuery.error || paymentMutation.error);
 
   return (
     <div className="min-h-screen bg-neutral-50 px-3 py-5 sm:px-4 sm:py-8">
@@ -255,6 +311,7 @@ export default function PatientRegistrationPageV2() {
         <main className="bg-white">
           <div className="border-b border-neutral-100 px-4 pt-5 sm:px-7"><StepIndicator step={step} /></div>
           <div className="p-4 sm:p-7">
+            {resumeNotice && <div className="mb-5 border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">{resumeNotice}</div>}
             {requestError && <div className="mb-5 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{requestError}</div>}
 
             {step === 1 && (
@@ -273,9 +330,9 @@ export default function PatientRegistrationPageV2() {
 
             {step === 2 && (
               <div className="space-y-5">
-                <SectionTitle title="Verify your mobile number" description="We will send a one-time verification code to your mobile." />
+                <SectionTitle title="Verify your mobile number" description="New patients are registered once. Existing patients sign in with OTP and continue their saved progress." />
                 <Field label="Mobile number" error={otpForm.formState.errors.mobile?.message}><div className="flex flex-col gap-2 sm:flex-row"><input {...otpForm.register('mobile')} type="tel" inputMode="numeric" className={inputClass} placeholder="10-digit mobile number" /><button onClick={handleSendOtp} type="button" disabled={sendOtpMutation.isPending} className="min-h-12 shrink-0 rounded-lg border border-neutral-300 bg-white px-5 text-sm font-semibold text-neutral-800 disabled:opacity-60">{sendOtpMutation.isPending ? 'Sending...' : otpSent ? 'Resend OTP' : 'Send OTP'}</button></div></Field>
-                {otpSent && <Field label="Enter OTP" error={otpForm.formState.errors.otp?.message}><div className="flex flex-col gap-2 sm:flex-row"><input {...otpForm.register('otp')} inputMode="numeric" maxLength={10} className={cn(inputClass, 'tracking-[0.2em]')} placeholder="••••••" /><button onClick={handleVerifyOtp} type="button" disabled={verifyOtpMutation.isPending || registerMutation.isPending} className="min-h-12 shrink-0 rounded-lg bg-primary-600 px-6 text-sm font-semibold text-white disabled:opacity-60">{verifyOtpMutation.isPending ? 'Verifying...' : 'Verify OTP'}</button></div></Field>}
+                {otpSent && <Field label="Enter OTP" error={otpForm.formState.errors.otp?.message}><div className="flex flex-col gap-2 sm:flex-row"><input {...otpForm.register('otp')} inputMode="numeric" maxLength={10} className={cn(inputClass, 'tracking-[0.2em]')} placeholder="••••••" /><button onClick={handleVerifyOtp} type="button" disabled={verifyOtpMutation.isPending || registerMutation.isPending} className="min-h-12 shrink-0 rounded-lg bg-primary-600 px-6 text-sm font-semibold text-white disabled:opacity-60">{verifyOtpMutation.isPending || registerMutation.isPending ? 'Checking...' : 'Verify OTP'}</button></div></Field>}
                 {otpVerified && <SuccessBox>Mobile number verified successfully.</SuccessBox>}
                 <NavButtons onBack={prevStep} onNext={nextStep} nextDisabled={!otpVerified} />
               </div>
