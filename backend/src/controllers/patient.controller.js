@@ -20,20 +20,16 @@ const registerPatient = asyncHandler(async (req, res) => {
     if (!referringDoctor) return res.status(400).json({ message: 'Invalid or inactive doctor QR code' });
   }
 
-  const existing = await Patient.findOne({ mobile });
+  // A mobile number identifies one patient account. Registration is create-only.
+  // Existing patients must prove ownership with OTP and continue their existing onboarding.
+  // Never mutate an existing patient's referral from this unauthenticated endpoint.
+  const existing = await Patient.findOne({ mobile }).select('_id mobileVerified consentAccepted referralLocked status');
   if (existing) {
-    if (existing.referralLocked) {
-      return res.status(400).json({ message: 'Mobile number already registered with a completed payment', patientId: existing._id });
-    }
-    if (referringDoctor && existing.referringDoctor?.toString() !== referringDoctor._id.toString()) {
-      const prevDoctor = existing.referringDoctor;
-      existing.referringDoctor = referringDoctor._id;
-      existing.referralSource = 'qr_code';
-      await existing.save();
-      await writeAuditLog({ req, action: 'patient_referral_changed', module: 'Patient', recordId: existing._id, previousValue: { referringDoctor: prevDoctor }, newValue: { referringDoctor: referringDoctor._id }, reason: 'Unpaid patient scanned a different doctor QR code' });
-    }
-    if (referringDoctor && scanId) await QrScan.findOneAndUpdate({ _id: scanId, doctor: referringDoctor._id }, { patient: existing._id, registrationDate: new Date() });
-    return res.json({ message: 'Patient already registered, referral updated', patientId: existing._id, patient: existing, doctor: referringDoctor ? { id: referringDoctor._id, doctorId: referringDoctor.doctorId, fullName: referringDoctor.fullName, clinicName: referringDoctor.clinicName } : null });
+    return res.status(409).json({
+      code: 'PATIENT_ALREADY_REGISTERED',
+      message: 'This mobile number is already registered. Verify OTP to sign in and continue your existing registration.',
+      registered: true,
+    });
   }
 
   const patient = await Patient.create({ fullName, mobile, referringDoctor: referringDoctor?._id || null, referralSource: doctorCode ? 'qr_code' : 'direct', ...rest });
