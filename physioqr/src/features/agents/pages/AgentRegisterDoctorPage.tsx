@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -62,7 +63,7 @@ export default function AgentRegisterDoctorPage() {
 
 const inputClass = 'min-h-11 w-full rounded-lg border border-neutral-300 px-3.5 py-2.5 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100';
 
-function Field({ label, error, wide, required, children }: { label: string; error?: string; wide?: boolean; required?: boolean; children: React.ReactNode }) {
+function Field({ label, error, wide, required, children }: { label: string; error?: string; wide?: boolean; required?: boolean; children: ReactNode }) {
   return <label className={wide ? 'block sm:col-span-2' : 'block'}><span className="mb-1.5 block text-sm font-semibold text-neutral-700">{label}{required && <span className="ml-0.5 text-rose-500">*</span>}</span>{children}{error && <p className="mt-1 text-xs font-medium text-rose-600">{error}</p>}</label>;
 }
 
