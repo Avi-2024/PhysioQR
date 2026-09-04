@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type FormEvent, type ReactNode } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { LockKeyhole, ShieldCheck } from 'lucide-react';
 import apiClient from '@/lib/api-client';
@@ -17,7 +17,7 @@ export default function ChangePasswordPage() {
   if (!isAuthenticated || !user) return <Navigate to="/login" replace />;
   if (!user.mustChangePassword) return <Navigate to={getRedirectPathForRole(user.role)} replace />;
 
-  const submit = async (event: React.FormEvent) => {
+  const submit = async (event: FormEvent) => {
     event.preventDefault();
     setError('');
     if (newPassword.length < 8) return setError('New password must be at least 8 characters.');
@@ -58,4 +58,4 @@ export default function ChangePasswordPage() {
 }
 
 const inputClass = 'mt-1.5 min-h-12 w-full rounded-lg border border-neutral-300 px-3.5 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100';
-function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="block"><span className="text-sm font-semibold text-neutral-700">{label}</span>{children}</label>; }
+function Field({ label, children }: { label: string; children: ReactNode }) { return <label className="block"><span className="text-sm font-semibold text-neutral-700">{label}</span>{children}</label>; }
