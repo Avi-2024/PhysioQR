@@ -11,6 +11,8 @@ const userSchema = new mongoose.Schema({
   email: { type: String, unique: true, sparse: true },
   mobile: { type: String, unique: true, sparse: true },
   password: { type: String, required: true },
+  mustChangePassword: { type: Boolean, default: false },
+  passwordChangedAt: Date,
   status: {
     type: String,
     enum: ['active', 'inactive', 'suspended', 'terminated'],
