@@ -5,6 +5,7 @@ import { PublicLayout } from '@/layouts/PublicLayout';
 import { withSuspense } from './route-utils';
 
 const LoginPage = lazy(() => import('@/features/auth/pages/LoginPage'));
+const ChangePasswordPage = lazy(() => import('@/features/auth/pages/ChangePasswordPage'));
 const PatientQRLandingPage = lazy(() => import('@/features/patients/pages/registration/PatientQRLandingPage'));
 const PatientRegistrationPage = lazy(() => import('@/features/patients/pages/registration/PatientRegistrationPage'));
 const PaymentSuccessPage = lazy(() => import('@/features/payments/pages/results/PaymentSuccessPage'));
@@ -25,6 +26,7 @@ export const publicRoutes: RouteObject = {
       path: '/login',
       element: <PublicRoute>{withSuspense(<LoginPage />)}</PublicRoute>,
     },
+    { path: '/change-password', element: withSuspense(<ChangePasswordPage />) },
     { path: '/forgot-password', element: withSuspense(<ForgotPasswordPage />) },
     { path: '/register', element: withSuspense(<PatientRegistrationPage />) },
     { path: '/qr', element: withSuspense(<PatientQRLandingPage />) },
