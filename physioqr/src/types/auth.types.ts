@@ -8,6 +8,7 @@ export interface AuthUser {
   role: UserRole;
   avatarUrl?: string;
   revenueModel?: 'split_model' | 'platform_fee_model';
+  mustChangePassword?: boolean;
 }
 
 export interface AuthTokens {
