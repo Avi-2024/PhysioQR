@@ -9,11 +9,11 @@ const {
   logout,
   getSessions,
   revokeSession,
-  changePassword,
   sendOtp,
   verifyOtp,
   resetPassword,
 } = require('../controllers/auth.controller');
+const { changePassword } = require('../controllers/password.controller');
 const { requireFields, validateSchema } = require('../middlewares/validate.middleware');
 const { authLimiter, otpLimiter } = require('../middlewares/rateLimit.middleware');
 
