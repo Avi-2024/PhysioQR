@@ -121,7 +121,7 @@ export default function AgentDoctorsPage() {
           type="button"
           onClick={(event) => {
             event.stopPropagation();
-            navigate(`/agent/doctors/${row.id}?edit=1`);
+            navigate(`/agent/doctors/${row.id}/edit`);
           }}
           className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50"
         >
