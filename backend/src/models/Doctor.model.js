@@ -54,6 +54,7 @@ const doctorSchema = new mongoose.Schema({
   // Referral Program
   registrationDate: Date,
   approvalDate: Date,
+  preferredProgram: { type: mongoose.Schema.Types.ObjectId, ref: 'Program' },
   requestedPatientFee: Number,
   approvedPatientFee: Number,
   revenueModel: { type: String, enum: ['split', 'platform_fee'], default: 'split' },
