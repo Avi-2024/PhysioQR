@@ -13,7 +13,8 @@ const AGENT_DOCTOR_FIELDS = [
   'doctorId','fullName','mobile','whatsapp','email','gender','dateOfBirth','profilePhoto',
   'qualification','specialization','medicalRegNumber','registrationCouncil','yearsOfExperience','languagesSpoken',
   'clinicName','clinicAddress','city','state','postalCode','clinicContact','clinicEmail','clinicWorkingHours','googleMapsLink','clinicBranches',
-  'preferredProgram','revenueModel','registrationDate','approvalDate','status','rejectionReason','suspensionReason','referralCode','qrCodeActive','kycStatus','createdAt','updatedAt',
+  'preferredProgram','revenueModel','requestedPatientFee','requestedFeeShareType','requestedFeeSharePercentage','requestedFixedFeeShareAmount',
+  'registrationDate','approvalDate','status','rejectionReason','suspensionReason','referralCode','qrCodeActive','kycStatus','createdAt','updatedAt',
 ].join(' ');
 
 const getCurrentAgent = async (req) => {
