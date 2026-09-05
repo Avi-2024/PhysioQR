@@ -23,8 +23,13 @@ const AGENT_EDITABLE_DOCTOR_FIELDS = [
   'city',
   'preferredProgram',
   'revenueModel',
+  'requestedPatientFee',
+  'requestedFeeShareType',
+  'requestedFeeSharePercentage',
+  'requestedFixedFeeShareAmount',
 ];
 const REVENUE_MODELS = ['split', 'platform_fee'];
+const REQUESTED_FEE_SHARE_TYPES = ['percentage', 'fixed'];
 
 const AGENT_DOCTOR_LIST_FIELDS = [
   'doctorId','fullName','mobile','qualification','specialization','medicalRegNumber',
@@ -35,6 +40,8 @@ const AGENT_DOCTOR_LIST_FIELDS = [
 const AGENT_DOCTOR_DETAIL_FIELDS = [
   AGENT_DOCTOR_LIST_FIELDS,
   'qrCodeUrl',
+  'requestedPatientFee','requestedFeeShareType','requestedFeeSharePercentage','requestedFixedFeeShareAmount',
+  'approvedPatientFee','feeShareType','feeSharePercentage','fixedFeeShareAmount',
 ].join(' ');
 
 const getCurrentAgent = async (req) => {
@@ -72,11 +79,101 @@ const normalizeDoctorUpdates = (updates) => {
     'city',
     'preferredProgram',
     'revenueModel',
+    'requestedFeeShareType',
   ];
   stringFields.forEach((field) => {
     if (updates[field] !== undefined) updates[field] = String(updates[field]).trim();
   });
   return updates;
+};
+
+const validateCommercialUpdates = (updates) => {
+  if (updates.requestedPatientFee !== undefined) {
+    const fee = Number(updates.requestedPatientFee);
+    if (!Number.isFinite(fee) || fee < 1 || fee > 100000) {
+      const error = new Error('Patient price must be between 1 and 100000');
+      error.status = 400;
+      throw error;
+    }
+    updates.requestedPatientFee = fee;
+  }
+
+  if (updates.requestedFeeShareType !== undefined && !REQUESTED_FEE_SHARE_TYPES.includes(updates.requestedFeeShareType)) {
+    const error = new Error('Commission type must be percentage or fixed');
+    error.status = 400;
+    throw error;
+  }
+
+  if (updates.requestedFeeShareType === 'percentage') {
+    const percentage = Number(updates.requestedFeeSharePercentage);
+    if (!Number.isFinite(percentage) || percentage < 0 || percentage > 100) {
+      const error = new Error('Commission percentage must be between 0 and 100');
+      error.status = 400;
+      throw error;
+    }
+    updates.requestedFeeSharePercentage = percentage;
+    delete updates.requestedFixedFeeShareAmount;
+  }
+
+  if (updates.requestedFeeShareType === 'fixed') {
+    const amount = Number(updates.requestedFixedFeeShareAmount);
+    if (!Number.isFinite(amount) || amount < 0 || amount > 100000) {
+      const error = new Error('Fixed commission must be between 0 and 100000');
+      error.status = 400;
+      throw error;
+    }
+    if (updates.requestedPatientFee !== undefined && amount > updates.requestedPatientFee) {
+      const error = new Error('Fixed commission cannot exceed the patient price');
+      error.status = 400;
+      throw error;
+    }
+    updates.requestedFixedFeeShareAmount = amount;
+    delete updates.requestedFeeSharePercentage;
+  }
+};
+
+const commercialTermsChanged = (doctor, updates) => {
+  if (updates.revenueModel !== undefined && updates.revenueModel !== doctor.revenueModel) return true;
+  if (updates.requestedPatientFee !== undefined) {
+    const current = doctor.requestedPatientFee ?? doctor.approvedPatientFee;
+    if (Number(updates.requestedPatientFee) !== Number(current)) return true;
+  }
+  if (updates.requestedFeeShareType !== undefined) {
+    const currentType = doctor.requestedFeeShareType || doctor.feeShareType;
+    if (updates.requestedFeeShareType !== currentType) return true;
+    if (updates.requestedFeeShareType === 'percentage') {
+      const current = doctor.requestedFeeSharePercentage ?? doctor.feeSharePercentage;
+      if (Number(updates.requestedFeeSharePercentage) !== Number(current)) return true;
+    }
+    if (updates.requestedFeeShareType === 'fixed') {
+      const current = doctor.requestedFixedFeeShareAmount ?? doctor.fixedFeeShareAmount;
+      if (Number(updates.requestedFixedFeeShareAmount) !== Number(current)) return true;
+    }
+  }
+  return false;
+};
+
+const applyCommercialUpdates = (doctor, updates) => {
+  if (updates.requestedPatientFee !== undefined) {
+    doctor.requestedPatientFee = updates.requestedPatientFee;
+    doctor.approvedPatientFee = updates.requestedPatientFee;
+  }
+  if (updates.requestedFeeShareType === 'percentage') {
+    doctor.requestedFeeShareType = 'percentage';
+    doctor.requestedFeeSharePercentage = updates.requestedFeeSharePercentage;
+    doctor.requestedFixedFeeShareAmount = undefined;
+    doctor.feeShareType = 'percentage';
+    doctor.feeSharePercentage = updates.requestedFeeSharePercentage;
+    doctor.fixedFeeShareAmount = undefined;
+  }
+  if (updates.requestedFeeShareType === 'fixed') {
+    doctor.requestedFeeShareType = 'fixed';
+    doctor.requestedFixedFeeShareAmount = updates.requestedFixedFeeShareAmount;
+    doctor.requestedFeeSharePercentage = undefined;
+    doctor.feeShareType = 'fixed';
+    doctor.fixedFeeShareAmount = updates.requestedFixedFeeShareAmount;
+    doctor.feeSharePercentage = undefined;
+  }
 };
 
 const validateDoctorUpdates = async ({ doctor, updates }) => {
@@ -99,6 +196,8 @@ const validateDoctorUpdates = async ({ doctor, updates }) => {
     error.status = 400;
     throw error;
   }
+
+  validateCommercialUpdates(updates);
 
   if (updates.preferredProgram !== undefined) {
     if (!mongoose.isValidObjectId(updates.preferredProgram)) {
@@ -142,13 +241,13 @@ const validateDoctorUpdates = async ({ doctor, updates }) => {
     }
   }
 
-  if (updates.revenueModel !== undefined && updates.revenueModel !== doctor.revenueModel) {
+  if (commercialTermsChanged(doctor, updates)) {
     const hasVerifiedPayment = await Payment.exists({
       doctor: doctor._id,
       status: { $in: VERIFIED_PAYMENT_STATUSES },
     });
     if (hasVerifiedPayment) {
-      const error = new Error('Payment model cannot be changed by Agent after a verified patient payment. Contact Admin.');
+      const error = new Error('Commercial terms cannot be changed by Agent after a verified patient payment. Contact Admin.');
       error.status = 409;
       throw error;
     }
@@ -211,13 +310,25 @@ const updateMyDoctor = asyncHandler(async (req, res) => {
   Object.keys(updates).forEach((field) => {
     previousValue[field] = doctor[field];
   });
+  if (commercialTermsChanged(doctor, updates)) {
+    previousValue.approvedPatientFee = doctor.approvedPatientFee;
+    previousValue.feeShareType = doctor.feeShareType;
+    previousValue.feeSharePercentage = doctor.feeSharePercentage;
+    previousValue.fixedFeeShareAmount = doctor.fixedFeeShareAmount;
+  }
 
   const mobileChanged = updates.mobile !== undefined && updates.mobile !== doctor.mobile;
   const loginUser = mobileChanged && doctor.user ? await User.findById(doctor.user) : null;
   const previousLoginMobile = loginUser?.mobile;
   const previousTokenVersion = loginUser?.tokenVersion;
 
-  Object.assign(doctor, updates);
+  const simpleUpdates = { ...updates };
+  delete simpleUpdates.requestedPatientFee;
+  delete simpleUpdates.requestedFeeShareType;
+  delete simpleUpdates.requestedFeeSharePercentage;
+  delete simpleUpdates.requestedFixedFeeShareAmount;
+  Object.assign(doctor, simpleUpdates);
+  applyCommercialUpdates(doctor, updates);
   await doctor.save();
 
   try {
@@ -243,7 +354,13 @@ const updateMyDoctor = asyncHandler(async (req, res) => {
     module: 'Doctor',
     recordId: doctor._id,
     previousValue,
-    newValue: updates,
+    newValue: {
+      ...updates,
+      approvedPatientFee: doctor.approvedPatientFee,
+      feeShareType: doctor.feeShareType,
+      feeSharePercentage: doctor.feeSharePercentage,
+      fixedFeeShareAmount: doctor.fixedFeeShareAmount,
+    },
   });
 
   const safeDoctor = await Doctor.findOne({ _id: doctor._id, agent: agent._id })
@@ -268,9 +385,6 @@ const completeLegacyMyDoctorActivation = asyncHandler(async (req, res) => {
   const doctor = await Doctor.findOne({ _id: req.params.doctorId, agent: agent._id });
   if (!doctor) return res.status(404).json({ message: 'Doctor not found' });
 
-  // `submitted` is a legacy Agent-registration state. New Agent registrations are
-  // auto-approved in the registration request. Do not allow Agents to override
-  // Admin-controlled under_review/rejected/suspended/inactive states.
   if (doctor.status !== 'submitted') {
     return res.status(400).json({ message: 'Only legacy submitted Agent doctors can complete automatic activation' });
   }
@@ -309,8 +423,6 @@ const completeLegacyMyDoctorActivation = asyncHandler(async (req, res) => {
   });
 });
 
-// Agents may collect non-financial onboarding documents only for doctors assigned
-// to them. PAN/cancelled-cheque/bank documents remain Doctor/Admin-only.
 const uploadMyDoctorDocument = asyncHandler(async (req, res) => {
   const agent = await getCurrentAgent(req);
   if (agent.status !== 'active') return res.status(403).json({ message: 'Inactive agent cannot upload doctor documents' });
