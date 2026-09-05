@@ -6,10 +6,11 @@ const { requireFields, validateNumberRange } = require('../middlewares/validate.
 const { notifyAssignedAgentAfterDoctorAction } = require('../middlewares/agentDoctorNotification.middleware');
 const { reactivateDoctor } = require('../controllers/admin/doctor-reactivation.controller');
 const { updateDoctorKycAndBank } = require('../controllers/admin/doctor-kyc.controller');
+const { approveDoctor } = require('../controllers/admin/doctor-approval.controller');
 const { registerDoctorSecure } = require('../controllers/doctorRegistration.controller');
 const {
   getAllDoctors, getDoctorById,
-  approveDoctor, rejectDoctor, requestDoctorDocuments, suspendDoctor,
+  rejectDoctor, requestDoctorDocuments, suspendDoctor,
   generateQrCode, disableQrCode, reactivateQrCode,
   uploadKycDocument, getKycDocumentAccess, uploadMyKycDocument, getMyKycDocumentAccess,
   getMyProfile, updateMyProfile, getMySummary, getMyPatients, getMyQrStats,

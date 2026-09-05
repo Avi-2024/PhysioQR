@@ -80,7 +80,7 @@ export default function AgentDashboardPage() {
         />
         <MetricCard
           loading={dashboardQuery.isLoading}
-          label="Pending Approval"
+          label="Needs Review"
           value={number(dashboard.pendingApproval)}
           helper={`${number(dashboard.approved)} approved`}
           icon={CalendarClock}
@@ -152,11 +152,11 @@ export default function AgentDashboardPage() {
 
           <WorkList
             title="Recently Approved"
-            description="Doctors approved from your onboarding pipeline"
+            description="Latest approved doctors from your onboarding"
             loading={dashboardQuery.isLoading}
             items={recentApprovedDoctors}
-            emptyTitle="No recent approvals"
-            emptyCopy="Approved doctors will appear here after Admin review."
+            emptyTitle="No doctors registered yet"
+            emptyCopy="Doctors you register will appear here as Approved immediately."
             actionLabel="View my doctors"
             onAction={() => navigate('/agent/doctors')}
             renderItem={(doctor) => (
@@ -286,7 +286,7 @@ function QuickActions({
   const actions = [
     { label: 'Register Doctor', description: 'Start a new onboarding', icon: UserPlus, onClick: onRegisterDoctor },
     { label: 'Record Clinic Visit', description: 'Add visit and follow-up', icon: MapPin, onClick: onClinicVisits },
-    { label: 'My Doctors', description: 'Check approval pipeline', icon: Stethoscope, onClick: onDoctors },
+    { label: 'My Doctors', description: 'Check doctor status', icon: Stethoscope, onClick: onDoctors },
   ];
 
   return (

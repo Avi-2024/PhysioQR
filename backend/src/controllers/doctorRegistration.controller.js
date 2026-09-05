@@ -1,9 +1,9 @@
-const QRCode = require('qrcode');
+const mongoose = require('mongoose');
 const Doctor = require('../models/Doctor.model');
 const Agent = require('../models/Agent.model');
 const User = require('../models/User.model');
 const Program = require('../models/Program.model');
-const { DoctorWallet } = require('../models/Wallet.model');
+const { provisionApprovedDoctor } = require('../services/doctorApproval.service');
 const { writeAuditLog } = require('../utils/auditLogger');
 const asyncHandler = require('../utils/asyncHandler');
 
@@ -16,15 +16,40 @@ const REGISTRATION_FIELDS = [
   'preferredProgram', 'revenueModel', 'requestedFeeShareType',
   'requestedFeeSharePercentage', 'requestedFixedFeeShareAmount',
 ];
+
+// Agent onboarding intentionally stays minimal. Detailed pricing, fee-share, KYC,
+// bank, and profile configuration remain Doctor/Admin responsibilities.
+const AGENT_REGISTRATION_FIELDS = [
+  'fullName',
+  'mobile',
+  'qualification',
+  'specialization',
+  'medicalRegNumber',
+  'clinicName',
+  'city',
+  'preferredProgram',
+  'revenueModel',
+];
+
+const AGENT_REQUIRED_FIELDS = AGENT_REGISTRATION_FIELDS;
 const REVENUE_MODELS = ['split', 'platform_fee'];
 const REQUESTED_FEE_SHARE_TYPES = ['percentage', 'fixed'];
 
-function pickRegistrationFields(body = {}) {
+function pickRegistrationFields(body = {}, fields = REGISTRATION_FIELDS) {
   const payload = {};
-  REGISTRATION_FIELDS.forEach((field) => {
+  fields.forEach((field) => {
     if (body[field] !== undefined) payload[field] = body[field];
   });
   return payload;
+}
+
+function validateAgentRegistration(payload) {
+  for (const field of AGENT_REQUIRED_FIELDS) {
+    if (payload[field] === undefined || payload[field] === null || String(payload[field]).trim() === '') {
+      return `${field} is required`;
+    }
+  }
+  return null;
 }
 
 function validateCommercialProposal(payload) {
@@ -56,8 +81,8 @@ function validateCommercialProposal(payload) {
   return null;
 }
 
-// Agent-selected commercial terms become the initial active configuration.
-// Admin remains able to change them later from the Doctor workflow.
+// Non-Agent registration channels may still capture a commercial proposal.
+// Agents only choose the high-level revenue model; Admin owns detailed pricing.
 function applyCommercialProposalDefaults(payload) {
   if (payload.requestedPatientFee !== undefined) payload.approvedPatientFee = payload.requestedPatientFee;
   if (payload.requestedFeeShareType === 'percentage') {
@@ -79,60 +104,13 @@ function loginIdentifierFilter(payload) {
   return clauses.length ? { $or: clauses } : null;
 }
 
-async function activateAgentRegisteredDoctor({ doctor }) {
-  const appUrl = process.env.APP_URL || process.env.FRONTEND_URL || 'http://localhost:3000';
-  const referralUrl = `${appUrl.replace(/\/$/, '')}/register?doctor=${doctor.doctorId}`;
-  const qrCodeUrl = await QRCode.toDataURL(referralUrl);
-  const generatedPassword = `Doctor@${Math.floor(100000 + Math.random() * 900000)}`;
-  let loginUser = null;
-
-  try {
-    loginUser = await User.create({
-      role: 'doctor',
-      email: doctor.email || undefined,
-      mobile: doctor.mobile,
-      password: generatedPassword,
-      status: 'active',
-      mustChangePassword: true,
-    });
-
-    doctor.status = 'approved';
-    doctor.approvalDate = new Date();
-    doctor.user = loginUser._id;
-    doctor.referralCode = doctor.doctorId;
-    doctor.qrCodeUrl = qrCodeUrl;
-    doctor.qrCodeActive = true;
-    await doctor.save();
-
-    loginUser.profileRef = doctor._id;
-    loginUser.profileModel = 'Doctor';
-    await loginUser.save();
-
-    await DoctorWallet.findOneAndUpdate(
-      { doctor: doctor._id },
-      { $setOnInsert: { doctor: doctor._id } },
-      { upsert: true, new: true }
-    );
-
-    return generatedPassword;
-  } catch (error) {
-    if (loginUser?._id) await User.deleteOne({ _id: loginUser._id }).catch(() => {});
-    doctor.status = 'under_review';
-    doctor.approvalDate = undefined;
-    doctor.user = undefined;
-    doctor.referralCode = undefined;
-    doctor.qrCodeUrl = undefined;
-    doctor.qrCodeActive = false;
-    await doctor.save().catch(() => {});
-    throw error;
-  }
-}
-
 const registerDoctorSecure = asyncHandler(async (req, res) => {
-  const payload = pickRegistrationFields(req.body);
   const isAgentRegistration = req.user?.role === 'agent';
-  // Agent registrations are activated in the same request. Until provisioning
-  // succeeds, keep the persisted record non-approved to avoid partial state.
+  const payload = pickRegistrationFields(
+    req.body,
+    isAgentRegistration ? AGENT_REGISTRATION_FIELDS : REGISTRATION_FIELDS
+  );
+
   payload.status = isAgentRegistration ? 'under_review' : 'submitted';
   payload.registrationDate = new Date();
 
@@ -140,15 +118,25 @@ const registerDoctorSecure = asyncHandler(async (req, res) => {
   if (payload.mobile) payload.mobile = String(payload.mobile).trim();
   if (payload.medicalRegNumber) payload.medicalRegNumber = String(payload.medicalRegNumber).trim();
 
+  if (isAgentRegistration) {
+    const validationError = validateAgentRegistration(payload);
+    if (validationError) return res.status(400).json({ message: validationError });
+  }
+
   if (payload.revenueModel && !REVENUE_MODELS.includes(payload.revenueModel)) {
     return res.status(400).json({ message: 'Payment model must be split or platform_fee' });
   }
 
-  const commercialError = validateCommercialProposal(payload);
-  if (commercialError) return res.status(400).json({ message: commercialError });
-  applyCommercialProposalDefaults(payload);
+  if (!isAgentRegistration) {
+    const commercialError = validateCommercialProposal(payload);
+    if (commercialError) return res.status(400).json({ message: commercialError });
+    applyCommercialProposalDefaults(payload);
+  }
 
   if (payload.preferredProgram) {
+    if (!mongoose.isValidObjectId(payload.preferredProgram)) {
+      return res.status(400).json({ message: 'Selected rehabilitation programme is invalid' });
+    }
     const program = await Program.findOne({ _id: payload.preferredProgram, isActive: true }).select('_id').lean();
     if (!program) return res.status(400).json({ message: 'Selected rehabilitation programme is unavailable or inactive' });
   }
@@ -183,7 +171,19 @@ const registerDoctorSecure = asyncHandler(async (req, res) => {
   }
 
   const doctor = await Doctor.create(payload);
-  const temporaryPassword = isAgentRegistration ? await activateAgentRegisteredDoctor({ doctor }) : undefined;
+  let temporaryPassword;
+
+  if (isAgentRegistration) {
+    try {
+      const provisioned = await provisionApprovedDoctor({ doctor });
+      temporaryPassword = provisioned.temporaryPassword;
+    } catch (error) {
+      // Compensating rollback keeps Agent registration atomic on Mongo setups
+      // where multi-document transactions may not be available (e.g. standalone dev).
+      await Doctor.deleteOne({ _id: doctor._id, status: { $ne: 'approved' } }).catch(() => {});
+      throw error;
+    }
+  }
 
   await writeAuditLog({
     req,
@@ -196,15 +196,15 @@ const registerDoctorSecure = asyncHandler(async (req, res) => {
       agent: doctor.agent || null,
       preferredProgram: doctor.preferredProgram || null,
       revenueModel: doctor.revenueModel,
-      approvedPatientFee: doctor.approvedPatientFee,
-      feeShareType: doctor.feeShareType,
-      feeSharePercentage: doctor.feeSharePercentage,
-      fixedFeeShareAmount: doctor.fixedFeeShareAmount,
       qrCodeActive: doctor.qrCodeActive,
     },
   });
 
-  res.status(201).json({ ...doctor.toObject(), temporaryPassword, autoApproved: isAgentRegistration });
+  res.status(201).json({
+    ...doctor.toObject(),
+    temporaryPassword,
+    autoApproved: isAgentRegistration,
+  });
 });
 
 module.exports = { registerDoctorSecure };
