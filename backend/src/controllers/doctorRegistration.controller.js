@@ -1,5 +1,6 @@
 const Doctor = require('../models/Doctor.model');
 const Agent = require('../models/Agent.model');
+const Program = require('../models/Program.model');
 const { writeAuditLog } = require('../utils/auditLogger');
 const asyncHandler = require('../utils/asyncHandler');
 
@@ -9,7 +10,9 @@ const REGISTRATION_FIELDS = [
   'yearsOfExperience', 'languagesSpoken', 'consultationFee', 'clinicName',
   'clinicAddress', 'city', 'state', 'postalCode', 'clinicContact', 'clinicEmail',
   'clinicWorkingHours', 'googleMapsLink', 'clinicBranches', 'requestedPatientFee',
+  'preferredProgram', 'revenueModel',
 ];
+const REVENUE_MODELS = ['split', 'platform_fee'];
 
 function pickRegistrationFields(body = {}) {
   const payload = {};
@@ -27,6 +30,15 @@ const registerDoctorSecure = asyncHandler(async (req, res) => {
   if (payload.email) payload.email = String(payload.email).trim().toLowerCase();
   if (payload.mobile) payload.mobile = String(payload.mobile).trim();
   if (payload.medicalRegNumber) payload.medicalRegNumber = String(payload.medicalRegNumber).trim();
+
+  if (payload.revenueModel && !REVENUE_MODELS.includes(payload.revenueModel)) {
+    return res.status(400).json({ message: 'Payment model must be split or platform_fee' });
+  }
+
+  if (payload.preferredProgram) {
+    const program = await Program.findOne({ _id: payload.preferredProgram, isActive: true }).select('_id').lean();
+    if (!program) return res.status(400).json({ message: 'Selected rehabilitation programme is unavailable or inactive' });
+  }
 
   const duplicateClauses = [];
   if (payload.mobile) duplicateClauses.push({ mobile: payload.mobile });
@@ -62,7 +74,13 @@ const registerDoctorSecure = asyncHandler(async (req, res) => {
     action: 'doctor_registered',
     module: 'Doctor',
     recordId: doctor._id,
-    newValue: { fullName: doctor.fullName, status: doctor.status, agent: doctor.agent || null },
+    newValue: {
+      fullName: doctor.fullName,
+      status: doctor.status,
+      agent: doctor.agent || null,
+      preferredProgram: doctor.preferredProgram || null,
+      revenueModel: doctor.revenueModel,
+    },
   });
 
   res.status(201).json(doctor);
