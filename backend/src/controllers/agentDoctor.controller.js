@@ -13,7 +13,7 @@ const AGENT_DOCTOR_FIELDS = [
   'doctorId','fullName','mobile','whatsapp','email','gender','dateOfBirth','profilePhoto',
   'qualification','specialization','medicalRegNumber','registrationCouncil','yearsOfExperience','languagesSpoken',
   'clinicName','clinicAddress','city','state','postalCode','clinicContact','clinicEmail','clinicWorkingHours','googleMapsLink','clinicBranches',
-  'registrationDate','approvalDate','status','rejectionReason','suspensionReason','referralCode','qrCodeActive','kycStatus','createdAt','updatedAt',
+  'preferredProgram','revenueModel','registrationDate','approvalDate','status','rejectionReason','suspensionReason','referralCode','qrCodeActive','kycStatus','createdAt','updatedAt',
 ].join(' ');
 
 const getCurrentAgent = async (req) => {
@@ -24,13 +24,20 @@ const getCurrentAgent = async (req) => {
 
 const getMyDoctors = asyncHandler(async (req, res) => {
   const agent = await getCurrentAgent(req);
-  const doctors = await Doctor.find({ agent: agent._id }).select(AGENT_DOCTOR_FIELDS).sort({ createdAt: -1 }).lean();
+  const doctors = await Doctor.find({ agent: agent._id })
+    .select(AGENT_DOCTOR_FIELDS)
+    .populate('preferredProgram', 'programCode name')
+    .sort({ createdAt: -1 })
+    .lean();
   res.json(doctors);
 });
 
 const getMyDoctorById = asyncHandler(async (req, res) => {
   const agent = await getCurrentAgent(req);
-  const doctor = await Doctor.findOne({ _id: req.params.doctorId, agent: agent._id }).select(AGENT_DOCTOR_FIELDS).lean();
+  const doctor = await Doctor.findOne({ _id: req.params.doctorId, agent: agent._id })
+    .select(AGENT_DOCTOR_FIELDS)
+    .populate('preferredProgram', 'programCode name')
+    .lean();
   if (!doctor) return res.status(404).json({ message: 'Doctor not found' });
   const [patientCount, paidPatientIds, recentVisits] = await Promise.all([
     Patient.countDocuments({ referringDoctor: doctor._id }),
