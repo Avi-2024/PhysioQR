@@ -87,7 +87,7 @@ const normalizeDoctorUpdates = (updates) => {
   return updates;
 };
 
-const validateCommercialUpdates = (updates) => {
+const validateCommercialUpdates = (doctor, updates) => {
   if (updates.requestedPatientFee !== undefined) {
     const fee = Number(updates.requestedPatientFee);
     if (!Number.isFinite(fee) || fee < 1 || fee > 100000) {
@@ -96,6 +96,33 @@ const validateCommercialUpdates = (updates) => {
       throw error;
     }
     updates.requestedPatientFee = fee;
+  }
+
+  const effectiveRevenueModel = updates.revenueModel || doctor.revenueModel || 'split';
+
+  if (effectiveRevenueModel === 'platform_fee') {
+    // No doctor fee share exists in Platform Fee mode. Remove any stale values
+    // supplied by an old client before applying the update.
+    delete updates.requestedFeeShareType;
+    delete updates.requestedFeeSharePercentage;
+    delete updates.requestedFixedFeeShareAmount;
+    return;
+  }
+
+  const hasCommissionInput = updates.requestedFeeShareType !== undefined
+    || updates.requestedFeeSharePercentage !== undefined
+    || updates.requestedFixedFeeShareAmount !== undefined;
+
+  if (updates.revenueModel === 'split' && doctor.revenueModel !== 'split' && !updates.requestedFeeShareType) {
+    const error = new Error('Commission type is required when switching to Split Model');
+    error.status = 400;
+    throw error;
+  }
+
+  if (hasCommissionInput && !updates.requestedFeeShareType) {
+    const error = new Error('Commission type is required when updating Split Model commission');
+    error.status = 400;
+    throw error;
   }
 
   if (updates.requestedFeeShareType !== undefined && !REQUESTED_FEE_SHARE_TYPES.includes(updates.requestedFeeShareType)) {
@@ -122,7 +149,8 @@ const validateCommercialUpdates = (updates) => {
       error.status = 400;
       throw error;
     }
-    if (updates.requestedPatientFee !== undefined && amount > updates.requestedPatientFee) {
+    const patientPrice = updates.requestedPatientFee ?? doctor.requestedPatientFee ?? doctor.approvedPatientFee;
+    if (Number.isFinite(Number(patientPrice)) && amount > Number(patientPrice)) {
       const error = new Error('Fixed commission cannot exceed the patient price');
       error.status = 400;
       throw error;
@@ -158,6 +186,17 @@ const applyCommercialUpdates = (doctor, updates) => {
     doctor.requestedPatientFee = updates.requestedPatientFee;
     doctor.approvedPatientFee = updates.requestedPatientFee;
   }
+
+  if (doctor.revenueModel === 'platform_fee') {
+    doctor.requestedFeeShareType = undefined;
+    doctor.requestedFeeSharePercentage = undefined;
+    doctor.requestedFixedFeeShareAmount = undefined;
+    doctor.feeShareType = 'percentage';
+    doctor.feeSharePercentage = 0;
+    doctor.fixedFeeShareAmount = undefined;
+    return;
+  }
+
   if (updates.requestedFeeShareType === 'percentage') {
     doctor.requestedFeeShareType = 'percentage';
     doctor.requestedFeeSharePercentage = updates.requestedFeeSharePercentage;
@@ -197,7 +236,7 @@ const validateDoctorUpdates = async ({ doctor, updates }) => {
     throw error;
   }
 
-  validateCommercialUpdates(updates);
+  validateCommercialUpdates(doctor, updates);
 
   if (updates.preferredProgram !== undefined) {
     if (!mongoose.isValidObjectId(updates.preferredProgram)) {
@@ -311,6 +350,9 @@ const updateMyDoctor = asyncHandler(async (req, res) => {
     previousValue[field] = doctor[field];
   });
   if (commercialTermsChanged(doctor, updates)) {
+    previousValue.requestedFeeShareType = doctor.requestedFeeShareType;
+    previousValue.requestedFeeSharePercentage = doctor.requestedFeeSharePercentage;
+    previousValue.requestedFixedFeeShareAmount = doctor.requestedFixedFeeShareAmount;
     previousValue.approvedPatientFee = doctor.approvedPatientFee;
     previousValue.feeShareType = doctor.feeShareType;
     previousValue.feeSharePercentage = doctor.feeSharePercentage;
