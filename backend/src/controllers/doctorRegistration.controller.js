@@ -17,8 +17,6 @@ const REGISTRATION_FIELDS = [
   'requestedFeeSharePercentage', 'requestedFixedFeeShareAmount',
 ];
 
-// Agent onboarding intentionally stays minimal. Detailed pricing, fee-share, KYC,
-// bank, and profile configuration remain Doctor/Admin responsibilities.
 const AGENT_REGISTRATION_FIELDS = [
   'fullName',
   'mobile',
@@ -29,9 +27,25 @@ const AGENT_REGISTRATION_FIELDS = [
   'city',
   'preferredProgram',
   'revenueModel',
+  'requestedPatientFee',
+  'requestedFeeShareType',
+  'requestedFeeSharePercentage',
+  'requestedFixedFeeShareAmount',
 ];
 
-const AGENT_REQUIRED_FIELDS = AGENT_REGISTRATION_FIELDS;
+const AGENT_REQUIRED_FIELDS = [
+  'fullName',
+  'mobile',
+  'qualification',
+  'specialization',
+  'medicalRegNumber',
+  'clinicName',
+  'city',
+  'preferredProgram',
+  'revenueModel',
+  'requestedPatientFee',
+  'requestedFeeShareType',
+];
 const REVENUE_MODELS = ['split', 'platform_fee'];
 const REQUESTED_FEE_SHARE_TYPES = ['percentage', 'fixed'];
 
@@ -55,7 +69,7 @@ function validateAgentRegistration(payload) {
 function validateCommercialProposal(payload) {
   if (payload.requestedPatientFee !== undefined) {
     const fee = Number(payload.requestedPatientFee);
-    if (!Number.isFinite(fee) || fee < 0 || fee > 100000) return 'Patient price must be between 0 and 100000';
+    if (!Number.isFinite(fee) || fee < 1 || fee > 100000) return 'Patient price must be between 1 and 100000';
     payload.requestedPatientFee = fee;
   }
 
@@ -81,8 +95,6 @@ function validateCommercialProposal(payload) {
   return null;
 }
 
-// Non-Agent registration channels may still capture a commercial proposal.
-// Agents only choose the high-level revenue model; Admin owns detailed pricing.
 function applyCommercialProposalDefaults(payload) {
   if (payload.requestedPatientFee !== undefined) payload.approvedPatientFee = payload.requestedPatientFee;
   if (payload.requestedFeeShareType === 'percentage') {
@@ -127,11 +139,9 @@ const registerDoctorSecure = asyncHandler(async (req, res) => {
     return res.status(400).json({ message: 'Payment model must be split or platform_fee' });
   }
 
-  if (!isAgentRegistration) {
-    const commercialError = validateCommercialProposal(payload);
-    if (commercialError) return res.status(400).json({ message: commercialError });
-    applyCommercialProposalDefaults(payload);
-  }
+  const commercialError = validateCommercialProposal(payload);
+  if (commercialError) return res.status(400).json({ message: commercialError });
+  applyCommercialProposalDefaults(payload);
 
   if (payload.preferredProgram) {
     if (!mongoose.isValidObjectId(payload.preferredProgram)) {
@@ -178,8 +188,6 @@ const registerDoctorSecure = asyncHandler(async (req, res) => {
       const provisioned = await provisionApprovedDoctor({ doctor });
       temporaryPassword = provisioned.temporaryPassword;
     } catch (error) {
-      // Compensating rollback keeps Agent registration atomic on Mongo setups
-      // where multi-document transactions may not be available (e.g. standalone dev).
       await Doctor.deleteOne({ _id: doctor._id, status: { $ne: 'approved' } }).catch(() => {});
       throw error;
     }
@@ -196,6 +204,10 @@ const registerDoctorSecure = asyncHandler(async (req, res) => {
       agent: doctor.agent || null,
       preferredProgram: doctor.preferredProgram || null,
       revenueModel: doctor.revenueModel,
+      requestedPatientFee: doctor.requestedPatientFee,
+      requestedFeeShareType: doctor.requestedFeeShareType,
+      requestedFeeSharePercentage: doctor.requestedFeeSharePercentage,
+      requestedFixedFeeShareAmount: doctor.requestedFixedFeeShareAmount,
       qrCodeActive: doctor.qrCodeActive,
     },
   });
