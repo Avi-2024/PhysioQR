@@ -7,7 +7,7 @@ const {
   createAgent, getAllAgents, getAgentById, updateAgent, deleteAgent, getMyDashboard,
   addClinicVisit, getMyVisits, getMyVisitById, updateMyVisit, getAllClinicVisits,
 } = require('../controllers/agent.controller');
-const { getMyDoctors, getMyDoctorById, uploadMyDoctorDocument } = require('../controllers/agentDoctor.controller');
+const { getMyDoctors, getMyDoctorById, updateMyDoctor, completeLegacyMyDoctorActivation, uploadMyDoctorDocument } = require('../controllers/agentDoctor.controller');
 const { getMyFollowUps, updateMyFollowUp } = require('../controllers/agentFollowUp.controller');
 const { getMyPerformance, getMyProfile, getMyNotifications, markMyNotificationRead, markAllMyNotificationsRead } = require('../controllers/agentWorkspace.controller');
 
@@ -22,6 +22,8 @@ router.patch('/me/notifications/read-all', authorize('agent'), markAllMyNotifica
 router.patch('/me/notifications/:notificationId/read', authorize('agent'), markMyNotificationRead);
 router.get('/me/doctors', authorize('agent'), getMyDoctors);
 router.get('/me/doctors/:doctorId', authorize('agent'), getMyDoctorById);
+router.patch('/me/doctors/:doctorId', authorize('agent'), updateMyDoctor);
+router.post('/me/doctors/:doctorId/complete-activation', authorize('agent'), completeLegacyMyDoctorActivation);
 router.post('/me/doctors/:doctorId/documents', authorize('agent'), upload.single('document'), uploadMyDoctorDocument);
 router.get('/me/follow-ups', authorize('agent'), getMyFollowUps);
 router.get('/me/visits', authorize('agent'), getMyVisits);
