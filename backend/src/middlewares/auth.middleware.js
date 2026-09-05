@@ -10,6 +10,13 @@ const getAccessToken = (req) => {
   return req.cookies?.[ACCESS_COOKIE_NAME];
 };
 
+// Only these authenticated auth endpoints remain available while the account
+// is waiting for its mandatory first-login password change.
+const isPasswordChangeAllowedRequest = (req) => {
+  const url = String(req.originalUrl || req.url || '');
+  return url.includes('/auth/change-password') || url.includes('/auth/logout') || url.includes('/auth/me');
+};
+
 // Verifies JWT access token and resolves the authenticated account.
 const protect = async (req, res, next) => {
   const token = getAccessToken(req);
@@ -35,6 +42,14 @@ const protect = async (req, res, next) => {
 
     req.user = user;
     req.auth = { tokenType: 'user', sessionId: decoded.sessionId };
+
+    if (user.mustChangePassword && !isPasswordChangeAllowedRequest(req)) {
+      return res.status(403).json({
+        code: 'PASSWORD_CHANGE_REQUIRED',
+        message: 'Please change your temporary password before continuing.',
+      });
+    }
+
     return next();
   } catch {
     return res.status(401).json({ message: 'Token invalid or expired' });

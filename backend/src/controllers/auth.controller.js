@@ -57,6 +57,7 @@ const sanitizeUser = (user) => ({
   status: user.status,
   profileRef: user.profileRef,
   profileModel: user.profileModel,
+  mustChangePassword: Boolean(user.mustChangePassword),
 });
 
 // Builds a sanitized patient auth payload.
@@ -233,6 +234,9 @@ const changePassword = asyncHandler(async (req, res) => {
   if (req.user.role === 'patient') {
     return res.status(400).json({ message: 'Patients use OTP login and do not have a password' });
   }
+  if (currentPassword === newPassword) {
+    return res.status(400).json({ message: 'New password must be different from the current password' });
+  }
 
   const user = await User.findById(req.user._id);
   if (!user || !(await user.matchPassword(currentPassword))) {
@@ -240,6 +244,8 @@ const changePassword = asyncHandler(async (req, res) => {
   }
 
   user.password = newPassword;
+  user.mustChangePassword = false;
+  user.passwordChangedAt = new Date();
   user.tokenVersion = (user.tokenVersion || 0) + 1;
   await user.save();
   await authSessionService.revokeOwnerSessions({ ownerType: 'user', ownerId: user._id, reason: 'password_changed' });

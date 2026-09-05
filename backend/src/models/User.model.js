@@ -11,6 +11,14 @@ const userSchema = new mongoose.Schema({
   email: { type: String, unique: true, sparse: true },
   mobile: { type: String, unique: true, sparse: true },
   password: { type: String, required: true },
+  // Admin-created Agent/Doctor credentials are first-login credentials only.
+  mustChangePassword: {
+    type: Boolean,
+    default: function () {
+      return this.role === 'agent' || this.role === 'doctor';
+    },
+  },
+  passwordChangedAt: Date,
   status: {
     type: String,
     enum: ['active', 'inactive', 'suspended', 'terminated'],

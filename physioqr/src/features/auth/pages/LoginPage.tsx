@@ -21,11 +21,13 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { login } = useAuthStore();
-  const preferredRole = asRecord(location.state).preferredRole;
+  const locationState = asRecord(location.state);
+  const preferredRole = locationState.preferredRole;
   const initialMode: LoginMode = preferredRole === 'patient' ? 'patient' : 'credentials';
   const [mode, setMode] = useState<LoginMode>(initialMode);
   const [submitError, setSubmitError] = useState('');
   const [otpSent, setOtpSent] = useState(false);
+  const passwordChanged = Boolean(locationState.passwordChanged);
 
   const credentialForm = useForm<CredentialForm>({ resolver: zodResolver(credentialSchema), defaultValues: { identifier: '', password: '' } });
   const patientForm = useForm<PatientForm>({ resolver: zodResolver(patientSchema), defaultValues: { mobile: '', otp: '' } });
@@ -56,14 +58,16 @@ export default function LoginPage() {
         return;
       }
 
+      const mustChangePassword = Boolean(apiUser.mustChangePassword);
       login({
         id: text(apiUser.id || apiUser._id),
         name: text(apiUser.name || apiUser.fullName || apiUser.email || apiUser.mobile, role === 'doctor' ? 'Doctor' : 'User'),
         email: text(apiUser.email),
         mobile: text(apiUser.mobile),
         role,
+        mustChangePassword,
       }, token);
-      navigate(getRedirectPathForRole(role));
+      navigate(mustChangePassword ? '/change-password' : getRedirectPathForRole(role), { replace: true });
     } catch (error) {
       setSubmitError(errorMessage(error));
     }
@@ -111,6 +115,7 @@ export default function LoginPage() {
 
       <div className="p-8 sm:p-10 flex flex-col justify-center">
         <div className="mb-6"><h2 className="text-xl font-bold text-neutral-900">Sign in to PhysioQR</h2><p className="text-xs text-neutral-500 mt-1">Use the sign-in method for your account</p></div>
+        {passwordChanged && <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">Password updated successfully. Sign in with your new password.</div>}
         <div className="grid grid-cols-2 gap-2 p-1 bg-neutral-100 rounded-xl border border-neutral-200 mb-6">
           <button type="button" onClick={() => changeMode('patient')} className={`flex items-center justify-center gap-2 py-2.5 text-sm font-bold rounded-lg transition-all ${mode === 'patient' ? 'bg-primary-600 text-white shadow-sm' : 'text-neutral-600'}`}><HeartPulse className="w-4 h-4"/>Patient</button>
           <button type="button" onClick={() => changeMode('credentials')} className={`flex items-center justify-center gap-2 py-2.5 text-sm font-bold rounded-lg transition-all ${mode === 'credentials' ? 'bg-primary-600 text-white shadow-sm' : 'text-neutral-600'}`}><Stethoscope className="w-4 h-4"/>Account</button>

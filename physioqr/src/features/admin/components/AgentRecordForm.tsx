@@ -22,13 +22,13 @@ const STATUS_OPTIONS: [string, string][] = [
   ['terminated', 'Terminated'],
 ];
 
-// Renders the shared admin form for creating or editing an agent.
 export function AgentRecordForm({ row, onCancel, onSaved, submitLabel, className }: AgentRecordFormProps) {
   const queryClient = useQueryClient();
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const isEdit = Boolean(row);
   const profilePhoto = recordText(row, 'profilePhoto');
   const identityProof = recordText(row, 'identityProof');
+  const joiningDateDefault = isEdit ? dateInputValue(row?.joiningDate) : todayInputValue();
 
   const mutation = useMutation({
     mutationFn: async (form: FormData) => {
@@ -39,7 +39,6 @@ export function AgentRecordForm({ row, onCancel, onSaved, submitLabel, className
       }
 
       setFieldErrors({});
-
       const payload = buildAgentPayload(form, row);
       if (isEdit) return apiClient.put(`/agents/${recordMutationId(row)}`, payload);
       return apiClient.post('/agents', payload);
@@ -52,18 +51,24 @@ export function AgentRecordForm({ row, onCancel, onSaved, submitLabel, className
   });
 
   return (
-    <form className={cn('space-y-5', className)} onSubmit={(event) => { event.preventDefault(); mutation.mutate(new FormData(event.currentTarget)); }}>
-     
-
+    <form
+      className={cn('space-y-5', className)}
+      onSubmit={(event) => {
+        event.preventDefault();
+        mutation.mutate(new FormData(event.currentTarget));
+      }}
+    >
       <section className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
         <h3 className="mb-1 text-sm font-bold uppercase tracking-wide text-neutral-500">Profile details</h3>
-        <p className="mb-4 text-xs text-neutral-500">Fields marked <span className="font-bold text-rose-500">*</span> are required.</p>
+        <p className="mb-4 text-xs text-neutral-500">
+          Fields marked <span className="font-bold text-rose-500">*</span> are required.
+        </p>
         <div className="grid gap-4 md:grid-cols-2">
           <AgentInput name="fullName" label="Full name" defaultValue={recordText(row, 'fullName')} required error={fieldErrors.fullName} />
           <AgentInput name="mobile" label="Mobile number" defaultValue={recordText(row, 'mobile')} required placeholder="10-15 digit number" error={fieldErrors.mobile} />
           <AgentInput name="email" label="Email address" type="email" defaultValue={recordText(row, 'email')} error={fieldErrors.email} />
           <AgentInput name="whatsapp" label="WhatsApp number" defaultValue={recordText(row, 'whatsapp')} error={fieldErrors.whatsapp} />
-          <AgentInput name="joiningDate" label="Joining date" type="date" defaultValue={dateInputValue(row?.joiningDate)} />
+          <AgentInput name="joiningDate" label="Joining date" type="date" defaultValue={joiningDateDefault} />
           <AgentFileField
             name="profilePhoto"
             label="Profile photo"
@@ -76,12 +81,10 @@ export function AgentRecordForm({ row, onCancel, onSaved, submitLabel, className
       </section>
 
       <section className="rounded-xl border border-neutral-200 bg-white p-4">
-        <h3 className="mb-4 text-sm font-bold uppercase tracking-wide text-neutral-500">Location and assignment</h3>
+        <h3 className="mb-4 text-sm font-bold uppercase tracking-wide text-neutral-500">Location</h3>
         <div className="grid gap-4 md:grid-cols-2">
           <AgentInput name="city" label="City" defaultValue={recordText(row, 'city')} />
           <AgentInput name="state" label="State" defaultValue={recordText(row, 'state')} />
-          <AgentInput name="assignedRegion" label="Assigned region" defaultValue={recordText(row, 'assignedRegion')} />
-          <AgentInput name="reportingPerson" label="Reporting person" defaultValue={recordText(row, 'reportingPerson')} />
           <AgentFileField
             name="identityProof"
             label="Identity proof"
@@ -112,7 +115,11 @@ export function AgentRecordForm({ row, onCancel, onSaved, submitLabel, className
         <Button type="button" variant="outline" onClick={onCancel} disabled={mutation.isPending}>
           Cancel
         </Button>
-        <Button type="submit" disabled={mutation.isPending} leftIcon={mutation.isPending ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}>
+        <Button
+          type="submit"
+          disabled={mutation.isPending}
+          leftIcon={mutation.isPending ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+        >
           {mutation.isPending ? 'Saving...' : submitLabel ?? (isEdit ? 'Save changes' : 'Create agent')}
         </Button>
       </div>
@@ -120,7 +127,6 @@ export function AgentRecordForm({ row, onCancel, onSaved, submitLabel, className
   );
 }
 
-// Renders a text input with the admin agent form styling.
 function AgentInput({
   name,
   label,
@@ -151,7 +157,7 @@ function AgentInput({
         placeholder={placeholder}
         className={cn(
           'mt-2 w-full rounded-lg border px-3 py-2.5 text-sm focus:border-primary-500 focus:ring-primary-500',
-          error ? 'border-rose-400 bg-rose-50' : 'border-neutral-300'
+          error ? 'border-rose-400 bg-rose-50' : 'border-neutral-300',
         )}
       />
       {error && <p className="mt-1 text-xs font-semibold text-rose-600">{error}</p>}
@@ -159,7 +165,6 @@ function AgentInput({
   );
 }
 
-// Renders a textarea with the admin agent form styling.
 function AgentTextArea({ name, label, defaultValue }: { name: string; label: string; defaultValue?: string }) {
   return (
     <label className="block">
@@ -174,7 +179,6 @@ function AgentTextArea({ name, label, defaultValue }: { name: string; label: str
   );
 }
 
-// Renders a select field with the admin agent form styling.
 function AgentSelect({ name, label, defaultValue, options }: { name: string; label: string; defaultValue?: string; options: [string, string][] }) {
   return (
     <label className="block">
@@ -190,7 +194,6 @@ function AgentSelect({ name, label, defaultValue, options }: { name: string; lab
   );
 }
 
-// Renders a file picker and current file state without trying to prefill the file input.
 function AgentFileField({
   name,
   label,
@@ -215,14 +218,18 @@ function AgentFileField({
       <span className="text-sm font-semibold text-neutral-700">{label}</span>
       <div className="mt-2 flex items-center gap-3 rounded-lg border border-dashed border-neutral-300 bg-white px-3 py-2.5">
         <Upload className="h-4 w-4 shrink-0 text-neutral-500" />
-        <input type="file" name={name} accept={accept} className="block w-full text-sm text-neutral-600 file:mr-3 file:rounded-md file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-primary-700 file:cursor-pointer" />
+        <input
+          type="file"
+          name={name}
+          accept={accept}
+          className="block w-full text-sm text-neutral-600 file:mr-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-primary-700"
+        />
       </div>
       <CurrentFileState label={currentLabel} value={currentValue} unavailable={currentUnavailable} icon={Icon} />
     </div>
   );
 }
 
-// Renders the current file preview, link, or withheld-state message.
 function CurrentFileState({ label, value, unavailable, icon: Icon }: { label: string; value?: string; unavailable?: boolean; icon: React.ElementType }) {
   if (!value && !unavailable) return null;
 
@@ -257,14 +264,12 @@ function CurrentFileState({ label, value, unavailable, icon: Icon }: { label: st
   );
 }
 
-// Reads a record field as a clean string for form defaults.
 function recordText(row: ApiRecord | undefined, field: string) {
   const value = row?.[field];
   if (value === undefined || value === null || value === '' || value === '-') return '';
   return String(value);
 }
 
-// Converts backend date values into an HTML date input value.
 function dateInputValue(value: unknown) {
   if (!value) return '';
   const date = new Date(String(value));
@@ -272,12 +277,18 @@ function dateInputValue(value: unknown) {
   return date.toISOString().slice(0, 10);
 }
 
-// Finds the database identifier used by the update endpoint.
+function todayInputValue() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 function recordMutationId(row: ApiRecord | undefined) {
   return String(row?._id || row?.id || '');
 }
 
-// Validates admin-entered agent fields before sending them to the API.
 function validateAgentForm(form: FormData) {
   const errs: Record<string, string> = {};
   const fullName = String(form.get('fullName') || '').trim();
@@ -295,7 +306,6 @@ function validateAgentForm(form: FormData) {
   return Object.keys(errs).length ? errs : null;
 }
 
-// Builds the API payload while preserving existing file references.
 function buildAgentPayload(form: FormData, row: ApiRecord | undefined) {
   const isEdit = Boolean(row);
   const payload: ApiRecord = {
@@ -306,9 +316,7 @@ function buildAgentPayload(form: FormData, row: ApiRecord | undefined) {
     address: optionalText(form, 'address', isEdit),
     city: optionalText(form, 'city', isEdit),
     state: optionalText(form, 'state', isEdit),
-    assignedRegion: optionalText(form, 'assignedRegion', isEdit),
     joiningDate: optionalText(form, 'joiningDate', isEdit),
-    reportingPerson: optionalText(form, 'reportingPerson', isEdit),
     status: requiredText(form, 'status') || 'active',
   };
 
@@ -320,41 +328,34 @@ function buildAgentPayload(form: FormData, row: ApiRecord | undefined) {
   return removeUndefined(payload);
 }
 
-// Reads required text fields from submitted form data.
 function requiredText(form: FormData, field: string) {
   return String(form.get(field) || '').trim();
 }
 
-// Reads optional text fields, preserving clear-intent during edit.
 function optionalText(form: FormData, field: string, isEdit: boolean) {
   const value = String(form.get(field) || '').trim();
   return value || (isEdit ? '' : undefined);
 }
 
-// Resolves the replacement file name or existing stored file reference.
 function fileReference(form: FormData, field: string, currentValue: string) {
   const value = form.get(field);
   if (value instanceof File && value.size > 0) return value.name;
   return currentValue || undefined;
 }
 
-// Removes undefined keys so edit requests do not overwrite hidden file fields.
 function removeUndefined(payload: ApiRecord) {
   return Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined));
 }
 
-// Checks if a stored value can be opened directly in the browser.
 function isOpenablePath(value: string) {
   return /^(https?:\/\/|\/)/i.test(value);
 }
 
-// Checks if a stored value can be safely shown as an image preview.
 function isPreviewableImage(value: string) {
   if (/^data:image\//i.test(value)) return true;
   return /^(https?:\/\/|\/)/i.test(value) && /\.(png|jpe?g|webp|gif|bmp|svg)(\?.*)?$/i.test(value);
 }
 
-// Converts a validation or API error into display text.
 function formErrorMessage(error: unknown) {
   if (error && typeof error === 'object') {
     const response = (error as { response?: { data?: { message?: unknown } } }).response;
