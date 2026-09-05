@@ -35,7 +35,9 @@ router.get('/sessions', protect, getSessions);
 router.delete('/sessions/:id', protect, revokeSession);
 router.post('/change-password', protect, validateSchema({
   body: {
-    currentPassword: { type: 'string', min: 6, max: 128, required: true },
+    // Optional only for mandatory first-login password setup. Normal password
+    // changes still require the current password in the controller.
+    currentPassword: { type: 'string', min: 6, max: 128 },
     newPassword: { type: 'string', min: 8, max: 128, required: true },
   },
 }), changePassword);
