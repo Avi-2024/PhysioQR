@@ -10,9 +10,11 @@ const REGISTRATION_FIELDS = [
   'yearsOfExperience', 'languagesSpoken', 'consultationFee', 'clinicName',
   'clinicAddress', 'city', 'state', 'postalCode', 'clinicContact', 'clinicEmail',
   'clinicWorkingHours', 'googleMapsLink', 'clinicBranches', 'requestedPatientFee',
-  'preferredProgram', 'revenueModel',
+  'preferredProgram', 'revenueModel', 'requestedFeeShareType',
+  'requestedFeeSharePercentage', 'requestedFixedFeeShareAmount',
 ];
 const REVENUE_MODELS = ['split', 'platform_fee'];
+const REQUESTED_FEE_SHARE_TYPES = ['percentage', 'fixed'];
 
 function pickRegistrationFields(body = {}) {
   const payload = {};
@@ -20,6 +22,35 @@ function pickRegistrationFields(body = {}) {
     if (body[field] !== undefined) payload[field] = body[field];
   });
   return payload;
+}
+
+function validateCommercialProposal(payload) {
+  if (payload.requestedPatientFee !== undefined) {
+    const fee = Number(payload.requestedPatientFee);
+    if (!Number.isFinite(fee) || fee < 0 || fee > 100000) return 'Patient price must be between 0 and 100000';
+    payload.requestedPatientFee = fee;
+  }
+
+  if (payload.requestedFeeShareType && !REQUESTED_FEE_SHARE_TYPES.includes(payload.requestedFeeShareType)) {
+    return 'Commission type must be percentage or fixed';
+  }
+
+  if (payload.requestedFeeShareType === 'percentage') {
+    const percentage = Number(payload.requestedFeeSharePercentage);
+    if (!Number.isFinite(percentage) || percentage < 0 || percentage > 100) return 'Commission percentage must be between 0 and 100';
+    payload.requestedFeeSharePercentage = percentage;
+    delete payload.requestedFixedFeeShareAmount;
+  }
+
+  if (payload.requestedFeeShareType === 'fixed') {
+    const amount = Number(payload.requestedFixedFeeShareAmount);
+    if (!Number.isFinite(amount) || amount < 0 || amount > 100000) return 'Fixed commission must be between 0 and 100000';
+    if (payload.requestedPatientFee !== undefined && amount > payload.requestedPatientFee) return 'Fixed commission cannot exceed the patient price';
+    payload.requestedFixedFeeShareAmount = amount;
+    delete payload.requestedFeeSharePercentage;
+  }
+
+  return null;
 }
 
 const registerDoctorSecure = asyncHandler(async (req, res) => {
@@ -34,6 +65,9 @@ const registerDoctorSecure = asyncHandler(async (req, res) => {
   if (payload.revenueModel && !REVENUE_MODELS.includes(payload.revenueModel)) {
     return res.status(400).json({ message: 'Payment model must be split or platform_fee' });
   }
+
+  const commercialError = validateCommercialProposal(payload);
+  if (commercialError) return res.status(400).json({ message: commercialError });
 
   if (payload.preferredProgram) {
     const program = await Program.findOne({ _id: payload.preferredProgram, isActive: true }).select('_id').lean();
@@ -80,6 +114,10 @@ const registerDoctorSecure = asyncHandler(async (req, res) => {
       agent: doctor.agent || null,
       preferredProgram: doctor.preferredProgram || null,
       revenueModel: doctor.revenueModel,
+      requestedPatientFee: doctor.requestedPatientFee,
+      requestedFeeShareType: doctor.requestedFeeShareType,
+      requestedFeeSharePercentage: doctor.requestedFeeSharePercentage,
+      requestedFixedFeeShareAmount: doctor.requestedFixedFeeShareAmount,
     },
   });
 
