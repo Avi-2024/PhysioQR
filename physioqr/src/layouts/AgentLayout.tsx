@@ -1,4 +1,155 @@
-import React,{useState}from'react';import{Outlet,NavLink,useNavigate}from'react-router-dom';import{LayoutDashboard,Stethoscope,UserPlus,MapPin,CalendarClock,TrendingUp,LogOut,Bell,Menu,X,UserRound}from'lucide-react';import{useQuery}from'@tanstack/react-query';import{useAuthStore}from'@/stores/auth.store';import{Logo}from'@/components/brand/Logo';import{cn}from'@/lib/cn';import apiClient from'@/lib/api-client';
-const NAV_ITEMS=[{label:'Dashboard',path:'/agent/dashboard',icon:LayoutDashboard},{label:'My Doctors',path:'/agent/doctors',icon:Stethoscope},{label:'Register Doctor',path:'/agent/doctors/new',icon:UserPlus},{label:'Clinic Visits',path:'/agent/clinic-visits',icon:MapPin},{label:'Follow-ups',path:'/agent/follow-ups',icon:CalendarClock},{label:'Performance',path:'/agent/performance',icon:TrendingUp},{label:'Profile',path:'/agent/profile',icon:UserRound}];
-export function AgentLayout(){const{user,logout}=useAuthStore();const navigate=useNavigate();const[mobileOpen,setMobileOpen]=useState(false);const nq=useQuery({queryKey:['agent-notifications','unread'],queryFn:async()=>(await apiClient.get('/agents/me/notifications?unread=true&limit=1')).data,refetchInterval:60000});const unread=Number((nq.data as any)?.unreadCount||0);const handleLogout=()=>{logout();navigate('/login')};const nav=(mobile=false)=><nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">{NAV_ITEMS.map(item=><NavLink key={item.path} to={item.path} onClick={mobile?()=>setMobileOpen(false):undefined} className={({isActive})=>cn('flex min-h-11 items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',isActive?'bg-primary-600 text-white font-semibold':'text-neutral-400 hover:text-white hover:bg-neutral-800')}><item.icon className="w-4 h-4"/>{item.label}</NavLink>)}</nav>;
-return <div className="min-h-screen bg-neutral-50 flex overflow-x-clip"><aside className="hidden lg:flex w-64 bg-neutral-900 text-white flex-col fixed inset-y-0 z-30"><div className="h-20 flex items-center gap-4 px-6 border-b border-neutral-800"><Logo width={56} height={56}/></div>{nav()}<div className="p-4 border-t border-neutral-800 flex items-center justify-between"><button onClick={()=>navigate('/agent/profile')} className="text-left"><p className="text-xs font-semibold text-neutral-200">{user?.name||'Agent'}</p><span className="text-2xs text-neutral-500">Field Agent</span></button><button onClick={handleLogout} title="Logout" className="text-neutral-400 hover:text-white"><LogOut className="w-4 h-4"/></button></div></aside>{mobileOpen&&<div className="fixed inset-0 z-40 lg:hidden"><button aria-label="Close agent navigation" className="absolute inset-0 bg-neutral-950/50" onClick={()=>setMobileOpen(false)}/><aside className="relative flex h-full w-[min(84vw,20rem)] flex-col bg-neutral-900 text-white shadow-2xl"><div className="h-16 flex items-center justify-between px-4 border-b border-neutral-800"><div className="flex items-center gap-3"><Logo width={48} height={48}/><b>Agent Portal</b></div><button onClick={()=>setMobileOpen(false)} className="p-2"><X className="w-5 h-5"/></button></div>{nav(true)}</aside></div>}<div className="flex-1 lg:pl-64 flex flex-col min-w-0"><header className="min-h-16 bg-white border-b border-neutral-200 sticky top-0 z-20 px-4 sm:px-6 flex items-center justify-between"><div className="flex items-center gap-3"><button onClick={()=>setMobileOpen(!mobileOpen)} className="lg:hidden p-2 text-neutral-600"><Menu className="w-5 h-5"/></button></div><div className="flex items-center gap-2"><button onClick={()=>navigate('/agent/notifications')} className="relative p-2 text-neutral-500 hover:bg-neutral-100 rounded-lg" aria-label="Notifications"><Bell className="w-5 h-5"/>{unread>0&&<span className="absolute right-0 top-0 min-w-4 h-4 px-1 rounded-full bg-danger-600 text-[10px] leading-4 text-white text-center">{unread>99?'99+':unread}</span>}</button><button onClick={handleLogout} className="hidden sm:flex items-center gap-2 text-xs font-semibold text-neutral-600"><LogOut className="w-4 h-4"/>Logout</button></div></header><main id="main-content" className="flex-1 w-full max-w-[1320px] mx-auto p-4 sm:p-6 lg:p-8"><Outlet/></main></div></div>}
+import React, { useState } from "react";
+import { Outlet, NavLink, useNavigate } from "react-router-dom";
+import {
+  LayoutDashboard,
+  Stethoscope,
+  UserPlus,
+  MapPin,
+  CalendarClock,
+  TrendingUp,
+  LogOut,
+  Bell,
+  Menu,
+  X,
+  UserRound,
+} from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { useAuthStore } from "@/stores/auth.store";
+import { Logo } from "@/components/brand/Logo";
+import { cn } from "@/lib/cn";
+import apiClient from "@/lib/api-client";
+const NAV_ITEMS = [
+  { label: "Dashboard", path: "/agent/dashboard", icon: LayoutDashboard },
+  { label: "My Doctors", path: "/agent/doctors", icon: Stethoscope },
+  { label: "Register Doctor", path: "/agent/doctors/new", icon: UserPlus },
+  { label: "Clinic Visits", path: "/agent/clinic-visits", icon: MapPin },
+  { label: "Follow-ups", path: "/agent/follow-ups", icon: CalendarClock },
+  { label: "Performance", path: "/agent/performance", icon: TrendingUp },
+  { label: "Profile", path: "/agent/profile", icon: UserRound },
+];
+export function AgentLayout() {
+  const { user, logout } = useAuthStore();
+  const navigate = useNavigate();
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const nq = useQuery({
+    queryKey: ["agent-notifications", "unread"],
+    queryFn: async () =>
+      (await apiClient.get("/agents/me/notifications?unread=true&limit=1"))
+        .data,
+    refetchInterval: 60000,
+  });
+  const unread = Number((nq.data as any)?.unreadCount || 0);
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
+  };
+  const nav = (mobile = false) => (
+    <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+      {NAV_ITEMS.map((item) => (
+        <NavLink
+          key={item.path}
+          to={item.path}
+          onClick={mobile ? () => setMobileOpen(false) : undefined}
+          className={({ isActive }) =>
+            cn(
+              "flex min-h-11 items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+              isActive
+                ? "bg-primary-600 text-white font-semibold"
+                : "text-neutral-400 hover:text-white hover:bg-neutral-800",
+            )
+          }
+        >
+          <item.icon className="w-4 h-4" />
+          {item.label}
+        </NavLink>
+      ))}
+    </nav>
+  );
+  return (
+    <div className="min-h-screen bg-neutral-50 flex overflow-x-clip">
+      <aside className="hidden lg:flex w-64 bg-neutral-900 text-white flex-col fixed inset-y-0 z-30">
+        <div className="h-20 flex items-center gap-4 px-6 border-b border-neutral-800">
+          <Logo width={56} height={56} />
+        </div>
+        {nav()}
+        <div className="p-4 border-t border-neutral-800 flex items-center justify-between">
+          <button
+            onClick={() => navigate("/agent/profile")}
+            className="text-left"
+          >
+            <p className="text-xs font-semibold text-neutral-200">
+              {user?.name || "Agent"}
+            </p>
+            <span className="text-2xs text-neutral-500">Field Agent</span>
+          </button>
+          <button
+            onClick={handleLogout}
+            title="Logout"
+            className="text-neutral-400 hover:text-white"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
+        </div>
+      </aside>
+      {mobileOpen && (
+        <div className="fixed inset-0 z-40 lg:hidden">
+          <button
+            aria-label="Close agent navigation"
+            className="absolute inset-0 bg-neutral-950/50"
+            onClick={() => setMobileOpen(false)}
+          />
+          <aside className="relative flex h-full w-[min(84vw,20rem)] flex-col bg-neutral-900 text-white shadow-2xl">
+            <div className="h-16 flex items-center justify-between px-4 border-b border-neutral-800">
+              <div className="flex items-center gap-3">
+                <Logo width={48} height={48} />
+              </div>
+              <button onClick={() => setMobileOpen(false)} className="p-2">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            {nav(true)}
+          </aside>
+        </div>
+      )}
+      <div className="flex-1 lg:pl-64 flex flex-col min-w-0">
+        <header className="min-h-16 bg-white border-b border-neutral-200 sticky top-0 z-20 px-4 sm:px-6 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setMobileOpen(!mobileOpen)}
+              className="lg:hidden p-2 text-neutral-600"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigate("/agent/notifications")}
+              className="relative p-2 text-neutral-500 hover:bg-neutral-100 rounded-lg"
+              aria-label="Notifications"
+            >
+              <Bell className="w-5 h-5" />
+              {unread > 0 && (
+                <span className="absolute right-0 top-0 min-w-4 h-4 px-1 rounded-full bg-danger-600 text-[10px] leading-4 text-white text-center">
+                  {unread > 99 ? "99+" : unread}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={handleLogout}
+              className="hidden sm:flex items-center gap-2 text-xs font-semibold text-neutral-600"
+            >
+              <LogOut className="w-4 h-4" />
+              Logout
+            </button>
+          </div>
+        </header>
+        <main
+          id="main-content"
+          className="flex-1 w-full max-w-[1320px] mx-auto p-4 sm:p-6 lg:p-8"
+        >
+          <Outlet />
+        </main>
+      </div>
+    </div>
+  );
+}
