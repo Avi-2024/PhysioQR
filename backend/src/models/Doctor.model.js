@@ -51,11 +51,16 @@ const doctorSchema = new mongoose.Schema({
   googleMapsLink: String,
   clinicBranches: Number,
 
-  // Referral Program
+  // Referral Program / commercial proposal collected by Agent
   registrationDate: Date,
   approvalDate: Date,
   preferredProgram: { type: mongoose.Schema.Types.ObjectId, ref: 'Program' },
   requestedPatientFee: Number,
+  requestedFeeShareType: { type: String, enum: ['percentage', 'fixed'] },
+  requestedFeeSharePercentage: Number,
+  requestedFixedFeeShareAmount: Number,
+
+  // Admin-approved commercial configuration used by payment/fee-share engine
   approvedPatientFee: Number,
   revenueModel: { type: String, enum: ['split', 'platform_fee'], default: 'split' },
   feeSharePercentage: Number,
