@@ -44,7 +44,6 @@ const AGENT_REQUIRED_FIELDS = [
   'preferredProgram',
   'revenueModel',
   'requestedPatientFee',
-  'requestedFeeShareType',
 ];
 const REVENUE_MODELS = ['split', 'platform_fee'];
 const REQUESTED_FEE_SHARE_TYPES = ['percentage', 'fixed'];
@@ -63,6 +62,11 @@ function validateAgentRegistration(payload) {
       return `${field} is required`;
     }
   }
+
+  if (payload.revenueModel === 'split' && !payload.requestedFeeShareType) {
+    return 'requestedFeeShareType is required for Split Model';
+  }
+
   return null;
 }
 
@@ -71,6 +75,15 @@ function validateCommercialProposal(payload) {
     const fee = Number(payload.requestedPatientFee);
     if (!Number.isFinite(fee) || fee < 1 || fee > 100000) return 'Patient price must be between 1 and 100000';
     payload.requestedPatientFee = fee;
+  }
+
+  // Platform Fee means the complete verified patient payment belongs to PhysioQR.
+  // Doctor commission fields are intentionally not applicable in this model.
+  if (payload.revenueModel === 'platform_fee') {
+    delete payload.requestedFeeShareType;
+    delete payload.requestedFeeSharePercentage;
+    delete payload.requestedFixedFeeShareAmount;
+    return null;
   }
 
   if (payload.requestedFeeShareType && !REQUESTED_FEE_SHARE_TYPES.includes(payload.requestedFeeShareType)) {
@@ -97,6 +110,17 @@ function validateCommercialProposal(payload) {
 
 function applyCommercialProposalDefaults(payload) {
   if (payload.requestedPatientFee !== undefined) payload.approvedPatientFee = payload.requestedPatientFee;
+
+  if (payload.revenueModel === 'platform_fee') {
+    payload.feeShareType = 'percentage';
+    payload.feeSharePercentage = 0;
+    delete payload.fixedFeeShareAmount;
+    delete payload.requestedFeeShareType;
+    delete payload.requestedFeeSharePercentage;
+    delete payload.requestedFixedFeeShareAmount;
+    return;
+  }
+
   if (payload.requestedFeeShareType === 'percentage') {
     payload.feeShareType = 'percentage';
     payload.feeSharePercentage = payload.requestedFeeSharePercentage;
