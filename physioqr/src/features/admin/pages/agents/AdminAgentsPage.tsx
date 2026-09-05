@@ -314,7 +314,7 @@ export default function AdminAgentsPage() {
                     <th className="px-4 py-3">Region</th>
                     <th className="px-4 py-3">Status</th>
                     <th className="px-4 py-3">Joined</th>
-                    <th className="px-5 py-3 text-right">Action</th>
+                    <th className="px-5 py-3 ">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100">
@@ -339,7 +339,7 @@ export default function AdminAgentsPage() {
                       <td className="px-4 py-4 font-medium text-neutral-700">{displayText(agent.assignedRegion)}</td>
                       <td className="px-4 py-4"><StatusPill status={agent.status} /></td>
                       <td className="px-4 py-4 text-neutral-600">{formatDate(agent.joiningDate)}</td>
-                      <td className="px-5 py-4 text-right">
+                      <td className="px-5 py-4 ">
                         <button
                           type="button"
                           onClick={(event) => {
