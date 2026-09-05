@@ -1,32 +1,164 @@
+const mongoose = require('mongoose');
 const Agent = require('../models/Agent.model');
 const Doctor = require('../models/Doctor.model');
+const User = require('../models/User.model');
+const Program = require('../models/Program.model');
 const ClinicVisit = require('../models/ClinicVisit.model');
 const Patient = require('../models/Patient.model');
 const { Payment } = require('../models/Payment.model');
 const { uploadDoctorKycDocument } = require('../services/storage.service');
+const { provisionApprovedDoctor } = require('../services/doctorApproval.service');
 const { writeAuditLog } = require('../utils/auditLogger');
 const asyncHandler = require('../utils/asyncHandler');
 
 const VERIFIED_PAYMENT_STATUSES = ['successful', 'manually_verified', 'partially_refunded', 'refunded'];
 const AGENT_UPLOAD_DOCUMENT_TYPES = ['identity_proof', 'address_proof', 'medical_registration', 'profile_photo', 'other'];
-const AGENT_DOCTOR_FIELDS = [
-  'doctorId','fullName','mobile','whatsapp','email','gender','dateOfBirth','profilePhoto',
-  'qualification','specialization','medicalRegNumber','registrationCouncil','yearsOfExperience','languagesSpoken',
-  'clinicName','clinicAddress','city','state','postalCode','clinicContact','clinicEmail','clinicWorkingHours','googleMapsLink','clinicBranches',
-  'preferredProgram','revenueModel','registrationDate','approvalDate','status','rejectionReason','suspensionReason',
-  'referralCode','qrCodeActive','kycStatus','createdAt','updatedAt',
+const AGENT_EDITABLE_DOCTOR_FIELDS = [
+  'fullName',
+  'mobile',
+  'qualification',
+  'specialization',
+  'medicalRegNumber',
+  'clinicName',
+  'city',
+  'preferredProgram',
+  'revenueModel',
+];
+const REVENUE_MODELS = ['split', 'platform_fee'];
+
+const AGENT_DOCTOR_LIST_FIELDS = [
+  'doctorId','fullName','mobile','qualification','specialization','medicalRegNumber',
+  'clinicName','city','preferredProgram','revenueModel','registrationDate','approvalDate',
+  'status','rejectionReason','suspensionReason','referralCode','qrCodeActive','kycStatus','createdAt','updatedAt',
+].join(' ');
+
+const AGENT_DOCTOR_DETAIL_FIELDS = [
+  AGENT_DOCTOR_LIST_FIELDS,
+  'qrCodeUrl',
 ].join(' ');
 
 const getCurrentAgent = async (req) => {
   const agent = await Agent.findOne({ user: req.user._id }).select('_id status');
-  if (!agent) { const error = new Error('Agent profile not found'); error.status = 404; throw error; }
+  if (!agent) {
+    const error = new Error('Agent profile not found');
+    error.status = 404;
+    throw error;
+  }
   return agent;
+};
+
+const buildReferralUrl = (doctor) => {
+  if (!doctor?.doctorId) return null;
+  const appUrl = process.env.APP_URL || process.env.FRONTEND_URL || 'http://localhost:3000';
+  return `${appUrl.replace(/\/$/, '')}/register?doctor=${doctor.doctorId}`;
+};
+
+const pickEditableDoctorFields = (body = {}) => {
+  const updates = {};
+  AGENT_EDITABLE_DOCTOR_FIELDS.forEach((field) => {
+    if (body[field] !== undefined) updates[field] = body[field];
+  });
+  return updates;
+};
+
+const normalizeDoctorUpdates = (updates) => {
+  const stringFields = [
+    'fullName',
+    'mobile',
+    'qualification',
+    'specialization',
+    'medicalRegNumber',
+    'clinicName',
+    'city',
+    'preferredProgram',
+    'revenueModel',
+  ];
+  stringFields.forEach((field) => {
+    if (updates[field] !== undefined) updates[field] = String(updates[field]).trim();
+  });
+  return updates;
+};
+
+const validateDoctorUpdates = async ({ doctor, updates }) => {
+  for (const [field, value] of Object.entries(updates)) {
+    if (value === '') {
+      const error = new Error(`${field} cannot be empty`);
+      error.status = 400;
+      throw error;
+    }
+  }
+
+  if (updates.mobile !== undefined && !/^[6-9]\d{9}$/.test(updates.mobile)) {
+    const error = new Error('Enter a valid 10-digit mobile number');
+    error.status = 400;
+    throw error;
+  }
+
+  if (updates.revenueModel !== undefined && !REVENUE_MODELS.includes(updates.revenueModel)) {
+    const error = new Error('Payment model must be split or platform_fee');
+    error.status = 400;
+    throw error;
+  }
+
+  if (updates.preferredProgram !== undefined) {
+    if (!mongoose.isValidObjectId(updates.preferredProgram)) {
+      const error = new Error('Selected rehabilitation programme is invalid');
+      error.status = 400;
+      throw error;
+    }
+    const program = await Program.findOne({ _id: updates.preferredProgram, isActive: true }).select('_id').lean();
+    if (!program) {
+      const error = new Error('Selected rehabilitation programme is unavailable or inactive');
+      error.status = 400;
+      throw error;
+    }
+  }
+
+  const duplicateClauses = [];
+  if (updates.mobile !== undefined && updates.mobile !== doctor.mobile) duplicateClauses.push({ mobile: updates.mobile });
+  if (updates.medicalRegNumber !== undefined && updates.medicalRegNumber !== doctor.medicalRegNumber) {
+    duplicateClauses.push({ medicalRegNumber: updates.medicalRegNumber });
+  }
+
+  if (duplicateClauses.length) {
+    const duplicateDoctor = await Doctor.findOne({ _id: { $ne: doctor._id }, $or: duplicateClauses })
+      .select('_id doctorId mobile medicalRegNumber')
+      .lean();
+    if (duplicateDoctor) {
+      const error = new Error('Another doctor already uses this mobile or medical registration number');
+      error.status = 409;
+      throw error;
+    }
+  }
+
+  if (updates.mobile !== undefined && updates.mobile !== doctor.mobile) {
+    const userFilter = { mobile: updates.mobile };
+    if (doctor.user) userFilter._id = { $ne: doctor.user };
+    const duplicateUser = await User.findOne(userFilter).select('_id role').lean();
+    if (duplicateUser) {
+      const error = new Error('This mobile number is already used by another login account');
+      error.status = 409;
+      throw error;
+    }
+  }
+
+  if (updates.revenueModel !== undefined && updates.revenueModel !== doctor.revenueModel) {
+    const hasVerifiedPayment = await Payment.exists({
+      doctor: doctor._id,
+      status: { $in: VERIFIED_PAYMENT_STATUSES },
+    });
+    if (hasVerifiedPayment) {
+      const error = new Error('Payment model cannot be changed by Agent after a verified patient payment. Contact Admin.');
+      error.status = 409;
+      throw error;
+    }
+  }
 };
 
 const getMyDoctors = asyncHandler(async (req, res) => {
   const agent = await getCurrentAgent(req);
   const doctors = await Doctor.find({ agent: agent._id })
-    .select(AGENT_DOCTOR_FIELDS)
+    .select(AGENT_DOCTOR_LIST_FIELDS)
     .populate('preferredProgram', 'programCode name durationDays')
     .sort({ createdAt: -1 })
     .lean();
@@ -35,19 +167,146 @@ const getMyDoctors = asyncHandler(async (req, res) => {
 
 const getMyDoctorById = asyncHandler(async (req, res) => {
   const agent = await getCurrentAgent(req);
+  if (!mongoose.isValidObjectId(req.params.doctorId)) return res.status(404).json({ message: 'Doctor not found' });
+
   const doctor = await Doctor.findOne({ _id: req.params.doctorId, agent: agent._id })
-    .select(AGENT_DOCTOR_FIELDS)
+    .select(AGENT_DOCTOR_DETAIL_FIELDS)
     .populate('preferredProgram', 'programCode name durationDays')
     .lean();
+
   if (!doctor) return res.status(404).json({ message: 'Doctor not found' });
+
   const [patientCount, paidPatientIds, recentVisits] = await Promise.all([
     Patient.countDocuments({ referringDoctor: doctor._id }),
     Payment.distinct('patient', { doctor: doctor._id, status: { $in: VERIFIED_PAYMENT_STATUSES } }),
     ClinicVisit.find({ agent: agent._id, doctor: doctor._id })
       .select('visitDate visitTime clinicName clinicLocation outcome doctorInterestLevel followUpDate followUpStatus nextAction')
-      .sort({ visitDate: -1, createdAt: -1 }).limit(8).lean(),
+      .sort({ visitDate: -1, createdAt: -1 })
+      .limit(8)
+      .lean(),
   ]);
-  res.json({ doctor, performance: { patientRegistrations: patientCount, paidPatients: paidPatientIds.length }, recentVisits });
+
+  res.json({
+    doctor,
+    referralUrl: doctor.qrCodeActive ? buildReferralUrl(doctor) : null,
+    performance: { patientRegistrations: patientCount, paidPatients: paidPatientIds.length },
+    recentVisits,
+  });
+});
+
+const updateMyDoctor = asyncHandler(async (req, res) => {
+  const agent = await getCurrentAgent(req);
+  if (agent.status !== 'active') return res.status(403).json({ message: 'Inactive agent cannot edit doctors' });
+  if (!mongoose.isValidObjectId(req.params.doctorId)) return res.status(404).json({ message: 'Doctor not found' });
+
+  const doctor = await Doctor.findOne({ _id: req.params.doctorId, agent: agent._id });
+  if (!doctor) return res.status(404).json({ message: 'Doctor not found' });
+
+  const updates = normalizeDoctorUpdates(pickEditableDoctorFields(req.body));
+  if (!Object.keys(updates).length) return res.status(400).json({ message: 'No editable doctor fields were provided' });
+
+  await validateDoctorUpdates({ doctor, updates });
+
+  const previousValue = {};
+  Object.keys(updates).forEach((field) => {
+    previousValue[field] = doctor[field];
+  });
+
+  const mobileChanged = updates.mobile !== undefined && updates.mobile !== doctor.mobile;
+  const loginUser = mobileChanged && doctor.user ? await User.findById(doctor.user) : null;
+  const previousLoginMobile = loginUser?.mobile;
+  const previousTokenVersion = loginUser?.tokenVersion;
+
+  Object.assign(doctor, updates);
+  await doctor.save();
+
+  try {
+    if (loginUser) {
+      loginUser.mobile = updates.mobile;
+      loginUser.tokenVersion = (loginUser.tokenVersion || 0) + 1;
+      await loginUser.save();
+    }
+  } catch (error) {
+    Object.assign(doctor, previousValue);
+    await doctor.save().catch(() => {});
+    if (loginUser) {
+      loginUser.mobile = previousLoginMobile;
+      loginUser.tokenVersion = previousTokenVersion;
+      await loginUser.save().catch(() => {});
+    }
+    throw error;
+  }
+
+  await writeAuditLog({
+    req,
+    action: 'doctor_profile_updated_by_agent',
+    module: 'Doctor',
+    recordId: doctor._id,
+    previousValue,
+    newValue: updates,
+  });
+
+  const safeDoctor = await Doctor.findOne({ _id: doctor._id, agent: agent._id })
+    .select(AGENT_DOCTOR_DETAIL_FIELDS)
+    .populate('preferredProgram', 'programCode name durationDays')
+    .lean();
+
+  res.json({
+    message: mobileChanged
+      ? 'Doctor updated. Login mobile changed and existing doctor sessions were revoked.'
+      : 'Doctor updated successfully.',
+    doctor: safeDoctor,
+    referralUrl: safeDoctor?.qrCodeActive ? buildReferralUrl(safeDoctor) : null,
+  });
+});
+
+const completeLegacyMyDoctorActivation = asyncHandler(async (req, res) => {
+  const agent = await getCurrentAgent(req);
+  if (agent.status !== 'active') return res.status(403).json({ message: 'Inactive agent cannot activate doctors' });
+  if (!mongoose.isValidObjectId(req.params.doctorId)) return res.status(404).json({ message: 'Doctor not found' });
+
+  const doctor = await Doctor.findOne({ _id: req.params.doctorId, agent: agent._id });
+  if (!doctor) return res.status(404).json({ message: 'Doctor not found' });
+
+  // `submitted` is a legacy Agent-registration state. New Agent registrations are
+  // auto-approved in the registration request. Do not allow Agents to override
+  // Admin-controlled under_review/rejected/suspended/inactive states.
+  if (doctor.status !== 'submitted') {
+    return res.status(400).json({ message: 'Only legacy submitted Agent doctors can complete automatic activation' });
+  }
+
+  const previousValue = {
+    status: doctor.status,
+    approvalDate: doctor.approvalDate,
+    qrCodeActive: doctor.qrCodeActive,
+  };
+
+  const { temporaryPassword, referralUrl } = await provisionApprovedDoctor({ doctor });
+
+  await writeAuditLog({
+    req,
+    action: 'legacy_agent_doctor_auto_approval_completed',
+    module: 'Doctor',
+    recordId: doctor._id,
+    previousValue,
+    newValue: {
+      status: doctor.status,
+      approvalDate: doctor.approvalDate,
+      qrCodeActive: doctor.qrCodeActive,
+    },
+  });
+
+  const safeDoctor = await Doctor.findOne({ _id: doctor._id, agent: agent._id })
+    .select(AGENT_DOCTOR_DETAIL_FIELDS)
+    .populate('preferredProgram', 'programCode name durationDays')
+    .lean();
+
+  res.json({
+    message: 'Doctor activated and referral QR generated',
+    doctor: safeDoctor,
+    referralUrl,
+    temporaryPassword,
+  });
 });
 
 // Agents may collect non-financial onboarding documents only for doctors assigned
@@ -60,6 +319,7 @@ const uploadMyDoctorDocument = asyncHandler(async (req, res) => {
     return res.status(400).json({ message: `documentType must be one of: ${AGENT_UPLOAD_DOCUMENT_TYPES.join(', ')}` });
   }
   if (!req.file) return res.status(400).json({ message: 'document file is required' });
+  if (!mongoose.isValidObjectId(req.params.doctorId)) return res.status(404).json({ message: 'Doctor not found' });
 
   const doctor = await Doctor.findOne({ _id: req.params.doctorId, agent: agent._id });
   if (!doctor) return res.status(404).json({ message: 'Doctor not found' });
@@ -82,7 +342,15 @@ const uploadMyDoctorDocument = asyncHandler(async (req, res) => {
     newValue: { documentType, storageProvider: metadata.storageProvider, agent: agent._id },
   });
 
-  res.status(201).json({ message: 'Doctor document uploaded', document: { id: metadata._id, documentType, originalName: metadata.originalName, uploadedAt: metadata.uploadedAt } });
+  res.status(201).json({
+    message: 'Doctor document uploaded',
+    document: {
+      id: metadata._id,
+      documentType,
+      originalName: metadata.originalName,
+      uploadedAt: metadata.uploadedAt,
+    },
+  });
 });
 
-module.exports = { getMyDoctors, getMyDoctorById, uploadMyDoctorDocument };
+module.exports = { getMyDoctors, getMyDoctorById, updateMyDoctor, completeLegacyMyDoctorActivation, uploadMyDoctorDocument };
