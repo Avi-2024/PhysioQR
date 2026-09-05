@@ -1,6 +1,9 @@
+const QRCode = require('qrcode');
 const Doctor = require('../models/Doctor.model');
 const Agent = require('../models/Agent.model');
+const User = require('../models/User.model');
 const Program = require('../models/Program.model');
+const { DoctorWallet } = require('../models/Wallet.model');
 const { writeAuditLog } = require('../utils/auditLogger');
 const asyncHandler = require('../utils/asyncHandler');
 
@@ -53,10 +56,12 @@ function validateCommercialProposal(payload) {
   return null;
 }
 
-// Copies validated proposal values into the dormant fee-share fields so the
-// existing Admin approval form is prefilled. These values are not financially
-// effective until the doctor is approved and can still be changed by Admin.
+// Copies the commercial terms selected by the Agent into the active doctor
+// configuration. Admin can change these values later from the Doctor workflow.
 function applyCommercialProposalDefaults(payload) {
+  if (payload.requestedPatientFee !== undefined) {
+    payload.approvedPatientFee = payload.requestedPatientFee;
+  }
   if (payload.requestedFeeShareType === 'percentage') {
     payload.feeShareType = 'percentage';
     payload.feeSharePercentage = payload.requestedFeeSharePercentage;
@@ -69,9 +74,52 @@ function applyCommercialProposalDefaults(payload) {
   }
 }
 
+function loginIdentifierFilter(payload) {
+  const clauses = [];
+  if (payload.email) clauses.push({ email: payload.email });
+  if (payload.mobile) clauses.push({ mobile: payload.mobile });
+  return clauses.length ? { $or: clauses } : null;
+}
+
+async function activateAgentRegisteredDoctor({ doctor }) {
+  const generatedPassword = `Doctor@${Math.floor(100000 + Math.random() * 900000)}`;
+  const loginUser = await User.create({
+    role: 'doctor',
+    email: doctor.email || undefined,
+    mobile: doctor.mobile,
+    password: generatedPassword,
+    status: 'active',
+    mustChangePassword: true,
+  });
+
+  const appUrl = process.env.APP_URL || process.env.FRONTEND_URL || 'http://localhost:3000';
+  const referralUrl = `${appUrl.replace(/\/$/, '')}/register?doctor=${doctor.doctorId}`;
+
+  doctor.status = 'approved';
+  doctor.approvalDate = new Date();
+  doctor.user = loginUser._id;
+  doctor.referralCode = doctor.doctorId;
+  doctor.qrCodeUrl = await QRCode.toDataURL(referralUrl);
+  doctor.qrCodeActive = true;
+  await doctor.save();
+
+  loginUser.profileRef = doctor._id;
+  loginUser.profileModel = 'Doctor';
+  await loginUser.save();
+
+  await DoctorWallet.findOneAndUpdate(
+    { doctor: doctor._id },
+    { $setOnInsert: { doctor: doctor._id } },
+    { upsert: true, new: true }
+  );
+
+  return generatedPassword;
+}
+
 const registerDoctorSecure = asyncHandler(async (req, res) => {
   const payload = pickRegistrationFields(req.body);
-  payload.status = 'submitted';
+  const isAgentRegistration = req.user?.role === 'agent';
+  payload.status = isAgentRegistration ? 'approved' : 'submitted';
   payload.registrationDate = new Date();
 
   if (payload.email) payload.email = String(payload.email).trim().toLowerCase();
@@ -107,11 +155,16 @@ const registerDoctorSecure = asyncHandler(async (req, res) => {
     }
   }
 
-  if (req.user?.role === 'agent') {
+  if (isAgentRegistration) {
     const agent = await Agent.findOne({ user: req.user._id }).select('_id status');
     if (!agent) return res.status(404).json({ message: 'Agent profile not found' });
     if (agent.status !== 'active') return res.status(403).json({ message: 'Inactive agent cannot register doctors' });
     payload.agent = agent._id;
+
+    const identifierFilter = loginIdentifierFilter(payload);
+    if (identifierFilter && await User.exists(identifierFilter)) {
+      return res.status(409).json({ message: 'Doctor login mobile or email is already used by another account' });
+    }
   } else if (req.user?.role === 'admin' && req.body.agent) {
     const assignedAgent = await Agent.findById(req.body.agent).select('_id status');
     if (!assignedAgent) return res.status(400).json({ message: 'Assigned agent does not exist' });
@@ -120,9 +173,23 @@ const registerDoctorSecure = asyncHandler(async (req, res) => {
   }
 
   const doctor = await Doctor.create(payload);
+  let temporaryPassword;
+
+  if (isAgentRegistration) {
+    try {
+      temporaryPassword = await activateAgentRegisteredDoctor({ doctor });
+    } catch (error) {
+      // Never leave a doctor shown as approved if account provisioning failed.
+      doctor.status = 'under_review';
+      doctor.qrCodeActive = false;
+      await doctor.save().catch(() => {});
+      throw error;
+    }
+  }
+
   await writeAuditLog({
     req,
-    action: 'doctor_registered',
+    action: isAgentRegistration ? 'doctor_registered_auto_approved' : 'doctor_registered',
     module: 'Doctor',
     recordId: doctor._id,
     newValue: {
@@ -131,14 +198,19 @@ const registerDoctorSecure = asyncHandler(async (req, res) => {
       agent: doctor.agent || null,
       preferredProgram: doctor.preferredProgram || null,
       revenueModel: doctor.revenueModel,
-      requestedPatientFee: doctor.requestedPatientFee,
-      requestedFeeShareType: doctor.requestedFeeShareType,
-      requestedFeeSharePercentage: doctor.requestedFeeSharePercentage,
-      requestedFixedFeeShareAmount: doctor.requestedFixedFeeShareAmount,
+      approvedPatientFee: doctor.approvedPatientFee,
+      feeShareType: doctor.feeShareType,
+      feeSharePercentage: doctor.feeSharePercentage,
+      fixedFeeShareAmount: doctor.fixedFeeShareAmount,
+      qrCodeActive: doctor.qrCodeActive,
     },
   });
 
-  res.status(201).json(doctor);
+  res.status(201).json({
+    ...doctor.toObject(),
+    temporaryPassword,
+    autoApproved: isAgentRegistration,
+  });
 });
 
 module.exports = { registerDoctorSecure };
