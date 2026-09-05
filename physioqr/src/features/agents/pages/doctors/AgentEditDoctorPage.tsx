@@ -25,10 +25,17 @@ const schema = z.object({
   preferredProgram: z.string().min(1, 'Select a rehab program'),
   revenueModel: z.enum(['split', 'platform_fee']),
   requestedPatientFee: z.coerce.number().min(1, 'Enter the patient price').max(100000, 'Price is too high'),
-  requestedFeeShareType: z.enum(['percentage', 'fixed']),
+  requestedFeeShareType: z.enum(['percentage', 'fixed']).optional(),
   requestedFeeSharePercentage: optionalNumber(0, 100),
   requestedFixedFeeShareAmount: optionalNumber(0, 100000),
 }).superRefine((data, ctx) => {
+  if (data.revenueModel !== 'split') return;
+
+  if (!data.requestedFeeShareType) {
+    ctx.addIssue({ code: 'custom', path: ['requestedFeeShareType'], message: 'Select doctor commission type' });
+    return;
+  }
+
   if (data.requestedFeeShareType === 'percentage' && data.requestedFeeSharePercentage === undefined) {
     ctx.addIssue({ code: 'custom', path: ['requestedFeeSharePercentage'], message: 'Enter commission percentage' });
   }
@@ -83,6 +90,7 @@ export default function AgentEditDoctorPage() {
     },
   });
 
+  const revenueModel = watch('revenueModel');
   const commissionType = watch('requestedFeeShareType');
   const payload = record(doctorQuery.data);
   const doctor = record(payload.doctor);
@@ -90,7 +98,11 @@ export default function AgentEditDoctorPage() {
 
   useEffect(() => {
     if (!doctor._id) return;
-    const feeShareType = text(doctor.requestedFeeShareType || doctor.feeShareType) === 'fixed' ? 'fixed' : 'percentage';
+    const currentRevenueModel = text(doctor.revenueModel) === 'platform_fee' ? 'platform_fee' : 'split';
+    const feeShareType = currentRevenueModel === 'split' && text(doctor.requestedFeeShareType || doctor.feeShareType) === 'fixed'
+      ? 'fixed'
+      : 'percentage';
+
     reset({
       fullName: text(doctor.fullName),
       mobile: text(doctor.mobile),
@@ -100,13 +112,13 @@ export default function AgentEditDoctorPage() {
       clinicName: text(doctor.clinicName),
       city: text(doctor.city),
       preferredProgram: text(preferredProgram._id),
-      revenueModel: text(doctor.revenueModel) === 'platform_fee' ? 'platform_fee' : 'split',
+      revenueModel: currentRevenueModel,
       requestedPatientFee: numberValue(doctor.requestedPatientFee ?? doctor.approvedPatientFee),
       requestedFeeShareType: feeShareType,
-      requestedFeeSharePercentage: feeShareType === 'percentage'
+      requestedFeeSharePercentage: currentRevenueModel === 'split' && feeShareType === 'percentage'
         ? optionalNumberValue(doctor.requestedFeeSharePercentage ?? doctor.feeSharePercentage)
         : undefined,
-      requestedFixedFeeShareAmount: feeShareType === 'fixed'
+      requestedFixedFeeShareAmount: currentRevenueModel === 'split' && feeShareType === 'fixed'
         ? optionalNumberValue(doctor.requestedFixedFeeShareAmount ?? doctor.fixedFeeShareAmount)
         : undefined,
     });
@@ -197,7 +209,7 @@ export default function AgentEditDoctorPage() {
           <div className="my-6 border-t border-neutral-200" />
           <div>
             <h2 className="text-base font-bold text-neutral-900">Payment Setup</h2>
-            <p className="mt-1 text-xs text-neutral-500">Update the doctor payment model, patient price and commission.</p>
+            <p className="mt-1 text-xs text-neutral-500">Update the payment model and patient price. Doctor commission applies only to Split Model.</p>
           </div>
 
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -210,22 +222,31 @@ export default function AgentEditDoctorPage() {
             <Field label="Patient Price (₹)" required error={errors.requestedPatientFee?.message}>
               <input {...register('requestedPatientFee')} type="number" min="1" max="100000" step="1" className={inputClass} placeholder="e.g. 999" />
             </Field>
-            <Field label="Doctor Commission Type" required error={errors.requestedFeeShareType?.message}>
-              <select {...register('requestedFeeShareType')} className={inputClass}>
-                <option value="percentage">Percentage (%)</option>
-                <option value="fixed">Fixed Amount (₹)</option>
-              </select>
-            </Field>
-            {commissionType === 'percentage' ? (
-              <Field label="Doctor Commission (%)" required error={errors.requestedFeeSharePercentage?.message}>
-                <input {...register('requestedFeeSharePercentage')} type="number" min="0" max="100" step="0.01" className={inputClass} placeholder="e.g. 60" />
-              </Field>
-            ) : (
-              <Field label="Doctor Commission (₹)" required error={errors.requestedFixedFeeShareAmount?.message}>
-                <input {...register('requestedFixedFeeShareAmount')} type="number" min="0" max="100000" step="1" className={inputClass} placeholder="e.g. 500" />
-              </Field>
+
+            {revenueModel === 'split' && (
+              <>
+                <Field label="Doctor Commission Type" required error={errors.requestedFeeShareType?.message}>
+                  <select {...register('requestedFeeShareType')} className={inputClass}>
+                    <option value="percentage">Percentage (%)</option>
+                    <option value="fixed">Fixed Amount (₹)</option>
+                  </select>
+                </Field>
+                {commissionType === 'fixed' ? (
+                  <Field label="Doctor Commission (₹)" required error={errors.requestedFixedFeeShareAmount?.message}>
+                    <input {...register('requestedFixedFeeShareAmount')} type="number" min="0" max="100000" step="1" className={inputClass} placeholder="e.g. 500" />
+                  </Field>
+                ) : (
+                  <Field label="Doctor Commission (%)" required error={errors.requestedFeeSharePercentage?.message}>
+                    <input {...register('requestedFeeSharePercentage')} type="number" min="0" max="100" step="0.01" className={inputClass} placeholder="e.g. 60" />
+                  </Field>
+                )}
+              </>
             )}
           </div>
+
+          {revenueModel === 'platform_fee' && (
+            <p className="mt-3 text-xs leading-5 text-neutral-500">Platform Fee: the verified patient payment belongs to PhysioQR, so no Doctor commission is created.</p>
+          )}
 
           <p className="mt-4 text-xs leading-5 text-neutral-500">Commercial terms cannot be changed by Agent after a verified patient payment. Admin can manage them after that point.</p>
 
@@ -250,8 +271,15 @@ function Field({ label, error, required, children }: { label: string; error?: st
 
 function clean(data: FormData) {
   const cleaned = { ...data } as Record<string, unknown>;
-  if (data.requestedFeeShareType === 'percentage') delete cleaned.requestedFixedFeeShareAmount;
-  if (data.requestedFeeShareType === 'fixed') delete cleaned.requestedFeeSharePercentage;
+  if (data.revenueModel === 'platform_fee') {
+    delete cleaned.requestedFeeShareType;
+    delete cleaned.requestedFeeSharePercentage;
+    delete cleaned.requestedFixedFeeShareAmount;
+  } else if (data.requestedFeeShareType === 'percentage') {
+    delete cleaned.requestedFixedFeeShareAmount;
+  } else if (data.requestedFeeShareType === 'fixed') {
+    delete cleaned.requestedFeeSharePercentage;
+  }
   return Object.fromEntries(Object.entries(cleaned).filter(([, value]) => value !== '' && value !== undefined && value !== null));
 }
 
