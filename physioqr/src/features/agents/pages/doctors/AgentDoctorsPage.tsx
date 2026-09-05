@@ -35,13 +35,13 @@ export default function AgentDoctorsPage() {
     });
   }, [rows, search, status]);
 
-  const pending = rows.filter((row) => ['submitted', 'under_review', 'documents_required'].includes(row.status)).length;
+  const needsReview = rows.filter((row) => ['submitted', 'under_review', 'documents_required'].includes(row.status)).length;
   const columns: DataTableColumn<DoctorRow>[] = [
     { key: 'fullName', header: 'Doctor', render: (row) => <div><p className="font-semibold text-neutral-900">{row.fullName}</p><p className="text-xs text-neutral-500">{row.doctorId}</p></div> },
     { key: 'clinicName', header: 'Clinic', render: (row) => <div><p className="text-sm font-medium text-neutral-800">{row.clinicName}</p><p className="text-xs text-neutral-500">{row.city}</p></div> },
     { key: 'specialization', header: 'Specialization', render: (row) => <span className="text-sm text-neutral-700">{row.specialization}</span> },
     { key: 'mobile', header: 'Contact', render: (row) => <span className="text-sm text-neutral-700">{row.mobile}</span> },
-    { key: 'status', header: 'Approval', render: (row) => <StatusPill value={row.status} /> },
+    { key: 'status', header: 'Status', render: (row) => <StatusPill value={row.status} /> },
     { key: 'qrCodeActive', header: 'QR', render: (row) => <span className={`text-xs font-semibold ${row.qrCodeActive ? 'text-emerald-700' : 'text-neutral-500'}`}>{row.qrCodeActive ? 'Active' : 'Not active'}</span> },
     { key: 'createdAt', header: 'Added', render: (row) => <span className="text-sm text-neutral-600">{dateText(row.createdAt)}</span> },
   ];
@@ -50,21 +50,21 @@ export default function AgentDoctorsPage() {
 
   return <div className="space-y-6">
     <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-      <div><p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary-600">Doctor onboarding</p><h1 className="mt-1 text-2xl font-bold text-neutral-900 sm:text-3xl">My Doctors</h1><p className="mt-1 text-sm text-neutral-500">Only doctors assigned to your agent account are shown here.</p></div>
+      <div><p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary-600">Doctor onboarding</p><h1 className="mt-1 text-2xl font-bold text-neutral-900 sm:text-3xl">My Doctors</h1><p className="mt-1 text-sm text-neutral-500">Doctors registered by you are approved automatically and shown here immediately.</p></div>
       <button onClick={() => navigate('/agent/doctors/new')} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary-700"><Plus className="h-4 w-4" /> Register Doctor</button>
     </div>
 
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <Kpi icon={Stethoscope} label="Total doctors" value={rows.length} />
       <Kpi icon={ShieldCheck} label="Approved" value={rows.filter((row) => row.status === 'approved').length} />
-      <Kpi icon={Clock3} label="Pending review" value={pending} />
+      <Kpi icon={Clock3} label="Needs review" value={needsReview} />
       <Kpi icon={XCircle} label="Rejected / suspended" value={rows.filter((row) => ['rejected', 'suspended'].includes(row.status)).length} />
     </div>
 
     <section className="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="relative w-full max-w-xl"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search doctor, clinic, city, specialization or mobile" className="w-full rounded-lg border border-neutral-300 py-2.5 pl-9 pr-3 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100" /></div>
-        <div className="flex flex-wrap gap-2">{['all', 'draft', 'submitted', 'under_review', 'documents_required', 'approved', 'rejected', 'suspended'].map((item) => <button key={item} type="button" onClick={() => setStatus(item)} className={`rounded-full px-3 py-1.5 text-xs font-semibold capitalize ${status === item ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'}`}>{item === 'all' ? 'All' : item.replace(/_/g, ' ')}</button>)}</div>
+        <div className="flex flex-wrap gap-2">{['all', 'approved', 'under_review', 'documents_required', 'rejected', 'suspended', 'inactive'].map((item) => <button key={item} type="button" onClick={() => setStatus(item)} className={`rounded-full px-3 py-1.5 text-xs font-semibold capitalize ${status === item ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'}`}>{item === 'all' ? 'All' : item.replace(/_/g, ' ')}</button>)}</div>
       </div>
       <div className="mt-5"><DataTable columns={columns} data={filtered} loading={query.isLoading} emptyMessage="No doctors match the current filters." onRowClick={(row) => navigate(`/agent/doctors/${row.id}`)} /></div>
     </section>
