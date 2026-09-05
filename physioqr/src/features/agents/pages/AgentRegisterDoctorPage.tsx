@@ -7,6 +7,11 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, CheckCircle } from 'lucide-react';
 import apiClient from '@/lib/api-client';
 
+const optionalNumber = (min: number, max: number) => z.preprocess(
+  (value) => value === '' || value === undefined || value === null ? undefined : Number(value),
+  z.number().min(min).max(max).optional(),
+);
+
 const schema = z.object({
   fullName: z.string().min(2, 'Enter doctor full name'),
   mobile: z.string().regex(/^[6-9]\d{9}$/, 'Enter valid 10-digit mobile number'),
@@ -17,6 +22,21 @@ const schema = z.object({
   city: z.string().min(2, 'City required'),
   preferredProgram: z.string().optional(),
   revenueModel: z.enum(['split', 'platform_fee']),
+  requestedPatientFee: z.coerce.number().min(1, 'Enter the patient price').max(100000, 'Price is too high'),
+  requestedFeeShareType: z.enum(['percentage', 'fixed']),
+  requestedFeeSharePercentage: optionalNumber(0, 100),
+  requestedFixedFeeShareAmount: optionalNumber(0, 100000),
+}).superRefine((data, ctx) => {
+  if (data.requestedFeeShareType === 'percentage' && data.requestedFeeSharePercentage === undefined) {
+    ctx.addIssue({ code: 'custom', path: ['requestedFeeSharePercentage'], message: 'Enter commission percentage' });
+  }
+  if (data.requestedFeeShareType === 'fixed') {
+    if (data.requestedFixedFeeShareAmount === undefined) {
+      ctx.addIssue({ code: 'custom', path: ['requestedFixedFeeShareAmount'], message: 'Enter fixed commission' });
+    } else if (data.requestedFixedFeeShareAmount > data.requestedPatientFee) {
+      ctx.addIssue({ code: 'custom', path: ['requestedFixedFeeShareAmount'], message: 'Commission cannot exceed patient price' });
+    }
+  }
 });
 
 type FormData = z.infer<typeof schema>;
@@ -36,10 +56,15 @@ export default function AgentRegisterDoctorPage() {
       return Array.isArray(response.data) ? response.data : [];
     },
   });
-  const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
+  const { register, handleSubmit, watch, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { revenueModel: 'split', preferredProgram: '' },
+    defaultValues: {
+      revenueModel: 'split',
+      preferredProgram: '',
+      requestedFeeShareType: 'percentage',
+    },
   });
+  const commissionType = watch('requestedFeeShareType');
   const mutation = useMutation({
     mutationFn: async (data: FormData) => apiClient.post('/doctors', clean(data)),
     onSuccess: (response) => {
@@ -56,7 +81,7 @@ export default function AgentRegisterDoctorPage() {
         <button type="button" onClick={() => navigate(-1)} className="rounded-lg border border-neutral-300 p-2" aria-label="Go back"><ArrowLeft className="h-4 w-4" /></button>
         <div>
           <h1 className="text-2xl font-bold text-neutral-900">Register New Doctor</h1>
-          <p className="text-sm text-neutral-500">Only essential details are needed for Admin review.</p>
+          <p className="text-sm text-neutral-500">Capture essential doctor details and the agreed commercial proposal for Admin review.</p>
         </div>
       </div>
 
@@ -80,18 +105,47 @@ export default function AgentRegisterDoctorPage() {
               ))}
             </select>
           </Field>
+        </div>
 
-          <Field label="Payment Model" required error={errors.revenueModel?.message} wide>
+        <div className="my-6 border-t border-neutral-200" />
+        <div>
+          <h2 className="text-base font-bold text-neutral-900">Pricing & Commission</h2>
+          <p className="mt-1 text-xs text-neutral-500">Enter the commercial terms discussed with the doctor. Admin will review and can change them before approval.</p>
+        </div>
+
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <Field label="Payment Model" required error={errors.revenueModel?.message}>
             <select {...register('revenueModel')} className={inputClass}>
               <option value="split">Revenue Share (Split)</option>
               <option value="platform_fee">Platform Fee</option>
             </select>
           </Field>
+
+          <Field label="Patient Price (₹)" required error={errors.requestedPatientFee?.message}>
+            <input {...register('requestedPatientFee')} type="number" min="1" max="100000" step="1" className={inputClass} placeholder="e.g. 999" />
+          </Field>
+
+          <Field label="Doctor Commission Type" required error={errors.requestedFeeShareType?.message}>
+            <select {...register('requestedFeeShareType')} className={inputClass}>
+              <option value="percentage">Percentage (%)</option>
+              <option value="fixed">Fixed Amount (₹)</option>
+            </select>
+          </Field>
+
+          {commissionType === 'percentage' ? (
+            <Field label="Doctor Commission (%)" required error={errors.requestedFeeSharePercentage?.message}>
+              <input {...register('requestedFeeSharePercentage')} type="number" min="0" max="100" step="0.01" className={inputClass} placeholder="e.g. 60" />
+            </Field>
+          ) : (
+            <Field label="Doctor Commission (₹)" required error={errors.requestedFixedFeeShareAmount?.message}>
+              <input {...register('requestedFixedFeeShareAmount')} type="number" min="0" max="100000" step="1" className={inputClass} placeholder="e.g. 500" />
+            </Field>
+          )}
         </div>
 
         <div className="mt-5 space-y-1 text-xs leading-5 text-neutral-500">
           <p>Rehab programme is an onboarding preference. A patient's actual programme is still selected from their assessment and pain category.</p>
-          <p>The payment model is recorded for Admin review; Admin remains the final authority for pricing and fee-share settings.</p>
+          <p>Price and commission entered here are the doctor/agent proposal only. Admin approval is the final commercial configuration used for payments.</p>
         </div>
 
         {programsQuery.isError && <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs font-medium text-amber-800">Rehab programmes could not load. You can still register the doctor and choose the programme later.</div>}
@@ -110,7 +164,10 @@ function Field({ label, error, wide, required, children }: { label: string; erro
 }
 
 function clean(data: FormData) {
-  return Object.fromEntries(Object.entries(data).filter(([, value]) => value !== '' && value !== undefined && value !== null));
+  const payload = { ...data } as Record<string, unknown>;
+  if (data.requestedFeeShareType === 'percentage') delete payload.requestedFixedFeeShareAmount;
+  if (data.requestedFeeShareType === 'fixed') delete payload.requestedFeeSharePercentage;
+  return Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== '' && value !== undefined && value !== null));
 }
 
 function errorMessage(error: unknown) {
