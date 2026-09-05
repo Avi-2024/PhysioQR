@@ -56,12 +56,10 @@ function validateCommercialProposal(payload) {
   return null;
 }
 
-// Copies the commercial terms selected by the Agent into the active doctor
-// configuration. Admin can change these values later from the Doctor workflow.
+// Agent-selected commercial terms become the initial active configuration.
+// Admin remains able to change them later from the Doctor workflow.
 function applyCommercialProposalDefaults(payload) {
-  if (payload.requestedPatientFee !== undefined) {
-    payload.approvedPatientFee = payload.requestedPatientFee;
-  }
+  if (payload.requestedPatientFee !== undefined) payload.approvedPatientFee = payload.requestedPatientFee;
   if (payload.requestedFeeShareType === 'percentage') {
     payload.feeShareType = 'percentage';
     payload.feeSharePercentage = payload.requestedFeeSharePercentage;
@@ -82,44 +80,60 @@ function loginIdentifierFilter(payload) {
 }
 
 async function activateAgentRegisteredDoctor({ doctor }) {
-  const generatedPassword = `Doctor@${Math.floor(100000 + Math.random() * 900000)}`;
-  const loginUser = await User.create({
-    role: 'doctor',
-    email: doctor.email || undefined,
-    mobile: doctor.mobile,
-    password: generatedPassword,
-    status: 'active',
-    mustChangePassword: true,
-  });
-
   const appUrl = process.env.APP_URL || process.env.FRONTEND_URL || 'http://localhost:3000';
   const referralUrl = `${appUrl.replace(/\/$/, '')}/register?doctor=${doctor.doctorId}`;
+  const qrCodeUrl = await QRCode.toDataURL(referralUrl);
+  const generatedPassword = `Doctor@${Math.floor(100000 + Math.random() * 900000)}`;
+  let loginUser = null;
 
-  doctor.status = 'approved';
-  doctor.approvalDate = new Date();
-  doctor.user = loginUser._id;
-  doctor.referralCode = doctor.doctorId;
-  doctor.qrCodeUrl = await QRCode.toDataURL(referralUrl);
-  doctor.qrCodeActive = true;
-  await doctor.save();
+  try {
+    loginUser = await User.create({
+      role: 'doctor',
+      email: doctor.email || undefined,
+      mobile: doctor.mobile,
+      password: generatedPassword,
+      status: 'active',
+      mustChangePassword: true,
+    });
 
-  loginUser.profileRef = doctor._id;
-  loginUser.profileModel = 'Doctor';
-  await loginUser.save();
+    doctor.status = 'approved';
+    doctor.approvalDate = new Date();
+    doctor.user = loginUser._id;
+    doctor.referralCode = doctor.doctorId;
+    doctor.qrCodeUrl = qrCodeUrl;
+    doctor.qrCodeActive = true;
+    await doctor.save();
 
-  await DoctorWallet.findOneAndUpdate(
-    { doctor: doctor._id },
-    { $setOnInsert: { doctor: doctor._id } },
-    { upsert: true, new: true }
-  );
+    loginUser.profileRef = doctor._id;
+    loginUser.profileModel = 'Doctor';
+    await loginUser.save();
 
-  return generatedPassword;
+    await DoctorWallet.findOneAndUpdate(
+      { doctor: doctor._id },
+      { $setOnInsert: { doctor: doctor._id } },
+      { upsert: true, new: true }
+    );
+
+    return generatedPassword;
+  } catch (error) {
+    if (loginUser?._id) await User.deleteOne({ _id: loginUser._id }).catch(() => {});
+    doctor.status = 'under_review';
+    doctor.approvalDate = undefined;
+    doctor.user = undefined;
+    doctor.referralCode = undefined;
+    doctor.qrCodeUrl = undefined;
+    doctor.qrCodeActive = false;
+    await doctor.save().catch(() => {});
+    throw error;
+  }
 }
 
 const registerDoctorSecure = asyncHandler(async (req, res) => {
   const payload = pickRegistrationFields(req.body);
   const isAgentRegistration = req.user?.role === 'agent';
-  payload.status = isAgentRegistration ? 'approved' : 'submitted';
+  // Agent registrations are activated in the same request. Until provisioning
+  // succeeds, keep the persisted record non-approved to avoid partial state.
+  payload.status = isAgentRegistration ? 'under_review' : 'submitted';
   payload.registrationDate = new Date();
 
   if (payload.email) payload.email = String(payload.email).trim().toLowerCase();
@@ -148,11 +162,7 @@ const registerDoctorSecure = asyncHandler(async (req, res) => {
     const duplicate = await Doctor.findOne({ $or: duplicateClauses })
       .select('_id doctorId fullName mobile email medicalRegNumber')
       .lean();
-    if (duplicate) {
-      return res.status(409).json({
-        message: 'A doctor with the same mobile, email, or medical registration number already exists',
-      });
-    }
+    if (duplicate) return res.status(409).json({ message: 'A doctor with the same mobile, email, or medical registration number already exists' });
   }
 
   if (isAgentRegistration) {
@@ -173,19 +183,7 @@ const registerDoctorSecure = asyncHandler(async (req, res) => {
   }
 
   const doctor = await Doctor.create(payload);
-  let temporaryPassword;
-
-  if (isAgentRegistration) {
-    try {
-      temporaryPassword = await activateAgentRegisteredDoctor({ doctor });
-    } catch (error) {
-      // Never leave a doctor shown as approved if account provisioning failed.
-      doctor.status = 'under_review';
-      doctor.qrCodeActive = false;
-      await doctor.save().catch(() => {});
-      throw error;
-    }
-  }
+  const temporaryPassword = isAgentRegistration ? await activateAgentRegisteredDoctor({ doctor }) : undefined;
 
   await writeAuditLog({
     req,
@@ -206,11 +204,7 @@ const registerDoctorSecure = asyncHandler(async (req, res) => {
     },
   });
 
-  res.status(201).json({
-    ...doctor.toObject(),
-    temporaryPassword,
-    autoApproved: isAgentRegistration,
-  });
+  res.status(201).json({ ...doctor.toObject(), temporaryPassword, autoApproved: isAgentRegistration });
 });
 
 module.exports = { registerDoctorSecure };
