@@ -53,6 +53,22 @@ function validateCommercialProposal(payload) {
   return null;
 }
 
+// Copies validated proposal values into the dormant fee-share fields so the
+// existing Admin approval form is prefilled. These values are not financially
+// effective until the doctor is approved and can still be changed by Admin.
+function applyCommercialProposalDefaults(payload) {
+  if (payload.requestedFeeShareType === 'percentage') {
+    payload.feeShareType = 'percentage';
+    payload.feeSharePercentage = payload.requestedFeeSharePercentage;
+    delete payload.fixedFeeShareAmount;
+  }
+  if (payload.requestedFeeShareType === 'fixed') {
+    payload.feeShareType = 'fixed';
+    payload.fixedFeeShareAmount = payload.requestedFixedFeeShareAmount;
+    delete payload.feeSharePercentage;
+  }
+}
+
 const registerDoctorSecure = asyncHandler(async (req, res) => {
   const payload = pickRegistrationFields(req.body);
   payload.status = 'submitted';
@@ -68,6 +84,7 @@ const registerDoctorSecure = asyncHandler(async (req, res) => {
 
   const commercialError = validateCommercialProposal(payload);
   if (commercialError) return res.status(400).json({ message: commercialError });
+  applyCommercialProposalDefaults(payload);
 
   if (payload.preferredProgram) {
     const program = await Program.findOne({ _id: payload.preferredProgram, isActive: true }).select('_id').lean();
