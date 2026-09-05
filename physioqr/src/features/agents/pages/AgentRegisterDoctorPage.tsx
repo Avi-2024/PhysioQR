@@ -23,10 +23,17 @@ const schema = z.object({
   preferredProgram: z.string().min(1, 'Select a rehab program'),
   revenueModel: z.enum(['split', 'platform_fee']),
   requestedPatientFee: z.coerce.number().min(1, 'Enter the patient price').max(100000, 'Price is too high'),
-  requestedFeeShareType: z.enum(['percentage', 'fixed']),
+  requestedFeeShareType: z.enum(['percentage', 'fixed']).optional(),
   requestedFeeSharePercentage: optionalNumber(0, 100),
   requestedFixedFeeShareAmount: optionalNumber(0, 100000),
 }).superRefine((data, ctx) => {
+  if (data.revenueModel !== 'split') return;
+
+  if (!data.requestedFeeShareType) {
+    ctx.addIssue({ code: 'custom', path: ['requestedFeeShareType'], message: 'Select doctor commission type' });
+    return;
+  }
+
   if (data.requestedFeeShareType === 'percentage' && data.requestedFeeSharePercentage === undefined) {
     ctx.addIssue({ code: 'custom', path: ['requestedFeeSharePercentage'], message: 'Enter commission percentage' });
   }
@@ -79,6 +86,7 @@ export default function AgentRegisterDoctorPage() {
     },
   });
 
+  const revenueModel = watch('revenueModel');
   const commissionType = watch('requestedFeeShareType');
   const mutation = useMutation({
     mutationFn: async (data: FormData) => apiClient.post('/doctors', clean(data)),
@@ -169,7 +177,7 @@ export default function AgentRegisterDoctorPage() {
         <div className="my-6 border-t border-neutral-200" />
         <div>
           <h2 className="text-base font-bold text-neutral-900">Payment Setup</h2>
-          <p className="mt-1 text-xs text-neutral-500">Set the doctor payment model, patient price and commission.</p>
+          <p className="mt-1 text-xs text-neutral-500">Set the payment model and patient price. Doctor commission applies only to Split Model.</p>
         </div>
 
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -182,22 +190,31 @@ export default function AgentRegisterDoctorPage() {
           <Field label="Patient Price (₹)" required error={errors.requestedPatientFee?.message}>
             <input {...register('requestedPatientFee')} type="number" min="1" max="100000" step="1" className={inputClass} placeholder="e.g. 999" />
           </Field>
-          <Field label="Doctor Commission Type" required error={errors.requestedFeeShareType?.message}>
-            <select {...register('requestedFeeShareType')} className={inputClass}>
-              <option value="percentage">Percentage (%)</option>
-              <option value="fixed">Fixed Amount (₹)</option>
-            </select>
-          </Field>
-          {commissionType === 'percentage' ? (
-            <Field label="Doctor Commission (%)" required error={errors.requestedFeeSharePercentage?.message}>
-              <input {...register('requestedFeeSharePercentage')} type="number" min="0" max="100" step="0.01" className={inputClass} placeholder="e.g. 60" />
-            </Field>
-          ) : (
-            <Field label="Doctor Commission (₹)" required error={errors.requestedFixedFeeShareAmount?.message}>
-              <input {...register('requestedFixedFeeShareAmount')} type="number" min="0" max="100000" step="1" className={inputClass} placeholder="e.g. 500" />
-            </Field>
+
+          {revenueModel === 'split' && (
+            <>
+              <Field label="Doctor Commission Type" required error={errors.requestedFeeShareType?.message}>
+                <select {...register('requestedFeeShareType')} className={inputClass}>
+                  <option value="percentage">Percentage (%)</option>
+                  <option value="fixed">Fixed Amount (₹)</option>
+                </select>
+              </Field>
+              {commissionType === 'fixed' ? (
+                <Field label="Doctor Commission (₹)" required error={errors.requestedFixedFeeShareAmount?.message}>
+                  <input {...register('requestedFixedFeeShareAmount')} type="number" min="0" max="100000" step="1" className={inputClass} placeholder="e.g. 500" />
+                </Field>
+              ) : (
+                <Field label="Doctor Commission (%)" required error={errors.requestedFeeSharePercentage?.message}>
+                  <input {...register('requestedFeeSharePercentage')} type="number" min="0" max="100" step="0.01" className={inputClass} placeholder="e.g. 60" />
+                </Field>
+              )}
+            </>
           )}
         </div>
+
+        {revenueModel === 'platform_fee' && (
+          <p className="mt-3 text-xs leading-5 text-neutral-500">Platform Fee: the verified patient payment belongs to PhysioQR, so no Doctor commission is created.</p>
+        )}
 
         {programsQuery.isError && <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs font-medium text-amber-800">Active rehab programs could not load. Please retry before registering the doctor.</div>}
         {mutation.error && <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-700">{errorMessage(mutation.error)}</div>}
@@ -211,5 +228,17 @@ export default function AgentRegisterDoctorPage() {
 const inputClass = 'min-h-11 w-full rounded-lg border border-neutral-300 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 disabled:cursor-not-allowed disabled:bg-neutral-50 disabled:text-neutral-500';
 function Field({ label, error, required, children }: { label: string; error?: string; required?: boolean; children: ReactNode }) { return <label className="block"><span className="mb-1.5 block text-sm font-semibold text-neutral-700">{label}{required && <span className="ml-0.5 text-rose-500">*</span>}</span>{children}{error && <p className="mt-1 text-xs font-medium text-rose-600">{error}</p>}</label>; }
 function Info({ label, value }: { label: string; value: string }) { return <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3"><div className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{label}</div><div className="mt-1 text-sm font-semibold text-neutral-900">{value}</div></div>; }
-function clean(data: FormData) { const payload = { ...data } as Record<string, unknown>; if (data.requestedFeeShareType === 'percentage') delete payload.requestedFixedFeeShareAmount; if (data.requestedFeeShareType === 'fixed') delete payload.requestedFeeSharePercentage; return Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== '' && value !== undefined && value !== null)); }
+function clean(data: FormData) {
+  const payload = { ...data } as Record<string, unknown>;
+  if (data.revenueModel === 'platform_fee') {
+    delete payload.requestedFeeShareType;
+    delete payload.requestedFeeSharePercentage;
+    delete payload.requestedFixedFeeShareAmount;
+  } else if (data.requestedFeeShareType === 'percentage') {
+    delete payload.requestedFixedFeeShareAmount;
+  } else if (data.requestedFeeShareType === 'fixed') {
+    delete payload.requestedFeeSharePercentage;
+  }
+  return Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== '' && value !== undefined && value !== null));
+}
 function errorMessage(error: unknown) { if (error && typeof error === 'object') { const response = (error as { response?: { data?: { message?: unknown } } }).response; const message = response?.data?.message || (error as { message?: unknown }).message; if (message) return String(message); } return 'Unable to register doctor.'; }
