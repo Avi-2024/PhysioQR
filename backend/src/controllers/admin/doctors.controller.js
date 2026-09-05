@@ -28,7 +28,10 @@ const getDoctors = asyncHandler(async (req, res) => {
       filter,
       query: req.query,
       sort: buildSort(req.query.sortBy, req.query.sortOrder, ['createdAt', 'fullName', 'city', 'status', 'approvedPatientFee', 'approvalDate']),
-      populate: [{ path: 'agent', select: 'agentId fullName assignedRegion' }],
+      populate: [
+        { path: 'agent', select: 'agentId fullName assignedRegion' },
+        { path: 'preferredProgram', select: 'programCode name' },
+      ],
       select: '-bankAccountNumber -panNumber -identityProof -addressProof -medicalRegDoc -cancelledCheque -kycDocuments',
     }),
     Doctor.countDocuments(),
@@ -47,7 +50,10 @@ const getDoctorById = asyncHandler(async (req, res) => {
       ...(isObjectId(req.params.id) ? [{ _id: req.params.id }] : []),
       { doctorId: req.params.id },
     ],
-  }).populate('agent', 'agentId fullName assignedRegion mobile').lean();
+  })
+    .populate('agent', 'agentId fullName assignedRegion mobile')
+    .populate('preferredProgram', 'programCode name')
+    .lean();
 
   if (!doctor) return res.status(404).json({ message: 'Doctor not found' });
   if (doctor.bankAccountNumber) doctor.bankAccountNumber = `XXXXXX${doctor.bankAccountNumber.slice(-4)}`;
