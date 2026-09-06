@@ -6,6 +6,7 @@ const { paginateModel } = require('../utils/queryHelpers');
 const asyncHandler = require('../utils/asyncHandler');
 
 const ALLOWED_STATUSES = ['scheduled', 'completed', 'missed', 'cancelled'];
+const ALLOWED_QUERY_STATUSES = ['all', ...ALLOWED_STATUSES];
 
 const getCurrentAgent = async (req) => {
   const agent = await Agent.findOne({ user: req.user._id }).select('_id');
@@ -20,21 +21,33 @@ const getCurrentAgent = async (req) => {
 const getMyFollowUps = asyncHandler(async (req, res) => {
   const agent = await getCurrentAgent(req);
   const status = req.query.followUpStatus || 'scheduled';
-  if (!ALLOWED_STATUSES.includes(status)) return res.status(400).json({ message: 'Invalid follow-up status' });
+  if (!ALLOWED_QUERY_STATUSES.includes(status)) return res.status(400).json({ message: 'Invalid follow-up status' });
 
-  const filter = { agent: agent._id, followUpStatus: status };
+  const filter = { agent: agent._id };
   const now = new Date();
+
+  if (status === 'all') {
+    filter.followUpStatus = { $in: ALLOWED_STATUSES };
+  } else {
+    filter.followUpStatus = status;
+  }
 
   if (status === 'scheduled') {
     if (req.query.due === 'true') filter.followUpDate = { $lte: now };
     if (req.query.upcoming === 'true') filter.followUpDate = { $gt: now };
   }
 
+  const sort = status === 'scheduled'
+    ? { followUpDate: 1, createdAt: -1 }
+    : status === 'all'
+      ? { followUpDate: -1, updatedAt: -1 }
+      : { updatedAt: -1 };
+
   const result = await paginateModel({
     model: ClinicVisit,
     filter,
     query: req.query,
-    sort: status === 'scheduled' ? { followUpDate: 1, createdAt: -1 } : { updatedAt: -1 },
+    sort,
     populate: [{ path: 'doctor', select: 'doctorId fullName clinicName' }],
   });
 
@@ -68,8 +81,8 @@ const updateMyFollowUp = asyncHandler(async (req, res) => {
     visit.followUpDate = new Date(followUpDate);
     if (Number.isNaN(visit.followUpDate.getTime())) return res.status(400).json({ message: 'Follow-up date is invalid' });
     visit.followUpCompletedAt = null;
-  } else {
-    if (followUpStatus === 'completed') visit.followUpCompletedAt = new Date();
+  } else if (followUpStatus === 'completed') {
+    visit.followUpCompletedAt = new Date();
   }
 
   await visit.save();
