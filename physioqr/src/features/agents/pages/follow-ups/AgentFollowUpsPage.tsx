@@ -8,9 +8,10 @@ import { Modal } from '@/components/ui/Modal';
 import { cn } from '@/lib/cn';
 
 type ApiRecord = Record<string, unknown>;
-type Queue = 'due' | 'upcoming' | 'missed' | 'completed';
+type Queue = 'all' | 'due' | 'upcoming' | 'missed' | 'completed';
 
 const QUEUES: { key: Queue; label: string }[] = [
+  { key: 'all', label: 'All' },
   { key: 'due', label: 'Due now' },
   { key: 'upcoming', label: 'Upcoming' },
   { key: 'missed', label: 'Missed' },
@@ -19,7 +20,7 @@ const QUEUES: { key: Queue; label: string }[] = [
 
 export default function AgentFollowUpsPage() {
   const queryClient = useQueryClient();
-  const [queue, setQueue] = useState<Queue>('due');
+  const [queue, setQueue] = useState<Queue>('all');
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<ApiRecord | null>(null);
 
@@ -27,7 +28,10 @@ export default function AgentFollowUpsPage() {
     queryKey: ['agent-follow-ups', queue],
     queryFn: async () => {
       const params: Record<string, string | number | boolean> = { limit: 100 };
-      if (queue === 'due') {
+
+      if (queue === 'all') {
+        params.followUpStatus = 'all';
+      } else if (queue === 'due') {
         params.followUpStatus = 'scheduled';
         params.due = true;
       } else if (queue === 'upcoming') {
@@ -36,6 +40,7 @@ export default function AgentFollowUpsPage() {
       } else {
         params.followUpStatus = queue;
       }
+
       return (await apiClient.get('/agents/me/follow-ups', { params })).data;
     },
   });
@@ -54,6 +59,7 @@ export default function AgentFollowUpsPage() {
         row.clinicLocation,
         row.nextAction,
         row.followUpType,
+        row.followUpStatus,
         row.followUpCompletedNote,
       ].some((value) => text(value).toLowerCase().includes(q));
     });
@@ -74,18 +80,27 @@ export default function AgentFollowUpsPage() {
   });
 
   const queueLabel = QUEUES.find((item) => item.key === queue)?.label || queue;
+  const priorityLabel = queue === 'all'
+    ? 'Complete follow-up history'
+    : queue === 'due'
+      ? 'Needs action now'
+      : queue === 'missed'
+        ? 'Needs recovery'
+        : queue === 'upcoming'
+          ? 'Planned next'
+          : 'Finished work';
 
   return (
     <div className="space-y-6">
       <header>
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary-600">Relationship management</p>
         <h1 className="mt-1 text-2xl font-bold text-neutral-900 sm:text-3xl">Follow-ups</h1>
-        <p className="mt-1 max-w-3xl text-sm text-neutral-500">Work the doctor follow-ups that need attention now, then move through upcoming, missed and completed activity.</p>
+        <p className="mt-1 max-w-3xl text-sm text-neutral-500">See every clinic follow-up in one place, then focus on what is due, upcoming, missed or completed.</p>
       </header>
 
       <section className="grid gap-3 sm:grid-cols-3">
-        <SummaryCard icon={CalendarClock} label="Current queue" value={followUpsQuery.isLoading ? null : allRows.length} helper={queueLabel} />
-        <SummaryCard icon={Clock3} label="Priority" value={null} helper={queue === 'due' ? 'Needs action now' : queue === 'missed' ? 'Needs recovery' : queue === 'upcoming' ? 'Planned next' : 'Finished work'} />
+        <SummaryCard icon={CalendarClock} label="Current view" value={followUpsQuery.isLoading ? null : allRows.length} helper={queueLabel} />
+        <SummaryCard icon={Clock3} label="Priority" value={null} helper={priorityLabel} />
         <SummaryCard icon={CheckCircle2} label="Workflow" value={null} helper="Complete, reschedule, miss or cancel" />
       </section>
 
@@ -96,7 +111,7 @@ export default function AgentFollowUpsPage() {
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search doctor, clinic, type or next action"
+              placeholder="Search doctor, clinic, type, status or next action"
               className="w-full rounded-lg border border-neutral-300 py-2.5 pl-9 pr-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
             />
           </label>
@@ -119,23 +134,44 @@ export default function AgentFollowUpsPage() {
         </div>
 
         <div className="p-4 sm:p-5">
-          {followUpsQuery.isError && <ErrorState title="Follow-ups could not load" message="Check your connection and try again." onRetry={() => followUpsQuery.refetch()} />}
+          {followUpsQuery.isError && (
+            <ErrorState
+              title="Follow-ups could not load"
+              message="Check your connection and try again."
+              onRetry={() => followUpsQuery.refetch()}
+            />
+          )}
           {followUpsQuery.isLoading && <Skeleton className="h-56 w-full" />}
           {!followUpsQuery.isLoading && !followUpsQuery.isError && rows.length === 0 && (
             <div className="rounded-lg border border-dashed border-neutral-300 bg-neutral-50 p-8 text-center">
               <CalendarCheck className="mx-auto h-8 w-8 text-neutral-400" />
-              <p className="mt-3 text-sm font-semibold text-neutral-800">No {queueLabel.toLowerCase()} follow-ups</p>
-              <p className="mt-1 text-xs text-neutral-500">{search ? 'Try a different search.' : 'Clinic Visit follow-ups move into the right queue automatically.'}</p>
+              <p className="mt-3 text-sm font-semibold text-neutral-800">
+                {queue === 'all' ? 'No follow-ups yet' : `No ${queueLabel.toLowerCase()} follow-ups`}
+              </p>
+              <p className="mt-1 text-xs text-neutral-500">
+                {search ? 'Try a different search.' : 'Clinic Visit follow-ups appear here automatically when scheduled.'}
+              </p>
             </div>
           )}
           {!followUpsQuery.isLoading && rows.length > 0 && (
-            <div className="space-y-3">{rows.map((row) => <FollowUpCard key={text(row._id || row.id)} row={row} onUpdate={() => setSelected(row)} />)}</div>
+            <div className="space-y-3">
+              {rows.map((row) => (
+                <FollowUpCard key={text(row._id || row.id)} row={row} onUpdate={() => setSelected(row)} />
+              ))}
+            </div>
           )}
         </div>
       </section>
 
       <Modal isOpen={!!selected} onClose={() => setSelected(null)} title="Update follow-up" size="lg">
-        {selected && <FollowUpUpdateForm row={selected} saving={mutation.isPending} error={mutation.error} onSubmit={(payload) => mutation.mutate({ visitId: text(selected._id || selected.id), payload })} />}
+        {selected && (
+          <FollowUpUpdateForm
+            row={selected}
+            saving={mutation.isPending}
+            error={mutation.error}
+            onSubmit={(payload) => mutation.mutate({ visitId: text(selected._id || selected.id), payload })}
+          />
+        )}
       </Modal>
     </div>
   );
@@ -153,17 +189,31 @@ function FollowUpCard({ row, onUpdate }: { row: ApiRecord; onUpdate: () => void 
           <div className="flex flex-wrap items-center gap-2">
             <p className="font-semibold text-neutral-900">{text(doctor.fullName || row.doctorName, 'Clinic follow-up')}</p>
             <StatusPill value={text(row.followUpStatus, 'scheduled')} />
-            {text(row.followUpType) && <span className="rounded-full bg-primary-50 px-2.5 py-1 text-xs font-bold text-primary-700">{labelize(row.followUpType)}</span>}
+            {text(row.followUpType) && (
+              <span className="rounded-full bg-primary-50 px-2.5 py-1 text-xs font-bold text-primary-700">
+                {labelize(row.followUpType)}
+              </span>
+            )}
           </div>
           <p className="mt-1 text-sm text-neutral-600">{text(row.clinicName || doctor.clinicName, 'Clinic not specified')}</p>
           <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs text-neutral-500">
             <span className="inline-flex items-center gap-1.5"><CalendarClock className="h-3.5 w-3.5" />{dateText(row.followUpDate)}</span>
-            {text(row.clinicLocation) && <span className="inline-flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" />{text(row.clinicLocation)}</span>}
+            {text(row.clinicLocation) && (
+              <span className="inline-flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" />{text(row.clinicLocation)}</span>
+            )}
           </div>
-          {text(row.nextAction) && <div className="mt-3 rounded-lg bg-neutral-50 p-3 text-sm text-neutral-700"><strong>Next action:</strong> {text(row.nextAction)}</div>}
+          {text(row.nextAction) && (
+            <div className="mt-3 rounded-lg bg-neutral-50 p-3 text-sm text-neutral-700">
+              <strong>Next action:</strong> {text(row.nextAction)}
+            </div>
+          )}
           {text(row.followUpCompletedNote) && <div className="mt-2 text-xs text-neutral-500">Note: {text(row.followUpCompletedNote)}</div>}
         </div>
-        <button type="button" onClick={onUpdate} className="inline-flex min-h-10 flex-shrink-0 items-center justify-center gap-2 rounded-lg border border-neutral-300 px-3 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-50">
+        <button
+          type="button"
+          onClick={onUpdate}
+          className="inline-flex min-h-10 flex-shrink-0 items-center justify-center gap-2 rounded-lg border border-neutral-300 px-3 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-50"
+        >
           <RefreshCw className="h-4 w-4" /> Update
         </button>
       </div>
@@ -180,6 +230,7 @@ function FollowUpUpdateForm({ row, saving, error, onSubmit }: { row: ApiRecord; 
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
     if (status === 'scheduled' && !followUpDate) return;
+
     onSubmit({
       followUpStatus: status,
       followUpDate: status === 'scheduled' ? followUpDate : undefined,
@@ -192,7 +243,9 @@ function FollowUpUpdateForm({ row, saving, error, onSubmit }: { row: ApiRecord; 
     <form onSubmit={submit} className="space-y-4">
       <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-4">
         <p className="text-sm font-semibold text-neutral-900">{text(asRecord(row.doctor).fullName || row.doctorName, 'Clinic follow-up')}</p>
-        <p className="mt-1 text-xs text-neutral-500">Type: {text(row.followUpType) ? labelize(row.followUpType) : 'Not specified'} • Current due date: {dateText(row.followUpDate)}</p>
+        <p className="mt-1 text-xs text-neutral-500">
+          Type: {text(row.followUpType) ? labelize(row.followUpType) : 'Not specified'} • Current due date: {dateText(row.followUpDate)}
+        </p>
       </div>
 
       <label className="block">
@@ -208,23 +261,44 @@ function FollowUpUpdateForm({ row, saving, error, onSubmit }: { row: ApiRecord; 
       {status === 'scheduled' && (
         <label className="block">
           <span className="text-sm font-semibold text-neutral-700">New follow-up date</span>
-          <input type="date" required value={followUpDate} onChange={(event) => setFollowUpDate(event.target.value)} className="mt-2 w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-sm" />
+          <input
+            type="date"
+            required
+            value={followUpDate}
+            onChange={(event) => setFollowUpDate(event.target.value)}
+            className="mt-2 w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-sm"
+          />
         </label>
       )}
 
       <label className="block">
         <span className="text-sm font-semibold text-neutral-700">Follow-up note</span>
-        <textarea value={note} onChange={(event) => setNote(event.target.value)} className="mt-2 min-h-24 w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-sm" placeholder="What happened in this follow-up?" />
+        <textarea
+          value={note}
+          onChange={(event) => setNote(event.target.value)}
+          className="mt-2 min-h-24 w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-sm"
+          placeholder="What happened in this follow-up?"
+        />
       </label>
 
       <label className="block">
         <span className="text-sm font-semibold text-neutral-700">Next action</span>
-        <input value={nextAction} onChange={(event) => setNextAction(event.target.value)} className="mt-2 w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-sm" placeholder="Optional next action" />
+        <input
+          value={nextAction}
+          onChange={(event) => setNextAction(event.target.value)}
+          className="mt-2 w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-sm"
+          placeholder="Optional next action"
+        />
       </label>
 
       {error && <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">{errorMessage(error)}</div>}
+
       <div className="flex justify-end border-t border-neutral-100 pt-4">
-        <button type="submit" disabled={saving} className="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-60">
+        <button
+          type="submit"
+          disabled={saving}
+          className="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-60"
+        >
           {saving ? 'Saving...' : 'Update follow-up'}
         </button>
       </div>
@@ -254,7 +328,12 @@ function StatusPill({ value }: { value: string }) {
     missed: 'bg-rose-50 text-rose-700',
     cancelled: 'bg-neutral-100 text-neutral-600',
   };
-  return <span className={cn('rounded-full px-2.5 py-1 text-xs font-bold capitalize', styles[value] || 'bg-neutral-100 text-neutral-600')}>{labelize(value)}</span>;
+
+  return (
+    <span className={cn('rounded-full px-2.5 py-1 text-xs font-bold capitalize', styles[value] || 'bg-neutral-100 text-neutral-600')}>
+      {labelize(value)}
+    </span>
+  );
 }
 
 function extractItems(payload: unknown): ApiRecord[] {
