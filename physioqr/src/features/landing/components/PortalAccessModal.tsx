@@ -30,19 +30,18 @@ export function PortalAccessModal({ isOpen, onClose, onSelectRole }: PortalAcces
       <div className="rc-modal-container" onClick={(e) => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', marginBottom: '24px' }}>
           <div style={{ minWidth: 0 }}>
-            <span className="rc-eyebrow">PORTAL ACCESS SELECTOR</span>
-            <h2 id="portal-modal-title" style={{ fontSize: 'clamp(20px, 4vw, 24px)', fontWeight: 800, color: 'var(--text-primary)', marginTop: '2px' }}>
+            <h2 id="portal-modal-title" style={{ fontSize: 'clamp(20px, 4vw, 24px)', fontWeight: 800, color: 'var(--text-primary)' }}>
               Welcome to PhysioQR
             </h2>
             <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-              Choose the portal that matches your PhysioQR experience.
+              Choose how you want to continue.
             </p>
           </div>
 
           <button
             onClick={onClose}
             style={{ border: 'none', background: 'var(--bg-surface-soft)', padding: '8px', borderRadius: '50%', cursor: 'pointer', color: 'var(--text-muted)', flexShrink: 0 }}
-            aria-label="Close portal access selector"
+            aria-label="Close"
           >
             <X className="w-5 h-5" />
           </button>
@@ -66,10 +65,10 @@ export function PortalAccessModal({ isOpen, onClose, onSelectRole }: PortalAcces
                 </span>
               </div>
               <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                Access your assigned rehabilitation programme, daily exercises, progress tracking, reminders, and payment receipts.
+                Continue your onboarding or access your rehabilitation programme, daily exercises, progress and payment receipts.
               </p>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '12px', color: 'var(--teal-700)', fontWeight: 700, fontSize: '13.5px' }}>
-                <span>Patient Login</span>
+                <span>Continue as Patient</span>
                 <ArrowRight className="w-4 h-4" />
               </div>
             </div>
@@ -90,14 +89,14 @@ export function PortalAccessModal({ isOpen, onClose, onSelectRole }: PortalAcces
               <div className="rc-modal-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
                 <h3 style={{ fontSize: '18px', fontWeight: 800, color: 'var(--text-primary)' }}>Continue as Doctor</h3>
                 <span style={{ fontSize: '11px', fontWeight: 700, background: 'var(--bg-surface-soft)', color: 'var(--text-secondary)', padding: '2px 8px', borderRadius: '12px' }}>
-                  Registered Account
+                  Password Login
                 </span>
               </div>
               <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                Manage patient referrals, clinic QR standees, KYC verification, and patient progress monitoring.
+                Manage patient referrals, clinic QR activity, KYC status and patient progress.
               </p>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '12px', color: 'var(--teal-600)', fontWeight: 700, fontSize: '13.5px' }}>
-                <span>Doctor Portal</span>
+                <span>Continue as Doctor</span>
                 <ArrowRight className="w-4 h-4" />
               </div>
             </div>
