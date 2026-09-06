@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { HeartPulse, Stethoscope, X, ArrowRight } from 'lucide-react';
+import { HeartPulse, UserRoundCog, X, ArrowRight } from 'lucide-react';
 import { UserRole } from '../types/landing.types';
 
 interface PortalAccessModalProps {
@@ -83,21 +83,21 @@ export function PortalAccessModal({ isOpen, onClose, onSelectRole }: PortalAcces
         >
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
             <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'var(--teal-900)', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <Stethoscope className="w-6 h-6" />
+              <UserRoundCog className="w-6 h-6" />
             </div>
 
             <div style={{ flex: 1, minWidth: 0 }}>
               <div className="rc-modal-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
-                <h3 style={{ fontSize: '18px', fontWeight: 800, color: 'var(--text-primary)' }}>Continue as Doctor</h3>
+                <h3 style={{ fontSize: '18px', fontWeight: 800, color: 'var(--text-primary)' }}>Continue with PhysioQR Account</h3>
                 <span style={{ fontSize: '11px', fontWeight: 700, background: 'var(--bg-surface-soft)', color: 'var(--text-secondary)', padding: '2px 8px', borderRadius: '12px' }}>
-                  Registered Account
+                  Password Login
                 </span>
               </div>
               <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                Manage patient referrals, clinic QR standees, KYC verification, and patient progress monitoring.
+                For Doctors, Agents and Admins. Sign in with your registered email or mobile number and password.
               </p>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '12px', color: 'var(--teal-600)', fontWeight: 700, fontSize: '13.5px' }}>
-                <span>Doctor Portal</span>
+                <span>Account Login</span>
                 <ArrowRight className="w-4 h-4" />
               </div>
             </div>
