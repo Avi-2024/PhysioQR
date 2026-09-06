@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { cn } from '@/lib/cn';
 
 type ApiRecord = Record<string, unknown>;
+type VisitFilter = 'all' | 'needs_follow_up' | 'registered' | 'interested' | 'not_interested';
 
 const OUTCOMES = [
   ['doctor_registered', 'Doctor registered'],
@@ -32,11 +33,19 @@ const FOLLOW_UP_TYPES = [
   ['other', 'Other'],
 ];
 
+const VISIT_FILTERS: { key: VisitFilter; label: string }[] = [
+  { key: 'all', label: 'All Visits' },
+  { key: 'needs_follow_up', label: 'Needs Follow-up' },
+  { key: 'registered', label: 'Registered' },
+  { key: 'interested', label: 'Interested' },
+  { key: 'not_interested', label: 'Not Interested' },
+];
+
 export default function AgentClinicVisitsPage() {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
-  const [outcome, setOutcome] = useState('all');
+  const [visitFilter, setVisitFilter] = useState<VisitFilter>('all');
 
   const visitsQuery = useQuery({
     queryKey: ['agent-visits'],
@@ -50,15 +59,37 @@ export default function AgentClinicVisitsPage() {
 
   const visits = useMemo(() => extractItems(visitsQuery.data), [visitsQuery.data]);
   const doctors = useMemo(() => extractItems(doctorsQuery.data), [doctorsQuery.data]);
+
+  const filterCounts = useMemo(() => {
+    return VISIT_FILTERS.reduce<Record<VisitFilter, number>>((counts, item) => {
+      counts[item.key] = visits.filter((visit) => matchesVisitFilter(visit, item.key)).length;
+      return counts;
+    }, {
+      all: 0,
+      needs_follow_up: 0,
+      registered: 0,
+      interested: 0,
+      not_interested: 0,
+    });
+  }, [visits]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return visits.filter((visit) => {
       const doctor = asRecord(visit.doctor);
-      const values = [doctor.fullName, visit.doctorName, visit.clinicName, visit.clinicLocation, visit.discussionDetails]
-        .map((value) => text(value).toLowerCase());
-      return (!q || values.some((value) => value.includes(q))) && (outcome === 'all' || visit.outcome === outcome);
+      const values = [
+        doctor.fullName,
+        visit.doctorName,
+        visit.clinicName,
+        visit.clinicLocation,
+        visit.discussionDetails,
+        visit.nextAction,
+      ].map((value) => text(value).toLowerCase());
+
+      const matchesSearch = !q || values.some((value) => value.includes(q));
+      return matchesSearch && matchesVisitFilter(visit, visitFilter);
     });
-  }, [outcome, search, visits]);
+  }, [search, visitFilter, visits]);
 
   const createMutation = useMutation({
     mutationFn: async (payload: ApiRecord) => (await apiClient.post('/agents/me/visits', payload)).data,
@@ -88,20 +119,42 @@ export default function AgentClinicVisitsPage() {
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Metric label="Total visits" value={visits.length} icon={MapPin} />
         <Metric label="Doctor registered" value={visits.filter((visit) => visit.outcome === 'doctor_registered').length} icon={Stethoscope} />
-        <Metric label="Scheduled follow-ups" value={visits.filter((visit) => visit.followUpStatus === 'scheduled').length} icon={CalendarClock} />
+        <Metric label="Open follow-ups" value={visits.filter((visit) => visit.followUpStatus === 'scheduled').length} icon={CalendarClock} />
         <Metric label="Completed follow-ups" value={visits.filter((visit) => visit.followUpStatus === 'completed').length} icon={CheckCircle2} />
       </section>
 
       <section className="rounded-xl border border-neutral-200 bg-white shadow-sm">
-        <div className="grid gap-3 border-b border-neutral-200 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_auto]">
+        <div className="grid gap-3 border-b border-neutral-200 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
           <label className="relative block">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
-            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search doctor, clinic, location or discussion" className="w-full rounded-lg border border-neutral-300 py-2.5 pl-9 pr-3 text-sm" />
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search doctor, clinic, location or discussion"
+              className="w-full rounded-lg border border-neutral-300 py-2.5 pl-9 pr-3 text-sm"
+            />
           </label>
+
           <div className="flex flex-wrap gap-2">
-            {['all', 'doctor_registered', 'interested', 'not_interested'].map((item) => (
-              <button key={item} type="button" onClick={() => setOutcome(item)} className={cn('rounded-full px-3 py-2 text-xs font-semibold', outcome === item ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200')}>
-                {item === 'all' ? 'All' : labelize(item)}
+            {VISIT_FILTERS.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => setVisitFilter(item.key)}
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold transition-colors',
+                  visitFilter === item.key
+                    ? 'bg-primary-600 text-white'
+                    : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200',
+                )}
+              >
+                {item.label}
+                <span className={cn(
+                  'rounded-full px-1.5 py-0.5 text-[10px] font-bold',
+                  visitFilter === item.key ? 'bg-white/20 text-white' : 'bg-white text-neutral-500',
+                )}>
+                  {filterCounts[item.key]}
+                </span>
               </button>
             ))}
           </div>
@@ -114,7 +167,7 @@ export default function AgentClinicVisitsPage() {
             <div className="rounded-lg border border-dashed border-neutral-300 bg-neutral-50 p-8 text-center">
               <MapPin className="mx-auto h-8 w-8 text-neutral-400" />
               <p className="mt-3 text-sm font-semibold text-neutral-800">No clinic visits found</p>
-              <p className="mt-1 text-xs text-neutral-500">Record a visit after meeting a doctor or clinic.</p>
+              <p className="mt-1 text-xs text-neutral-500">Try another filter or record a new clinic visit.</p>
             </div>
           )}
           {!visitsQuery.isLoading && filtered.length > 0 && (
@@ -280,6 +333,22 @@ function Pill({ value, muted }: { value: string; muted?: boolean }) {
   const positive = ['doctor_registered', 'completed'].includes(value);
   const warning = ['interested', 'scheduled', 'call_later'].includes(value);
   return <span className={cn('inline-flex rounded-full px-2.5 py-1 text-xs font-bold capitalize', muted ? 'bg-neutral-100 text-neutral-600' : positive ? 'bg-emerald-50 text-emerald-700' : warning ? 'bg-amber-50 text-amber-700' : 'bg-neutral-100 text-neutral-600')}>{labelize(value)}</span>;
+}
+
+function matchesVisitFilter(visit: ApiRecord, filter: VisitFilter) {
+  if (filter === 'all') return true;
+  if (filter === 'needs_follow_up') return visit.followUpStatus === 'scheduled';
+  if (filter === 'registered') return visit.outcome === 'doctor_registered';
+
+  const interest = text(visit.doctorInterestLevel);
+  if (filter === 'interested') {
+    return visit.outcome !== 'doctor_registered'
+      && (visit.outcome === 'interested' || interest === 'interested' || interest === 'very_interested');
+  }
+  if (filter === 'not_interested') {
+    return visit.outcome === 'not_interested' || interest === 'not_interested';
+  }
+  return true;
 }
 
 const inputClass = 'min-h-11 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100';
