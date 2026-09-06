@@ -13,8 +13,18 @@ const clinicVisitSchema = new mongoose.Schema({
     type: String,
     enum: ['very_interested', 'interested', 'neutral', 'not_interested'],
   },
+
+  // Historical fields are retained for backward compatibility only.
+  // New Agent clinic-visit UI does not collect KYC documents or URL attachments here.
   documentsCollected: [String],
+  photo: String,
+  attachment: String,
+
   followUpDate: Date,
+  followUpType: {
+    type: String,
+    enum: ['call', 'visit', 'whatsapp', 'other'],
+  },
   followUpNotes: String,
   followUpStatus: {
     type: String,
@@ -29,8 +39,6 @@ const clinicVisitSchema = new mongoose.Schema({
     enum: ['doctor_registered', 'interested', 'follow_up_required', 'not_interested', 'call_later', 'clinic_closed', 'incorrect_location'],
     required: true,
   },
-  photo: String,
-  attachment: String,
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
 }, { timestamps: true });
