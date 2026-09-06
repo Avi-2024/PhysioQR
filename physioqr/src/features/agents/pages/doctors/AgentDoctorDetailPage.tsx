@@ -119,12 +119,15 @@ export default function AgentDoctorDetailPage() {
   const commissionValue = commissionType === 'fixed'
     ? doctor.requestedFixedFeeShareAmount ?? doctor.fixedFeeShareAmount
     : doctor.requestedFeeSharePercentage ?? doctor.feeSharePercentage;
+  const statusReason = text(doctor.rejectionReason || doctor.suspensionReason);
+  const kycStatus = text(doctor.kycStatus, 'pending');
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <button
+            type="button"
             onClick={() => navigate('/agent/doctors')}
             className="inline-flex items-center gap-1 text-sm font-semibold text-neutral-600"
           >
@@ -143,6 +146,7 @@ export default function AgentDoctorDetailPage() {
           <p className="mt-1 text-sm text-neutral-500">
             {text(doctor.doctorId, '-')}
             {text(doctor.clinicName) ? ` • ${text(doctor.clinicName)}` : ''}
+            {text(doctor.city) ? ` • ${text(doctor.city)}` : ''}
           </p>
         </div>
 
@@ -163,8 +167,8 @@ export default function AgentDoctorDetailPage() {
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <Metric icon={Stethoscope} label="Doctor status" value={label(doctor.status)} loading={query.isLoading} />
+        <Metric icon={ShieldCheck} label="KYC status" value={label(kycStatus)} loading={query.isLoading} />
         <Metric icon={QrCode} label="QR status" value={doctor.qrCodeActive ? 'Active' : 'Not active'} loading={query.isLoading} />
-        <Metric icon={ShieldCheck} label="KYC status" value={label(doctor.kycStatus)} loading={query.isLoading} />
         <Metric icon={Users} label="Patient registrations" value={number(performance.patientRegistrations)} loading={query.isLoading} />
         <Metric icon={UserCheck} label="Paid patients" value={number(performance.paidPatients)} loading={query.isLoading} />
       </div>
@@ -172,34 +176,51 @@ export default function AgentDoctorDetailPage() {
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
         <div className="space-y-6">
           <section className="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm sm:p-6">
-            <h2 className="font-bold text-neutral-900">Doctor & Clinic Information</h2>
+            <h2 className="font-bold text-neutral-900">Doctor Profile & Clinic</h2>
+            <p className="mt-1 text-xs text-neutral-500">Complete Agent-visible doctor onboarding information.</p>
+
             {query.isLoading ? (
               <Skeleton className="mt-4 h-64" />
             ) : (
               <div className="mt-5 grid gap-x-8 gap-y-5 sm:grid-cols-2">
                 <Info label="Doctor ID" value={doctor.doctorId} />
+                <Info label="Doctor name" value={doctor.fullName} />
                 <Info label="Mobile" value={doctor.mobile} />
                 <Info label="Qualification" value={doctor.qualification} />
                 <Info label="Specialization" value={doctor.specialization} />
-                <Info label="Medical registration" value={doctor.medicalRegNumber} />
-                <Info label="Clinic" value={doctor.clinicName} />
+                <Info label="Medical registration number" value={doctor.medicalRegNumber} />
+                <Info label="Clinic name" value={doctor.clinicName} />
                 <Info label="City" value={doctor.city} />
-                <Info label="Rehab program" value={programLabel} />
-                <Info label="Registration date" value={dateText(doctor.registrationDate || doctor.createdAt)} />
-                <Info label="Approval date" value={dateText(doctor.approvalDate)} />
-                <Info label="Referral code" value={doctor.referralCode || doctor.doctorId} />
-                <Info label="KYC status" value={label(doctor.kycStatus)} />
               </div>
             )}
           </section>
 
           <section className="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm sm:p-6">
-            <div>
-              <h2 className="font-bold text-neutral-900">Payment Setup</h2>
-              <p className="mt-1 text-xs text-neutral-500">
-                Patient payment is collected through Razorpay and becomes authoritative only after backend verification.
-              </p>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="font-bold text-neutral-900">Selected Rehab Program</h2>
+                <p className="mt-1 text-xs text-neutral-500">Program selected while onboarding this doctor.</p>
+              </div>
+              {!query.isLoading && <span className="rounded-full bg-primary-50 px-3 py-1 text-xs font-bold text-primary-700">Selected</span>}
             </div>
+
+            {query.isLoading ? (
+              <Skeleton className="mt-4 h-32" />
+            ) : (
+              <div className="mt-5 grid gap-x-8 gap-y-5 sm:grid-cols-2">
+                <Info label="Program" value={programLabel} />
+                <Info label="Program code" value={preferredProgram.programCode} />
+                <Info label="Duration" value={durationText(preferredProgram.durationDays)} />
+                <Info label="Doctor preference" value={text(preferredProgram.name) ? 'Configured' : 'Not configured'} />
+              </div>
+            )}
+          </section>
+
+          <section className="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm sm:p-6">
+            <h2 className="font-bold text-neutral-900">Payment Setup</h2>
+            <p className="mt-1 text-xs text-neutral-500">
+              Patient payment is collected through Razorpay and becomes authoritative only after backend verification.
+            </p>
 
             {query.isLoading ? (
               <Skeleton className="mt-4 h-40" />
@@ -226,22 +247,25 @@ export default function AgentDoctorDetailPage() {
             )}
 
             <div className="mt-5 rounded-lg bg-neutral-50 p-3 text-xs leading-5 text-neutral-600">
-              Successful verified payment automatically drives payment records, patient activation and invoice generation. Agent does not handle manual payment confirmation.
+              Successful verified Razorpay payment automatically creates the payment record, activates the patient program and generates the invoice. Agent does not manually approve payments.
             </div>
           </section>
 
           <section className="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm sm:p-6">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <h2 className="font-bold text-neutral-900">Doctor KYC</h2>
-                <p className="mt-1 text-xs text-neutral-500">
-                  Agent can collect and upload operational KYC documents for the doctor.
-                </p>
+                <h2 className="font-bold text-neutral-900">KYC & Onboarding</h2>
+                <p className="mt-1 text-xs text-neutral-500">Current KYC state and documents the Agent can collect.</p>
               </div>
-              <Status value={text(doctor.kycStatus, 'pending')} />
+              <Status value={kycStatus} />
             </div>
 
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="mt-5 grid gap-x-8 gap-y-5 sm:grid-cols-2">
+              <Info label="KYC status" value={label(kycStatus)} />
+              <Info label="Profile last updated" value={dateText(doctor.updatedAt)} />
+            </div>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
               <KycItem label="Medical Registration" />
               <KycItem label="Identity Proof" />
               <KycItem label="Address Proof" />
@@ -249,8 +273,26 @@ export default function AgentDoctorDetailPage() {
             </div>
 
             <p className="mt-4 text-xs leading-5 text-neutral-500">
-              PAN, cancelled cheque, bank account, payout and wallet information remain protected and are not available in the Agent panel.
+              These are operational KYC items available to the Agent. PAN, bank account, cancelled cheque, payout and wallet information remain protected.
             </p>
+          </section>
+
+          <section className="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm sm:p-6">
+            <h2 className="font-bold text-neutral-900">Account, Referral & Status</h2>
+            {query.isLoading ? (
+              <Skeleton className="mt-4 h-40" />
+            ) : (
+              <div className="mt-5 grid gap-x-8 gap-y-5 sm:grid-cols-2">
+                <Info label="Current status" value={label(doctor.status)} />
+                <Info label="KYC status" value={label(kycStatus)} />
+                <Info label="Registration date" value={dateText(doctor.registrationDate || doctor.createdAt)} />
+                <Info label="Approval date" value={dateText(doctor.approvalDate)} />
+                <Info label="Last updated" value={dateText(doctor.updatedAt)} />
+                <Info label="Referral code" value={doctor.referralCode || doctor.doctorId} />
+                <Info label="QR active" value={doctor.qrCodeActive ? 'Yes' : 'No'} />
+                {statusReason && <Info label="Status reason" value={statusReason} />}
+              </div>
+            )}
           </section>
         </div>
 
@@ -298,9 +340,7 @@ export default function AgentDoctorDetailPage() {
             ) : text(doctor.status) === 'submitted' ? (
               <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
                 <p className="font-semibold">Legacy doctor setup is incomplete.</p>
-                <p className="mt-1 text-xs leading-5">
-                  This doctor was registered before automatic Agent approval was enabled. Complete activation once to create the login, wallet and referral QR.
-                </p>
+                <p className="mt-1 text-xs leading-5">Complete activation once to create the doctor login, wallet and referral QR.</p>
                 <button
                   type="button"
                   onClick={() => completeActivation.mutate()}
@@ -332,9 +372,14 @@ export default function AgentDoctorDetailPage() {
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h2 className="font-bold text-neutral-900">KYC Upload</h2>
-                <p className="mt-1 text-xs text-neutral-500">Upload doctor KYC documents collected during clinic onboarding.</p>
+                <p className="mt-1 text-xs text-neutral-500">Agent can update operational doctor KYC.</p>
               </div>
               <ShieldCheck className="h-5 w-5 text-primary-600" />
+            </div>
+
+            <div className="mt-3 flex items-center justify-between rounded-lg bg-neutral-50 px-3 py-2.5">
+              <span className="text-xs font-semibold text-neutral-500">Current KYC status</span>
+              <Status value={kycStatus} />
             </div>
 
             <select
@@ -398,27 +443,17 @@ export default function AgentDoctorDetailPage() {
       </div>
 
       <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
-        Agent can manage doctor onboarding, QR, operational KYC and basic commercial setup. Doctor banking, PAN, payout, wallet and confidential patient medical information remain protected.
+        Agent can view and manage the complete operational doctor profile, selected rehab program, QR, KYC and onboarding commercial setup. PAN, bank account, payout credentials, wallet balances and confidential patient medical information remain protected.
       </div>
     </div>
   );
 }
 
-function Metric({
-  icon: Icon,
-  label: metricLabel,
-  value,
-  loading,
-}: {
-  icon: React.ElementType;
-  label: string;
-  value: string | number;
-  loading: boolean;
-}) {
+function Metric({ icon: Icon, label: metricLabel, value, loading }: { icon: React.ElementType; label: string; value: string | number; loading: boolean }) {
   return (
     <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
       <Icon className="h-5 w-5 text-primary-600" />
-      {loading ? <Skeleton className="mt-3 h-7 w-24" /> : <p className="mt-3 text-xl font-bold text-neutral-900">{value}</p>}
+      {loading ? <Skeleton className="mt-3 h-7 w-24" /> : <p className="mt-3 text-xl font-bold capitalize text-neutral-900">{value}</p>}
       <p className="mt-1 text-xs text-neutral-500">{metricLabel}</p>
     </div>
   );
@@ -494,6 +529,11 @@ function money(value: unknown) {
 function percentage(value: unknown) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? `${parsed}%` : '-';
+}
+
+function durationText(value: unknown) {
+  const days = numberOrNull(value);
+  return days ? `${days} Days` : '-';
 }
 
 function dateText(value: unknown) {
