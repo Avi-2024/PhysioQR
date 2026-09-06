@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CalendarCheck, CalendarClock, CheckCircle2, Clock3, MapPin, RefreshCw } from 'lucide-react';
+import { CalendarCheck, CalendarClock, CheckCircle2, Clock3, MapPin, RefreshCw, Search } from 'lucide-react';
 import apiClient from '@/lib/api-client';
 import ErrorState from '@/components/feedback/ErrorState';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -8,19 +8,19 @@ import { Modal } from '@/components/ui/Modal';
 import { cn } from '@/lib/cn';
 
 type ApiRecord = Record<string, unknown>;
-type Queue = 'due' | 'upcoming' | 'completed' | 'missed' | 'cancelled';
+type Queue = 'due' | 'upcoming' | 'missed' | 'completed';
 
 const QUEUES: { key: Queue; label: string }[] = [
-  { key: 'due', label: 'Due' },
+  { key: 'due', label: 'Due now' },
   { key: 'upcoming', label: 'Upcoming' },
-  { key: 'completed', label: 'Completed' },
   { key: 'missed', label: 'Missed' },
-  { key: 'cancelled', label: 'Cancelled' },
+  { key: 'completed', label: 'Completed' },
 ];
 
 export default function AgentFollowUpsPage() {
   const queryClient = useQueryClient();
   const [queue, setQueue] = useState<Queue>('due');
+  const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<ApiRecord | null>(null);
 
   const followUpsQuery = useQuery({
@@ -32,6 +32,7 @@ export default function AgentFollowUpsPage() {
         params.due = true;
       } else if (queue === 'upcoming') {
         params.followUpStatus = 'scheduled';
+        params.upcoming = true;
       } else {
         params.followUpStatus = queue;
       }
@@ -40,14 +41,23 @@ export default function AgentFollowUpsPage() {
   });
 
   const allRows = useMemo(() => extractItems(followUpsQuery.data), [followUpsQuery.data]);
-  const now = Date.now();
   const rows = useMemo(() => {
-    if (queue !== 'upcoming') return allRows;
+    const q = search.trim().toLowerCase();
+    if (!q) return allRows;
+
     return allRows.filter((row) => {
-      const dueAt = dateMs(row.followUpDate);
-      return dueAt !== null && dueAt > now;
+      const doctor = asRecord(row.doctor);
+      return [
+        doctor.fullName,
+        row.doctorName,
+        row.clinicName,
+        row.clinicLocation,
+        row.nextAction,
+        row.followUpType,
+        row.followUpCompletedNote,
+      ].some((value) => text(value).toLowerCase().includes(q));
     });
-  }, [allRows, now, queue]);
+  }, [allRows, search]);
 
   const mutation = useMutation({
     mutationFn: async ({ visitId, payload }: { visitId: string; payload: ApiRecord }) => (
@@ -63,25 +73,45 @@ export default function AgentFollowUpsPage() {
     },
   });
 
+  const queueLabel = QUEUES.find((item) => item.key === queue)?.label || queue;
+
   return (
     <div className="space-y-6">
       <header>
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary-600">Relationship management</p>
         <h1 className="mt-1 text-2xl font-bold text-neutral-900 sm:text-3xl">Follow-ups</h1>
-        <p className="mt-1 max-w-3xl text-sm text-neutral-500">Follow-ups created from Clinic Visits appear here automatically with their date, type and next action.</p>
+        <p className="mt-1 max-w-3xl text-sm text-neutral-500">Work the doctor follow-ups that need attention now, then move through upcoming, missed and completed activity.</p>
       </header>
 
       <section className="grid gap-3 sm:grid-cols-3">
-        <SummaryCard icon={CalendarClock} label="Current queue" value={followUpsQuery.isLoading ? null : rows.length} helper={QUEUES.find((item) => item.key === queue)?.label || queue} />
-        <SummaryCard icon={Clock3} label="Due handling" value={queue === 'due' && !followUpsQuery.isLoading ? rows.length : null} helper="Scheduled up to today" />
-        <SummaryCard icon={CheckCircle2} label="Workflow" value={null} helper="Complete, miss, cancel or reschedule" />
+        <SummaryCard icon={CalendarClock} label="Current queue" value={followUpsQuery.isLoading ? null : allRows.length} helper={queueLabel} />
+        <SummaryCard icon={Clock3} label="Priority" value={null} helper={queue === 'due' ? 'Needs action now' : queue === 'missed' ? 'Needs recovery' : queue === 'upcoming' ? 'Planned next' : 'Finished work'} />
+        <SummaryCard icon={CheckCircle2} label="Workflow" value={null} helper="Complete, reschedule, miss or cancel" />
       </section>
 
       <section className="rounded-xl border border-neutral-200 bg-white shadow-sm">
-        <div className="border-b border-neutral-200 p-4 sm:p-5">
+        <div className="space-y-3 border-b border-neutral-200 p-4 sm:p-5">
+          <label className="relative block max-w-xl">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search doctor, clinic, type or next action"
+              className="w-full rounded-lg border border-neutral-300 py-2.5 pl-9 pr-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+            />
+          </label>
+
           <div className="flex flex-wrap gap-2">
             {QUEUES.map((item) => (
-              <button key={item.key} type="button" onClick={() => setQueue(item.key)} className={cn('rounded-full px-3 py-2 text-xs font-semibold transition-colors', queue === item.key ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200')}>
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => setQueue(item.key)}
+                className={cn(
+                  'rounded-full px-3 py-2 text-xs font-semibold transition-colors',
+                  queue === item.key ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200',
+                )}
+              >
                 {item.label}
               </button>
             ))}
@@ -94,8 +124,8 @@ export default function AgentFollowUpsPage() {
           {!followUpsQuery.isLoading && !followUpsQuery.isError && rows.length === 0 && (
             <div className="rounded-lg border border-dashed border-neutral-300 bg-neutral-50 p-8 text-center">
               <CalendarCheck className="mx-auto h-8 w-8 text-neutral-400" />
-              <p className="mt-3 text-sm font-semibold text-neutral-800">No follow-ups in this queue</p>
-              <p className="mt-1 text-xs text-neutral-500">Clinic Visit follow-ups move here automatically.</p>
+              <p className="mt-3 text-sm font-semibold text-neutral-800">No {queueLabel.toLowerCase()} follow-ups</p>
+              <p className="mt-1 text-xs text-neutral-500">{search ? 'Try a different search.' : 'Clinic Visit follow-ups move into the right queue automatically.'}</p>
             </div>
           )}
           {!followUpsQuery.isLoading && rows.length > 0 && (
