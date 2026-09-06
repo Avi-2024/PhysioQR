@@ -4,7 +4,17 @@ const { buildSearchFilter, buildSort, paginateModel } = require('../../utils/que
 const asyncHandler = require('../../utils/asyncHandler');
 
 const QUESTION_TYPES = ['single_choice', 'multiple_choice', 'yes_no', 'pain_scale', 'number', 'text', 'date', 'image'];
+const CHOICE_TYPES = ['single_choice', 'multiple_choice'];
+const RED_FLAG_TYPES = ['single_choice', 'multiple_choice', 'yes_no', 'pain_scale', 'number'];
 const RULE_OPERATORS = ['any_answer', 'equals', 'not_equals', 'includes', 'gte', 'lte', 'between'];
+
+const cleanOption = (option = {}, index = 0) => {
+  const label = String(option.label ?? '').trim();
+  const labelHindi = String(option.labelHindi ?? '').trim();
+  const fallbackValue = label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || `option_${index + 1}`;
+  const value = String(option.value ?? fallbackValue).trim();
+  return { label, labelHindi, value };
+};
 
 const normalizePayload = (body = {}) => {
   const payload = {};
@@ -20,11 +30,48 @@ const normalizePayload = (body = {}) => {
   if (body.displayOrder !== undefined && body.displayOrder !== '') payload.displayOrder = Number(body.displayOrder);
   if (body.redFlagMinValue !== undefined && body.redFlagMinValue !== '') payload.redFlagMinValue = Number(body.redFlagMinValue);
   if (body.redFlagMaxValue !== undefined && body.redFlagMaxValue !== '') payload.redFlagMaxValue = Number(body.redFlagMaxValue);
-  if (Array.isArray(body.options)) payload.options = body.options;
+  if (Array.isArray(body.options)) payload.options = body.options.map(cleanOption);
   if (Array.isArray(body.redFlagAnswerValues)) payload.redFlagAnswerValues = body.redFlagAnswerValues;
   if (body.showIfQuestion !== undefined) payload.showIfQuestion = body.showIfQuestion || null;
   if (body.conditionalLogic !== undefined) payload.conditionalLogic = body.conditionalLogic || undefined;
   return payload;
+};
+
+const validateOptions = (payload, { partial = false } = {}) => {
+  if (!payload.questionType) return null;
+  if (!CHOICE_TYPES.includes(payload.questionType)) return null;
+  if (partial && payload.options === undefined) return null;
+
+  if (!Array.isArray(payload.options) || payload.options.length < 2) return 'Single and multiple choice questions require at least two answer options';
+  if (payload.options.some((option) => !option.label || !option.value)) return 'Every answer option requires an English label';
+
+  const values = payload.options.map((option) => String(option.value).trim().toLowerCase());
+  if (new Set(values).size !== values.length) return 'Answer option values must be unique';
+  return null;
+};
+
+const validateRedFlag = (payload, { partial = false } = {}) => {
+  if (!payload.isRedFlag) return null;
+  if (!payload.questionType && partial) return null;
+  if (!RED_FLAG_TYPES.includes(payload.questionType)) return 'Red flags can only be configured for structured answer types';
+  if (!partial && (!payload.redFlagOperator || payload.redFlagOperator === 'any_answer')) return 'Choose an explicit red-flag trigger instead of any answer';
+  if (!partial && !payload.redFlagSafetyMessage) return 'Safety message is required for a red-flag question';
+
+  const operator = payload.redFlagOperator;
+  const values = Array.isArray(payload.redFlagAnswerValues) ? payload.redFlagAnswerValues : [];
+
+  if (['equals', 'not_equals', 'includes'].includes(operator) && !values.length) return 'Select the answer that should trigger the red flag';
+  if (operator === 'gte' && !Number.isFinite(payload.redFlagMinValue)) return 'Red flag minimum value is required';
+  if (operator === 'lte' && !Number.isFinite(payload.redFlagMaxValue)) return 'Red flag maximum value is required';
+  if (operator === 'between') {
+    if (!Number.isFinite(payload.redFlagMinValue) || !Number.isFinite(payload.redFlagMaxValue)) return 'Red flag minimum and maximum values are required';
+    if (payload.redFlagMinValue > payload.redFlagMaxValue) return 'Red flag minimum cannot exceed maximum';
+  }
+  if (payload.questionType === 'pain_scale') {
+    if (payload.redFlagMinValue !== undefined && (payload.redFlagMinValue < 0 || payload.redFlagMinValue > 10)) return 'Pain-scale red flag minimum must be between 0 and 10';
+    if (payload.redFlagMaxValue !== undefined && (payload.redFlagMaxValue < 0 || payload.redFlagMaxValue > 10)) return 'Pain-scale red flag maximum must be between 0 and 10';
+  }
+  return null;
 };
 
 const validatePayload = async (payload, { partial = false } = {}) => {
@@ -34,9 +81,30 @@ const validatePayload = async (payload, { partial = false } = {}) => {
   if (payload.questionType !== undefined && !QUESTION_TYPES.includes(payload.questionType)) return 'Invalid question type';
   if (payload.redFlagOperator !== undefined && !RULE_OPERATORS.includes(payload.redFlagOperator)) return 'Invalid red flag operator';
   if (payload.displayOrder !== undefined && (!Number.isFinite(payload.displayOrder) || payload.displayOrder < 0)) return 'Display order must be zero or greater';
+
+  const optionError = validateOptions(payload, { partial });
+  if (optionError) return optionError;
+  const redFlagError = validateRedFlag(payload, { partial });
+  if (redFlagError) return redFlagError;
+
   if (payload.redFlagOperator === 'between' && payload.redFlagMinValue !== undefined && payload.redFlagMaxValue !== undefined && payload.redFlagMinValue > payload.redFlagMaxValue) return 'Red flag minimum cannot exceed maximum';
   if (payload.showIfQuestion && !(await AssessmentQuestion.exists({ _id: payload.showIfQuestion, isActive: true }))) return 'Conditional parent question not found or inactive';
   return null;
+};
+
+const applyCreateDefaults = async (payload) => {
+  if (payload.questionType === 'yes_no' && (!Array.isArray(payload.options) || !payload.options.length)) {
+    payload.options = [
+      { label: 'Yes', labelHindi: 'हाँ', value: 'yes' },
+      { label: 'No', labelHindi: 'नहीं', value: 'no' },
+    ];
+  }
+
+  if (payload.displayOrder === undefined) {
+    const lastQuestion = await AssessmentQuestion.findOne().sort({ displayOrder: -1, createdAt: -1 }).select('displayOrder').lean();
+    const currentMax = Number(lastQuestion?.displayOrder || 0);
+    payload.displayOrder = Math.max(10, Math.ceil(currentMax / 10) * 10 + 10);
+  }
 };
 
 const getAssessmentQuestions = asyncHandler(async (req, res) => {
@@ -81,6 +149,7 @@ const getAssessmentQuestionById = asyncHandler(async (req, res) => {
 
 const createAssessmentQuestion = asyncHandler(async (req, res) => {
   const payload = normalizePayload(req.body);
+  await applyCreateDefaults(payload);
   const error = await validatePayload(payload);
   if (error) return res.status(400).json({ message: error });
   const question = await AssessmentQuestion.create(payload);
