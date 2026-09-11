@@ -91,11 +91,12 @@ const getRedFlagDetails = (visibleQuestions, answerMap) => visibleQuestions.redu
   return details;
 }, []);
 
-const questionScopeFilter = ({ bodyRegionId, surgeryTypeId }) => {
+const questionScopeFilter = ({ caseTypeId, bodyRegionId, surgeryTypeId }) => {
   const scopes = [
     { scopeType: 'common' },
     { scopeType: { $exists: false } },
   ];
+  if (caseTypeId) scopes.push({ scopeType: 'case_type', caseType: caseTypeId });
   if (bodyRegionId) scopes.push({ scopeType: 'body_region', bodyRegion: bodyRegionId });
   if (surgeryTypeId) scopes.push({ scopeType: 'surgery_type', surgeryType: surgeryTypeId });
   return { isActive: true, $or: scopes };
@@ -146,10 +147,10 @@ const notifyAssessmentReview = async (assessment, hasRedFlag) => {
 };
 
 // GET /api/assessments/questions
-// Returns common questions plus the selected body-region/surgery-specific layer.
+// Returns common questions plus the selected case/body-region/surgery layers.
 const getCommonQuestions = asyncHandler(async (req, res) => {
-  const { bodyRegionId, surgeryTypeId } = req.query;
-  const questions = await AssessmentQuestion.find(questionScopeFilter({ bodyRegionId, surgeryTypeId }))
+  const { caseTypeId, bodyRegionId, surgeryTypeId } = req.query;
+  const questions = await AssessmentQuestion.find(questionScopeFilter({ caseTypeId, bodyRegionId, surgeryTypeId }))
     .sort({ displayOrder: 1, createdAt: 1 })
     .lean();
   res.json(questions);
@@ -185,6 +186,7 @@ const submitCommonAssessment = asyncHandler(async (req, res) => {
 
   const answerMap = new Map(answers.map((answer) => [answer.question?.toString(), answer]));
   const questions = await AssessmentQuestion.find(questionScopeFilter({
+    caseTypeId: context.caseType._id,
     bodyRegionId: context.bodyRegion._id,
     surgeryTypeId: context.surgeryType?._id,
   })).sort({ displayOrder: 1, createdAt: 1 });
