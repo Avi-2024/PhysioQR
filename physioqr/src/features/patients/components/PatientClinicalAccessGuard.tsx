@@ -1,0 +1,46 @@
+import type { ReactNode } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { AlertTriangle, Clock3, RefreshCw, ShieldCheck } from 'lucide-react';
+import apiClient from '@/lib/api-client';
+
+type OnboardingStatus = {
+  reviewPending?: boolean;
+  reviewBlocked?: boolean;
+  nextAction?: string;
+  assessment?: {
+    reviewType?: string;
+    status?: string;
+    hasRedFlag?: boolean;
+  } | null;
+};
+
+type Props = { children: ReactNode };
+
+export default function PatientClinicalAccessGuard({ children }: Props) {
+  const query = useQuery<OnboardingStatus>({
+    queryKey: ['patient-onboarding-status', 'clinical-access'],
+    queryFn: () => apiClient.get('/patients/me/onboarding-status').then((response) => response.data),
+    staleTime: 15_000,
+    refetchOnMount: true,
+  });
+
+  if (query.isLoading) {
+    return <div className="flex min-h-[55vh] items-center justify-center text-sm font-semibold text-neutral-500">Checking your rehabilitation access…</div>;
+  }
+
+  if (query.isError || !query.data) {
+    return <div className="mx-auto mt-10 max-w-xl rounded-2xl border border-neutral-200 bg-white p-6 text-center"><ShieldCheck className="mx-auto h-9 w-9 text-neutral-400"/><h1 className="mt-3 text-lg font-bold text-neutral-950">We could not verify your clinical access</h1><p className="mt-2 text-sm leading-6 text-neutral-600">For safety, rehabilitation content is temporarily unavailable until your current status can be checked.</p><button type="button" onClick={() => query.refetch()} className="mt-5 inline-flex min-h-10 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white"><RefreshCw className="h-4 w-4"/>Try again</button></div>;
+  }
+
+  const status = query.data;
+  const assessment = status.assessment || null;
+  const reviewPending = Boolean(status.reviewPending || assessment?.status === 'pending_review');
+  const reviewBlocked = Boolean(status.reviewBlocked || assessment?.status === 'blocked');
+
+  if (reviewPending || reviewBlocked) {
+    const isSafetyReview = assessment?.reviewType === 'red_flag' || Boolean(assessment?.hasRedFlag);
+    return <div className="mx-auto max-w-2xl py-8"><section className={`rounded-2xl border bg-white p-6 sm:p-8 ${reviewBlocked ? 'border-rose-200' : 'border-amber-200'}`}><div className={`flex h-12 w-12 items-center justify-center rounded-xl ${reviewBlocked ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700'}`}>{reviewBlocked ? <AlertTriangle className="h-6 w-6"/> : <Clock3 className="h-6 w-6"/>}</div><h1 className="mt-5 text-2xl font-bold tracking-tight text-neutral-950">{reviewBlocked ? 'Rehabilitation access is currently paused' : 'Clinical review is in progress'}</h1><p className="mt-3 text-sm leading-6 text-neutral-600">{reviewBlocked ? 'Your latest assessment requires clinical clearance before rehabilitation exercises or programme content can be accessed.' : isSafetyReview ? 'Your assessment included a safety-sensitive response. A clinician needs to review it before your rehabilitation programme can continue.' : 'Your assessment is waiting for physiotherapy review before a programme can be approved.'}</p><div className="mt-5 rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3"><p className="text-sm font-semibold text-neutral-800">What happens next?</p><p className="mt-1 text-sm leading-6 text-neutral-600">Once the review is cleared, your programme access will become available automatically. Until then, exercise and progress screens remain locked.</p></div><button type="button" onClick={() => query.refetch()} className="mt-5 inline-flex min-h-10 items-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 text-sm font-semibold text-neutral-700"><RefreshCw className="h-4 w-4"/>Check review status</button></section></div>;
+  }
+
+  return <>{children}</>;
+}
