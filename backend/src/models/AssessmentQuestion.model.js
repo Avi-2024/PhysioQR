@@ -9,6 +9,18 @@ const assessmentQuestionSchema = new mongoose.Schema({
     required: true,
   },
   options: [{ label: String, labelHindi: String, value: String }],
+
+  // Existing questions default to common so current production data remains valid.
+  // Admin can scope new questions to a body region or a surgery type without
+  // creating a separate hardcoded frontend form for every pathway.
+  scopeType: {
+    type: String,
+    enum: ['common', 'body_region', 'surgery_type'],
+    default: 'common',
+  },
+  bodyRegion: { type: mongoose.Schema.Types.ObjectId, ref: 'PainCategory' },
+  surgeryType: { type: mongoose.Schema.Types.ObjectId, ref: 'SurgeryType' },
+
   isRedFlag: { type: Boolean, default: false },
   redFlagAnswerValues: [{ type: mongoose.Schema.Types.Mixed }],
   redFlagOperator: {
@@ -22,8 +34,7 @@ const assessmentQuestionSchema = new mongoose.Schema({
   displayOrder: { type: Number, default: 0 },
   isActive: { type: Boolean, default: true },
 
-  // Conditional logic controls when a common-assessment question is visible
-  // after a prior answer. Questions are intentionally not pain-category scoped.
+  // Conditional logic controls when a question becomes visible after a prior answer.
   showIfQuestion: { type: mongoose.Schema.Types.ObjectId, ref: 'AssessmentQuestion' },
   showIfAnswer: String,
   conditionalLogic: {
@@ -38,5 +49,7 @@ const assessmentQuestionSchema = new mongoose.Schema({
     maxValue: Number,
   },
 }, { timestamps: true });
+
+assessmentQuestionSchema.index({ isActive: 1, scopeType: 1, bodyRegion: 1, surgeryType: 1, displayOrder: 1 });
 
 module.exports = mongoose.model('AssessmentQuestion', assessmentQuestionSchema);
