@@ -1,10 +1,15 @@
 const mongoose = require('mongoose');
 const PainCategory = require('../models/PainCategory.model');
+const CaseType = require('../models/CaseType.model');
+const SurgeryType = require('../models/SurgeryType.model');
 const AssessmentQuestion = require('../models/AssessmentQuestion.model');
 const PatientAssessment = require('../models/PatientAssessment.model');
 const notificationService = require('../services/notification.service');
 const { writeAuditLog } = require('../utils/auditLogger');
 const asyncHandler = require('../utils/asyncHandler');
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const ALLOWED_SIDES = ['right', 'left', 'both', 'not_applicable'];
 
 const toComparable = (value) => {
   if (value === undefined || value === null) return '';
@@ -86,29 +91,80 @@ const getRedFlagDetails = (visibleQuestions, answerMap) => visibleQuestions.redu
   return details;
 }, []);
 
-const notifyHighRiskAssessment = async (assessment) => {
+const questionScopeFilter = ({ bodyRegionId, surgeryTypeId }) => {
+  const scopes = [
+    { scopeType: 'common' },
+    { scopeType: { $exists: false } },
+  ];
+  if (bodyRegionId) scopes.push({ scopeType: 'body_region', bodyRegion: bodyRegionId });
+  if (surgeryTypeId) scopes.push({ scopeType: 'surgery_type', surgeryType: surgeryTypeId });
+  return { isActive: true, $or: scopes };
+};
+
+const loadPathwayContext = async ({ caseTypeId, bodyRegionId, surgeryTypeId, surgeryDate, side }, { requireCaseType = true } = {}) => {
+  if (requireCaseType && !caseTypeId) return { error: 'Select what brings you to physiotherapy' };
+  const caseType = caseTypeId
+    ? await CaseType.findOne({ _id: caseTypeId, isActive: true }).lean()
+    : null;
+  if (caseTypeId && !caseType) return { error: 'Selected case type is invalid or inactive' };
+
+  const bodyRegion = bodyRegionId
+    ? await PainCategory.findOne({ _id: bodyRegionId, isActive: true }).select('_id name').lean()
+    : null;
+  if (bodyRegionId && !bodyRegion) return { error: 'Selected body region is invalid or inactive' };
+
+  let surgeryType = null;
+  let parsedSurgeryDate;
+  if (caseType?.requiresSurgeryDetails) {
+    if (!bodyRegion) return { error: 'Select the operated body region' };
+    if (!surgeryTypeId) return { error: 'Select the surgery type' };
+    surgeryType = await SurgeryType.findOne({ _id: surgeryTypeId, bodyRegion: bodyRegion._id, isActive: true }).lean();
+    if (!surgeryType) return { error: 'Selected surgery type is invalid for this body region' };
+    if (!surgeryDate) return { error: 'Surgery date is required' };
+    parsedSurgeryDate = new Date(surgeryDate);
+    if (Number.isNaN(parsedSurgeryDate.getTime())) return { error: 'Enter a valid surgery date' };
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+    if (parsedSurgeryDate > today) return { error: 'Surgery date cannot be in the future' };
+  }
+
+  const normalizedSide = side ? String(side).trim().toLowerCase() : undefined;
+  if (normalizedSide && !ALLOWED_SIDES.includes(normalizedSide)) return { error: 'Invalid side selection' };
+
+  return { caseType, bodyRegion, surgeryType, surgeryDate: parsedSurgeryDate, side: normalizedSide };
+};
+
+const notifyAssessmentReview = async (assessment, hasRedFlag) => {
   await notificationService.createNotification({
     recipientType: 'admin',
-    type: 'high_risk_assessment',
+    type: hasRedFlag ? 'high_risk_assessment' : 'clinical_review_required',
     channel: 'in_app',
-    title: 'High-risk assessment requires review',
-    message: `Assessment ${assessment._id} is pending clinical safety review.`,
+    title: hasRedFlag ? 'High-risk assessment requires review' : 'Clinical assessment requires physiotherapy review',
+    message: `Assessment ${assessment._id} is pending clinical review.`,
+    metadata: { assessmentId: assessment._id, reviewType: assessment.reviewType },
   });
 };
 
-// The assessment is intentionally common. Pain category is selected inside the
-// assessment UI and is stored as assessment context, but it does not select a
-// different question set.
+// GET /api/assessments/questions
+// Returns common questions plus the selected body-region/surgery-specific layer.
 const getCommonQuestions = asyncHandler(async (req, res) => {
-  const questions = await AssessmentQuestion.find({ isActive: true })
-    .select('-painCategory')
+  const { bodyRegionId, surgeryTypeId } = req.query;
+  const questions = await AssessmentQuestion.find(questionScopeFilter({ bodyRegionId, surgeryTypeId }))
     .sort({ displayOrder: 1, createdAt: 1 })
     .lean();
   res.json(questions);
 });
 
 const submitCommonAssessment = asyncHandler(async (req, res) => {
-  const { patientId, painCategoryId, answers } = req.body;
+  const {
+    patientId,
+    caseTypeId,
+    painCategoryId,
+    surgeryTypeId,
+    surgeryDate,
+    side,
+    answers,
+  } = req.body;
 
   if (req.user.role === 'patient' && req.user._id.toString() !== patientId) {
     return res.status(403).json({ message: 'Cannot submit assessment for another patient' });
@@ -117,48 +173,85 @@ const submitCommonAssessment = asyncHandler(async (req, res) => {
     return res.status(400).json({ message: 'answers must be a non-empty array' });
   }
 
-  const painCategory = await PainCategory.findOne({ _id: painCategoryId, isActive: true }).select('_id name').lean();
-  if (!painCategory) return res.status(400).json({ message: 'Select a valid active pain category' });
+  const context = await loadPathwayContext({
+    caseTypeId,
+    bodyRegionId: painCategoryId,
+    surgeryTypeId,
+    surgeryDate,
+    side,
+  });
+  if (context.error) return res.status(400).json({ message: context.error });
+  if (!context.bodyRegion) return res.status(400).json({ message: 'Select a valid active body region' });
 
   const answerMap = new Map(answers.map((answer) => [answer.question?.toString(), answer]));
-  const questions = await AssessmentQuestion.find({ isActive: true }).sort({ displayOrder: 1, createdAt: 1 });
+  const questions = await AssessmentQuestion.find(questionScopeFilter({
+    bodyRegionId: context.bodyRegion._id,
+    surgeryTypeId: context.surgeryType?._id,
+  })).sort({ displayOrder: 1, createdAt: 1 });
+
   const visibleQuestions = questions.filter((question) => isQuestionVisible(question, answerMap));
   const visibleQuestionIds = new Set(visibleQuestions.map((question) => question._id.toString()));
   const invalidAnswer = answers.find((answer) => !visibleQuestionIds.has(answer.question?.toString()));
   if (invalidAnswer) {
     return res.status(400).json({
-      message: 'Submitted answer contains an inactive or hidden question',
+      message: 'Submitted answer contains an inactive, hidden, or unrelated pathway question',
       question: invalidAnswer.question,
     });
   }
 
   const redFlagDetails = getRedFlagDetails(visibleQuestions, answerMap);
   const hasRedFlag = redFlagDetails.length > 0;
+  const requiresPhysioReview = Boolean(context.caseType?.requiresPhysioReview || context.surgeryType?.requiresPhysioReview);
+  const reviewRequired = hasRedFlag || requiresPhysioReview;
+  const postOpDayAtAssessment = context.surgeryDate
+    ? Math.max(0, Math.floor((Date.now() - context.surgeryDate.getTime()) / DAY_MS))
+    : undefined;
+
   const assessment = await PatientAssessment.create({
     patient: patientId,
-    painCategory: painCategory._id,
+    caseType: context.caseType._id,
+    painCategory: context.bodyRegion._id,
+    surgeryType: context.surgeryType?._id,
+    surgeryDate: context.surgeryDate,
+    side: context.side,
+    postOpDayAtAssessment,
+    requiresPhysioReview,
+    reviewType: hasRedFlag ? 'red_flag' : requiresPhysioReview ? 'physio_review' : undefined,
     answers,
     hasRedFlag,
     redFlagDetails,
-    status: hasRedFlag ? 'pending_review' : 'cleared',
+    status: reviewRequired ? 'pending_review' : 'cleared',
   });
 
-  if (hasRedFlag) {
-    await notifyHighRiskAssessment(assessment);
+  if (reviewRequired) {
+    await notifyAssessmentReview(assessment, hasRedFlag);
     await writeAuditLog({
       req,
-      action: 'high_risk_assessment_submitted',
+      action: hasRedFlag ? 'high_risk_assessment_submitted' : 'physio_review_assessment_submitted',
       module: 'PatientAssessment',
       recordId: assessment._id,
-      newValue: { patientId, painCategoryId: painCategory._id, redFlagDetails },
+      newValue: {
+        patientId,
+        caseTypeId: context.caseType._id,
+        painCategoryId: context.bodyRegion._id,
+        surgeryTypeId: context.surgeryType?._id,
+        reviewType: assessment.reviewType,
+        redFlagDetails,
+      },
     });
   }
 
   res.status(201).json({
     assessment,
-    painCategory,
+    caseType: context.caseType,
+    painCategory: context.bodyRegion,
+    surgeryType: context.surgeryType,
     hasRedFlag,
+    requiresPhysioReview,
+    reviewRequired,
     redFlagDetails,
+    postOpDay: postOpDayAtAssessment,
+    postOpWeek: postOpDayAtAssessment === undefined ? undefined : Math.floor(postOpDayAtAssessment / 7) + 1,
   });
 });
 
