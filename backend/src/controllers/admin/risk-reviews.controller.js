@@ -3,16 +3,21 @@ const { writeAuditLog } = require('../../utils/auditLogger');
 const { paginateModel } = require('../../utils/queryHelpers');
 const asyncHandler = require('../../utils/asyncHandler');
 
+const reviewFilter = { $or: [{ hasRedFlag: true }, { requiresPhysioReview: true }] };
+
 const populate = [
   { path: 'patient', select: 'patientId fullName mobile status referringDoctor', populate: { path: 'referringDoctor', select: 'doctorId fullName clinicName' } },
+  { path: 'caseType', select: 'code name requiresSurgeryDetails requiresPhysioReview' },
   { path: 'painCategory', select: 'name' },
+  { path: 'surgeryType', select: 'code name bodyRegion' },
   { path: 'reviewedBy', select: 'email mobile role' },
 ];
 
 const getRiskReviews = asyncHandler(async (req, res) => {
-  const { status = 'pending_review', search } = req.query;
-  const filter = { hasRedFlag: true };
+  const { status = 'pending_review', search, reviewType } = req.query;
+  const filter = { ...reviewFilter };
   if (status && status !== 'all') filter.status = status;
+  if (reviewType && reviewType !== 'all') filter.reviewType = reviewType;
 
   const result = await paginateModel({
     model: PatientAssessment,
@@ -31,26 +36,31 @@ const getRiskReviews = asyncHandler(async (req, res) => {
       item.patient?.mobile,
       item.patient?.referringDoctor?.fullName,
       item.patient?.referringDoctor?.clinicName,
+      item.caseType?.name,
       item.painCategory?.name,
+      item.surgeryType?.name,
+      item.reviewType,
       item.adminReviewNote,
       item.status,
       ...(item.redFlagDetails || []).flatMap((detail) => [detail.questionText, detail.answer, detail.reason]),
     ].filter((value) => value !== undefined && value !== null).some((value) => String(value).toLowerCase().includes(q)));
   }
 
-  const [total, pending, cleared, blocked] = await Promise.all([
+  const [total, pending, cleared, blocked, redFlags, physioReviews] = await Promise.all([
+    PatientAssessment.countDocuments(reviewFilter),
+    PatientAssessment.countDocuments({ ...reviewFilter, status: 'pending_review' }),
+    PatientAssessment.countDocuments({ ...reviewFilter, status: 'cleared' }),
+    PatientAssessment.countDocuments({ ...reviewFilter, status: 'blocked' }),
     PatientAssessment.countDocuments({ hasRedFlag: true }),
-    PatientAssessment.countDocuments({ hasRedFlag: true, status: 'pending_review' }),
-    PatientAssessment.countDocuments({ hasRedFlag: true, status: 'cleared' }),
-    PatientAssessment.countDocuments({ hasRedFlag: true, status: 'blocked' }),
+    PatientAssessment.countDocuments({ requiresPhysioReview: true }),
   ]);
 
-  res.json({ items, meta: result.meta, summary: { total, pending, cleared, blocked } });
+  res.json({ items, meta: result.meta, summary: { total, pending, cleared, blocked, redFlags, physioReviews } });
 });
 
 const getRiskReviewById = asyncHandler(async (req, res) => {
-  const assessment = await PatientAssessment.findOne({ _id: req.params.id, hasRedFlag: true }).populate(populate).lean();
-  if (!assessment) return res.status(404).json({ message: 'Risk review not found' });
+  const assessment = await PatientAssessment.findOne({ _id: req.params.id, ...reviewFilter }).populate(populate).lean();
+  if (!assessment) return res.status(404).json({ message: 'Clinical review not found' });
   res.json(assessment);
 });
 
@@ -63,10 +73,10 @@ const updateRiskReview = asyncHandler(async (req, res) => {
     return res.status(400).json({ message: 'Clinical review note is required' });
   }
 
-  const assessment = await PatientAssessment.findOne({ _id: req.params.id, hasRedFlag: true });
-  if (!assessment) return res.status(404).json({ message: 'Risk review not found' });
+  const assessment = await PatientAssessment.findOne({ _id: req.params.id, ...reviewFilter });
+  if (!assessment) return res.status(404).json({ message: 'Clinical review not found' });
   if (assessment.status !== 'pending_review') {
-    return res.status(409).json({ message: 'Only pending risk reviews can receive a clinical decision' });
+    return res.status(409).json({ message: 'Only pending clinical reviews can receive a decision' });
   }
 
   const previousValue = { status: assessment.status, adminReviewNote: assessment.adminReviewNote, reviewedBy: assessment.reviewedBy, reviewedAt: assessment.reviewedAt };
@@ -76,9 +86,12 @@ const updateRiskReview = asyncHandler(async (req, res) => {
   assessment.reviewedAt = new Date();
   await assessment.save();
 
+  const isRedFlagReview = assessment.reviewType === 'red_flag' || assessment.hasRedFlag;
   await writeAuditLog({
     req,
-    action: status === 'cleared' ? 'assessment_red_flag_cleared' : 'assessment_red_flag_blocked',
+    action: status === 'cleared'
+      ? isRedFlagReview ? 'assessment_red_flag_cleared' : 'assessment_physio_review_cleared'
+      : isRedFlagReview ? 'assessment_red_flag_blocked' : 'assessment_physio_review_blocked',
     module: 'PatientAssessment',
     recordId: assessment._id,
     previousValue,
