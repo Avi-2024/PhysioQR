@@ -12,6 +12,7 @@ const {
   getMyProgress,
   getMyPayments,
 } = require('../controllers/patient.controller');
+const { getClinicalAccess } = require('../controllers/patient-clinical-access.controller');
 
 router.post('/register', validateSchema({
   body: {
@@ -29,6 +30,7 @@ router.use(protect);
 router.use(authorize('patient'));
 router.post('/consent', recordConsent);
 router.get('/me/onboarding-status', getOnboardingStatus);
+router.get('/me/clinical-access', getClinicalAccess);
 router.get('/me/onboarding-quote', getOnboardingQuote);
 router.get('/me/program', getMyProgram);
 router.get('/me/progress', getMyProgress);
