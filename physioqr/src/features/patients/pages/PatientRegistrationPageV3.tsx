@@ -1,0 +1,237 @@
+import React, { useMemo, useState } from 'react';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { AlertTriangle, Check, ChevronDown, ChevronLeft, ChevronRight, Clock3, ShieldCheck } from 'lucide-react';
+import apiClient from '@/lib/api-client';
+import { cn } from '@/lib/cn';
+import { formatCurrency } from '@/lib/formatters';
+import { useAuthStore } from '@/stores/auth.store';
+import type { AuthUser } from '@/types';
+
+type ApiRecord = Record<string, unknown>;
+type CaseType = { _id:string; code:string; name:string; description?:string; requiresSurgeryDetails:boolean; requiresPhysioReview:boolean };
+type BodyRegion = { _id:string; name:string; description?:string };
+type SurgeryType = { _id:string; code:string; name:string; description?:string; requiresPhysioReview:boolean };
+
+type PathwayPayload = { caseTypes:CaseType[]; bodyRegions:BodyRegion[] };
+
+const STEPS = [
+  { id:1, label:'Details' },
+  { id:2, label:'Verify' },
+  { id:3, label:'Consent' },
+  { id:4, label:'Assessment' },
+  { id:5, label:'Programme' },
+  { id:6, label:'Payment' },
+];
+
+const basicSchema = z.object({
+  fullName:z.string().min(2, 'Enter your full name'),
+  email:z.string().email('Enter a valid email').optional().or(z.literal('')),
+  age:z.coerce.number().min(5, 'Age must be at least 5').max(110, 'Enter a valid age'),
+  gender:z.enum(['male','female','other']),
+  city:z.string().optional(),
+});
+const otpSchema = z.object({ mobile:z.string().regex(/^[6-9]\d{9}$/, 'Enter a valid 10-digit mobile number'), otp:z.string().min(4, 'Enter the OTP').max(10, 'OTP is too long') });
+type BasicForm = z.infer<typeof basicSchema>;
+type OtpForm = z.infer<typeof otpSchema>;
+
+declare global { interface Window { Razorpay?: new (options:Record<string,unknown>) => { open:()=>void } } }
+
+export default function PatientRegistrationPageV3() {
+  const [searchParams] = useSearchParams();
+  const doctorCode = searchParams.get('doctor') || '';
+  const scanId = searchParams.get('scanId') || '';
+  const navigate = useNavigate();
+  const { login } = useAuthStore();
+
+  const [step, setStep] = useState(1);
+  const [patient, setPatient] = useState<ApiRecord>({});
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpVerified, setOtpVerified] = useState(false);
+  const [consentAccepted, setConsentAccepted] = useState(false);
+  const [caseTypeId, setCaseTypeId] = useState('');
+  const [bodyRegionId, setBodyRegionId] = useState('');
+  const [surgeryTypeId, setSurgeryTypeId] = useState('');
+  const [surgeryDate, setSurgeryDate] = useState('');
+  const [side, setSide] = useState<'right'|'left'|'both'|'not_applicable'>('not_applicable');
+  const [assessment, setAssessment] = useState<Record<string,unknown>>({});
+  const [assessmentResult, setAssessmentResult] = useState<ApiRecord | null>(null);
+  const [error, setError] = useState('');
+  const [resumeNotice, setResumeNotice] = useState('');
+
+  const basicForm = useForm<BasicForm>({ resolver:zodResolver(basicSchema) });
+  const otpForm = useForm<OtpForm>({ resolver:zodResolver(otpSchema) });
+
+  const pathwaysQuery = useQuery<PathwayPayload>({
+    queryKey:['assessment-pathways'],
+    enabled:step >= 4,
+    queryFn:async() => (await apiClient.get('/assessments/pathways')).data,
+  });
+  const caseTypes = pathwaysQuery.data?.caseTypes || [];
+  const bodyRegions = pathwaysQuery.data?.bodyRegions || [];
+  const selectedCaseType = caseTypes.find((item) => item._id === caseTypeId);
+
+  const surgeryQuery = useQuery<{items:SurgeryType[]}>({
+    queryKey:['assessment-surgery-types', bodyRegionId],
+    enabled:step >= 4 && Boolean(selectedCaseType?.requiresSurgeryDetails && bodyRegionId),
+    queryFn:async() => (await apiClient.get('/assessments/surgery-types', { params:{ bodyRegionId } })).data,
+  });
+  const surgeryTypes = surgeryQuery.data?.items || [];
+
+  const pathwayReady = Boolean(caseTypeId && bodyRegionId && (!selectedCaseType?.requiresSurgeryDetails || (surgeryTypeId && surgeryDate)));
+  const questionsQuery = useQuery({
+    queryKey:['assessment-questions', 'pathway', bodyRegionId, surgeryTypeId],
+    enabled:step >= 4 && pathwayReady,
+    queryFn:async() => (await apiClient.get('/assessments/questions', { params:{ bodyRegionId, surgeryTypeId:surgeryTypeId || undefined } })).data,
+  });
+  const questions = extractItems(questionsQuery.data);
+
+  const assessmentReviewRequired = Boolean(assessmentResult?.reviewRequired || assessmentResult?.requiresPhysioReview || assessmentResult?.hasRedFlag);
+  const assessmentBlocked = text(asRecord(assessmentResult?.assessment).status) === 'blocked';
+  const postOpDay = assessmentResult?.postOpDay === undefined ? null : Number(assessmentResult.postOpDay);
+
+  const quoteQuery = useQuery({
+    queryKey:['patient-onboarding-quote', bodyRegionId, text(asRecord(assessmentResult?.assessment)._id)],
+    enabled:step >= 5 && Boolean(bodyRegionId) && otpVerified && Boolean(assessmentResult) && !assessmentReviewRequired && !assessmentBlocked,
+    queryFn:async() => (await apiClient.get('/patients/me/onboarding-quote', { params:{ painCategoryId:bodyRegionId } })).data,
+  });
+  const quote = asRecord(quoteQuery.data);
+  const quoteProgram = asRecord(quote.program);
+  const quoteDoctor = asRecord(quote.doctor);
+  const pricing = asRecord(quote.pricing);
+  const payable = Number(pricing.finalAmount || 0);
+
+  const registerMutation = useMutation({ mutationFn:async(data:BasicForm & {mobile:string}) => apiClient.post('/patients/register', { doctorCode, scanId:scanId || undefined, fullName:data.fullName, mobile:data.mobile, email:data.email || undefined, age:data.age, gender:data.gender, city:data.city || undefined }), onSuccess:(response)=>setPatient(asRecord(asRecord(response.data).patient)) });
+  const sendOtpMutation = useMutation({ mutationFn:async(mobile:string)=>apiClient.post('/auth/send-otp',{mobile,purpose:'registration'}), onSuccess:()=>setOtpSent(true) });
+  const verifyOtpMutation = useMutation({ mutationFn:async(values:OtpForm)=>apiClient.post('/auth/verify-otp',{mobile:values.mobile,otp:values.otp,purpose:'registration'}) });
+  const consentMutation = useMutation({ mutationFn:async()=>apiClient.post('/patients/consent',{termsAccepted:true,privacyAccepted:true,medicalDisclaimerAccepted:true,exerciseConsentAccepted:true,reminderConsentAccepted:true,selectedLanguage:'en'}), onSuccess:()=>{setConsentAccepted(true);nextStep();} });
+  const assessmentMutation = useMutation({
+    mutationFn:async()=>apiClient.post('/assessments/submit',{
+      patientId:text(patient.id || patient._id), caseTypeId, painCategoryId:bodyRegionId,
+      surgeryTypeId:selectedCaseType?.requiresSurgeryDetails ? surgeryTypeId : undefined,
+      surgeryDate:selectedCaseType?.requiresSurgeryDetails ? surgeryDate : undefined,
+      side,
+      answers:buildAssessmentAnswers(questions, assessment),
+    }),
+    onSuccess:(response)=>{ setAssessmentResult(asRecord(response.data)); setError(''); nextStep(); },
+  });
+  const paymentMutation = useMutation({
+    mutationFn:async()=>{
+      const orderResponse = await apiClient.post('/payments/create-order',{patientId:text(patient.id||patient._id),programId:text(quoteProgram.id),doctorId:text(quoteDoctor.id),idempotencyKey:`patient-${text(patient.id||patient._id)}-${text(quoteProgram.id)}-${Date.now()}`});
+      const order = asRecord(orderResponse.data);
+      if (order.key) { await loadRazorpayScript(); return openRazorpayCheckout({order,patient,onVerify:verifyGatewayPayment}); }
+      return verifyGatewayPayment({razorpay_order_id:text(order.orderId),razorpay_payment_id:`pay_mock_${Date.now()}`,razorpay_signature:'mock_signature'});
+    },
+    onSuccess:()=>navigate('/payment-success'), onError:()=>navigate('/payment-failed'),
+  });
+
+  const nextStep = () => setStep((current)=>Math.min(current+1,6));
+  const prevStep = () => setStep((current)=>Math.max(current-1,1));
+  const patientId = text(patient.id || patient._id);
+
+  const startPatientSession = (payload:ApiRecord) => {
+    const patientPayload = asRecord(payload.patient); const token = text(payload.accessToken || payload.token);
+    if (!token || !patientPayload.id) throw new Error('OTP verified, but the patient account could not be started. Please try again.');
+    const authUser:AuthUser = { id:text(patientPayload.id), name:text(patientPayload.fullName,'Patient'), email:text(patientPayload.email), mobile:text(patientPayload.mobile), role:'patient' };
+    login(authUser, token); setPatient(patientPayload); setOtpVerified(true);
+  };
+
+  const resumeExistingOnboarding = async() => {
+    const response = await apiClient.get('/patients/me/onboarding-status'); const status = asRecord(response.data); const savedPatient = asRecord(status.patient);
+    if (savedPatient.id) setPatient(savedPatient);
+    const nextAction = text(status.nextAction); if (nextAction === 'dashboard') return navigate('/patient/dashboard');
+    const savedAssessment = asRecord(status.assessment);
+    const savedCase = asRecord(savedAssessment.caseType); const savedRegion = asRecord(savedAssessment.painCategory); const savedSurgery = asRecord(savedAssessment.surgeryType);
+    if (savedCase._id || savedCase.id) setCaseTypeId(text(savedCase._id || savedCase.id));
+    if (savedRegion._id || savedRegion.id) setBodyRegionId(text(savedRegion._id || savedRegion.id));
+    if (savedSurgery._id || savedSurgery.id) setSurgeryTypeId(text(savedSurgery._id || savedSurgery.id));
+    if (savedAssessment.surgeryDate) setSurgeryDate(text(savedAssessment.surgeryDate).slice(0,10));
+    if (savedAssessment.side) setSide(text(savedAssessment.side) as typeof side);
+    if (Boolean(status.assessmentCompleted)) setAssessmentResult({ assessment:savedAssessment, hasRedFlag:Boolean(savedAssessment.hasRedFlag), requiresPhysioReview:Boolean(savedAssessment.requiresPhysioReview), reviewRequired:Boolean(status.reviewPending) });
+    setConsentAccepted(Boolean(status.consentCompleted));
+    setResumeNotice('Your existing PhysioQR registration has been restored.');
+    setStep(Math.min(6,Math.max(3,Number(status.nextStep || 3))));
+  };
+
+  const handleSendOtp = async() => { setError(''); if (!(await otpForm.trigger('mobile'))) return; await sendOtpMutation.mutateAsync(otpForm.getValues('mobile')); };
+  const handleVerifyOtp = async() => {
+    setError(''); if (!(await otpForm.trigger(['mobile','otp']))) return;
+    const mobile = otpForm.getValues('mobile'); const basicValues = basicForm.getValues(); let existingPatient = false;
+    if (!patientId) {
+      try { await registerMutation.mutateAsync({...basicValues,mobile}); }
+      catch(registrationError) { const response=asRecord(asRecord(registrationError).response); const data=asRecord(response.data); if(Number(response.status)===409 && text(data.code)==='PATIENT_ALREADY_REGISTERED'){existingPatient=true;registerMutation.reset();} else throw registrationError; }
+    }
+    const verifyResponse = await verifyOtpMutation.mutateAsync(otpForm.getValues()); const verifyData = asRecord(verifyResponse.data);
+    if (!Boolean(verifyData.registered)) return setError('OTP verified, but no patient account was found. Please restart registration.');
+    startPatientSession(verifyData); if (existingPatient) await resumeExistingOnboarding();
+  };
+
+  const resetPathAfterCase = (id:string) => { setCaseTypeId(id); setBodyRegionId(''); setSurgeryTypeId(''); setSurgeryDate(''); setSide('not_applicable'); setAssessment({}); setAssessmentResult(null); setError(''); };
+  const resetPathAfterRegion = (id:string) => { setBodyRegionId(id); setSurgeryTypeId(''); setSurgeryDate(''); setAssessment({}); setAssessmentResult(null); setError(''); };
+
+  const handleAssessmentSubmit = async() => {
+    setError('');
+    if (!caseTypeId) return setError('Please select what brings you to physiotherapy.');
+    if (!bodyRegionId) return setError(selectedCaseType?.requiresSurgeryDetails ? 'Please select the operated body region.' : 'Please select your body region.');
+    if (selectedCaseType?.requiresSurgeryDetails && !surgeryTypeId) return setError('Please select the surgery type.');
+    if (selectedCaseType?.requiresSurgeryDetails && !surgeryDate) return setError('Please enter the surgery date.');
+    if (!questions.length) return setError('Assessment questions are not configured for this pathway yet. Please contact support.');
+    if (!buildAssessmentAnswers(questions,assessment).length) return setError('Please answer the assessment questions before submitting.');
+    await assessmentMutation.mutateAsync();
+  };
+
+  const verifyGatewayPayment = async(payload:{razorpay_order_id:string;razorpay_payment_id:string;razorpay_signature:string}) => { await apiClient.post('/payments/verify',payload); };
+  const requestError = error || mutationError(sendOtpMutation.error || verifyOtpMutation.error || consentMutation.error || assessmentMutation.error || quoteQuery.error || paymentMutation.error || pathwaysQuery.error || surgeryQuery.error || questionsQuery.error);
+
+  return <div className="min-h-screen bg-neutral-50 px-3 py-5 sm:px-4 sm:py-8"><div className="mx-auto max-w-3xl">
+    <header className="mb-5 flex items-center justify-between gap-3 border-b border-neutral-200 bg-white px-4 py-3 sm:px-5"><div className="flex min-w-0 items-center gap-3"><img src="/PhysioQR.png" alt="PhysioQR" className="h-10 w-auto shrink-0 object-contain"/><div className="min-w-0"><h1 className="font-bold text-neutral-950">Patient Registration</h1><p className="truncate text-xs text-neutral-500">{doctorCode?`Referred by doctor ${doctorCode}`:'Secure patient onboarding'}</p></div></div><span className="hidden text-xs font-semibold text-primary-700 sm:inline">Step {step} of 6</span></header>
+    <main className="bg-white"><div className="border-b border-neutral-100 px-4 pt-5 sm:px-7"><StepIndicator step={step}/></div><div className="p-4 sm:p-7">
+      {resumeNotice && <div className="mb-5 border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">{resumeNotice}</div>}
+      {requestError && <div className="mb-5 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{requestError}</div>}
+
+      {step===1 && <form onSubmit={basicForm.handleSubmit(()=>nextStep())} className="space-y-5"><SectionTitle title="Tell us about yourself" description="We only need a few details to create your patient profile."/><Field label="Full name" error={basicForm.formState.errors.fullName?.message}><input {...basicForm.register('fullName')} className={inputClass} placeholder="e.g. Ramesh Kumar"/></Field><div className="grid gap-4 sm:grid-cols-2"><Field label="Email" error={basicForm.formState.errors.email?.message}><input {...basicForm.register('email')} type="email" className={inputClass}/></Field><Field label="Age" error={basicForm.formState.errors.age?.message}><input {...basicForm.register('age')} type="number" className={inputClass}/></Field><Field label="City"><input {...basicForm.register('city')} className={inputClass}/></Field><Field label="Gender" error={basicForm.formState.errors.gender?.message}><select {...basicForm.register('gender')} defaultValue="" className={inputClass}><option value="" disabled>Select gender</option><option value="male">Male</option><option value="female">Female</option><option value="other">Other</option></select></Field></div><PrimaryButton type="submit">Continue to mobile verification</PrimaryButton></form>}
+
+      {step===2 && <div className="space-y-5"><SectionTitle title="Verify your mobile number" description="Existing patients sign in with OTP and resume their saved journey."/><Field label="Mobile number" error={otpForm.formState.errors.mobile?.message}><div className="flex flex-col gap-2 sm:flex-row"><input {...otpForm.register('mobile')} type="tel" inputMode="numeric" className={inputClass}/><button onClick={handleSendOtp} type="button" disabled={sendOtpMutation.isPending} className={secondaryButton}>{sendOtpMutation.isPending?'Sending...':otpSent?'Resend OTP':'Send OTP'}</button></div></Field>{otpSent && <Field label="Enter OTP" error={otpForm.formState.errors.otp?.message}><div className="flex flex-col gap-2 sm:flex-row"><input {...otpForm.register('otp')} inputMode="numeric" className={inputClass}/><button onClick={handleVerifyOtp} type="button" disabled={verifyOtpMutation.isPending||registerMutation.isPending} className={primaryInline}>{verifyOtpMutation.isPending||registerMutation.isPending?'Checking...':'Verify OTP'}</button></div></Field>}{otpVerified&&<SuccessBox>Mobile number verified successfully.</SuccessBox>}<NavButtons onBack={prevStep} onNext={nextStep} nextDisabled={!otpVerified}/></div>}
+
+      {step===3 && <div className="space-y-5"><SectionTitle title="Consent & medical disclaimer" description="Please review this information before starting your assessment."/><div className="space-y-3 border-y border-neutral-200 py-4 text-sm leading-6 text-neutral-600"><p><strong className="text-neutral-900">Medical disclaimer:</strong> This programme is not emergency medical care. Stop and seek appropriate care for severe or worsening symptoms.</p><p><strong className="text-neutral-900">Programme consent:</strong> You confirm that the information you provide is accurate.</p></div><label className="flex cursor-pointer items-start gap-3 text-sm text-neutral-700"><input type="checkbox" checked={consentAccepted} onChange={(e)=>setConsentAccepted(e.target.checked)} className="mt-0.5 h-5 w-5 rounded text-primary-600"/><span>I accept the terms, privacy policy, medical disclaimer, and exercise programme consent.</span></label><NavButtons onBack={prevStep} onNext={()=>consentMutation.mutate()} nextDisabled={!consentAccepted||consentMutation.isPending} nextLabel={consentMutation.isPending?'Saving...':'Accept & Continue'}/></div>}
+
+      {step===4 && <div className="space-y-6"><SectionTitle title="Health assessment" description="PhysioQR will show only the questions relevant to your case."/>
+        <AssessmentSection title="1. What brings you to physiotherapy?"><div className="grid gap-3 sm:grid-cols-2">{caseTypes.map((item)=><button type="button" key={item._id} onClick={()=>resetPathAfterCase(item._id)} className={cn('rounded-xl border p-4 text-left transition',caseTypeId===item._id?'border-primary-500 bg-primary-50 ring-2 ring-primary-100':'border-neutral-200 bg-white hover:border-primary-200')}><div className="font-semibold text-neutral-950">{item.name}</div>{item.description&&<div className="mt-1 text-xs leading-5 text-neutral-500">{item.description}</div>}{item.requiresPhysioReview&&<div className="mt-2 text-xs font-semibold text-amber-700">Clinical review before programme</div>}</button>)}</div>{!pathwaysQuery.isLoading&&!caseTypes.length&&<EmptyConfig text="No active case types are configured."/>}</AssessmentSection>
+        {caseTypeId&&<AssessmentSection title={`2. ${selectedCaseType?.requiresSurgeryDetails?'Which body region was operated on?':'Where is your problem?'}`}><div className="relative"><select value={bodyRegionId} onChange={(e)=>resetPathAfterRegion(e.target.value)} className={cn(inputClass,'appearance-none pr-10')}><option value="">Select body region</option>{bodyRegions.map((item)=><option key={item._id} value={item._id}>{item.name}</option>)}</select><ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400"/></div></AssessmentSection>}
+        {selectedCaseType?.requiresSurgeryDetails&&bodyRegionId&&<AssessmentSection title="3. Surgery details"><div className="grid gap-4 sm:grid-cols-2"><Field label="What surgery did you have?"><select value={surgeryTypeId} onChange={(e)=>{setSurgeryTypeId(e.target.value);setAssessment({});}} className={inputClass}><option value="">Select surgery</option>{surgeryTypes.map((item)=><option key={item._id} value={item._id}>{item.name}</option>)}</select></Field><Field label="Surgery date"><input type="date" max={new Date().toISOString().slice(0,10)} value={surgeryDate} onChange={(e)=>setSurgeryDate(e.target.value)} className={inputClass}/></Field><Field label="Side"><select value={side} onChange={(e)=>setSide(e.target.value as typeof side)} className={inputClass}><option value="not_applicable">Not applicable</option><option value="right">Right</option><option value="left">Left</option><option value="both">Both</option></select></Field></div>{surgeryQuery.isSuccess&&!surgeryTypes.length&&<EmptyConfig text="No active surgery types are configured for this body region."/>}</AssessmentSection>}
+        {pathwayReady&&<AssessmentSection title={`${selectedCaseType?.requiresSurgeryDetails?'4':'3'}. Assessment questions`}><p className="mb-4 text-sm text-neutral-500">Common questions are combined with the questions configured for your selected body region{selectedCaseType?.requiresSurgeryDetails?' and surgery type':''}.</p>{questionsQuery.isLoading?<p className="text-sm text-neutral-500">Loading assessment questions...</p>:!questions.length?<EmptyConfig text="No assessment questions are configured for this pathway."/>:<div className="divide-y divide-neutral-200">{questions.map((question,index)=><QuestionInput key={text(question._id||question.id)} index={index} question={question} value={assessment[text(question._id||question.id)]} onChange={(value)=>setAssessment((current)=>({...current,[text(question._id||question.id)]:value}))}/>)}</div>}</AssessmentSection>}
+        <NavButtons onBack={prevStep} onNext={handleAssessmentSubmit} nextDisabled={!pathwayReady||!questions.length||assessmentMutation.isPending} nextLabel={assessmentMutation.isPending?'Submitting...':'Submit Assessment'}/>
+      </div>}
+
+      {step===5 && <div className="space-y-5">{assessmentReviewRequired ? <div className="rounded-xl border border-amber-200 bg-amber-50 p-6 text-center"><Clock3 className="mx-auto h-11 w-11 text-amber-600"/><h2 className="mt-3 text-lg font-bold text-amber-950">Clinical review required</h2><p className="mt-2 text-sm leading-6 text-amber-800">{Boolean(assessmentResult?.hasRedFlag)?'Your answers include a safety-sensitive response that must be reviewed before rehabilitation starts.':'This pathway requires physiotherapy review before a programme can be assigned.'}</p>{postOpDay!==null&&<p className="mt-2 text-sm font-semibold text-amber-900">Post-op day {postOpDay} · Week {Math.floor(postOpDay/7)+1}</p>}<div className="mt-4 inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-amber-800"><ShieldCheck className="h-4 w-4"/>Programme and payment are locked until review is cleared</div><button type="button" onClick={()=>navigate('/')} className="mt-6 block w-full rounded-lg border border-amber-300 bg-white px-4 py-3 text-sm font-semibold text-amber-900">Return home</button></div> : <><SectionTitle title="Your assigned programme" description="Programme selection uses your cleared assessment and selected body region."/><div className="border-y border-neutral-200 py-5">{quoteQuery.isLoading?<p className="text-sm text-primary-700">Loading programme and price...</p>:<div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div className="min-w-0"><h3 className="font-bold text-neutral-950">{text(quoteProgram.name,'Programme not configured')}</h3><p className="mt-1 text-sm text-neutral-600">{text(quoteProgram.description,'Doctor-guided rehabilitation programme')}</p><div className="mt-3 flex flex-wrap gap-2"><Badge>{text(quoteProgram.durationDays,'-')} days</Badge><Badge>{labelize(quoteProgram.difficultyLevel||'beginner')}</Badge><Badge>{text(quoteDoctor.fullName,'Doctor')}</Badge></div></div><div className="shrink-0 sm:text-right"><p className="text-2xl font-bold text-primary-700">{formatCurrency(payable)}</p><p className="text-xs text-neutral-500">Payable amount</p></div></div>}</div><NavButtons onBack={prevStep} onNext={nextStep} nextDisabled={!quoteProgram.id||quoteQuery.isLoading} nextLabel="Proceed to Payment"/></>}</div>}
+
+      {step===6&&<div className="space-y-5"><SectionTitle title="Complete payment" description="Secure Razorpay payment activates your cleared rehabilitation programme."/><div className="space-y-3 border-y border-neutral-200 py-4"><AmountRow label="Programme Fee" value={Number(pricing.originalAmount||payable)}/><AmountRow label="Discount" value={-Number(pricing.discountAmount||0)}/><div className="h-px bg-neutral-200"/><AmountRow label="Total Payable" value={payable} strong/></div><NavButtons onBack={prevStep} onNext={()=>paymentMutation.mutate()} nextDisabled={paymentMutation.isPending||!payable} nextLabel={paymentMutation.isPending?'Processing...':`Pay ${formatCurrency(payable)} & Activate`}/></div>}
+    </div></main>
+  </div></div>;
+}
+
+function AssessmentSection({title,children}:{title:string;children:React.ReactNode}){return <section className="rounded-xl border border-neutral-200 bg-white p-4 sm:p-5"><h3 className="mb-3 text-sm font-bold text-neutral-950">{title}</h3>{children}</section>}
+function SectionTitle({title,description}:{title:string;description:string}){return <div><h2 className="text-xl font-bold tracking-tight text-neutral-950">{title}</h2><p className="mt-1 text-sm leading-6 text-neutral-500">{description}</p></div>}
+function StepIndicator({step}:{step:number}){return <div className="mb-5 overflow-x-auto pb-1"><div className="flex min-w-max items-center">{STEPS.map((item,index)=><React.Fragment key={item.id}><div className="flex items-center gap-2"><div className={cn('flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold',step>item.id&&'bg-emerald-600 text-white',step===item.id&&'bg-primary-600 text-white',step<item.id&&'bg-neutral-100 text-neutral-400')}>{step>item.id?<Check className="h-4 w-4"/>:item.id}</div><span className={cn('text-xs font-semibold',step===item.id?'text-primary-700':step>item.id?'text-neutral-600':'text-neutral-400')}>{item.label}</span></div>{index<STEPS.length-1&&<div className={cn('mx-3 h-px w-7 sm:w-10',step>item.id?'bg-emerald-300':'bg-neutral-200')}/>}</React.Fragment>)}</div></div>}
+function QuestionInput({question,value,onChange,index}:{question:ApiRecord;value:unknown;onChange:(value:unknown)=>void;index:number}){const type=text(question.questionType,'text');const options=Array.isArray(question.options)?(question.options as unknown[]).map(asRecord):[];const questionText=text(question.questionText,`Question ${index+1}`);return <div className="py-5 first:pt-0 last:pb-0"><label className="block text-sm font-semibold leading-6 text-neutral-900">{index+1}. {questionText}</label><div className="mt-2.5">{type==='pain_scale'?<div><div className="mb-2 flex justify-between text-xs text-neutral-500"><span>No pain</span><span>Worst pain</span></div><input type="range" min="0" max="10" step="1" value={Number(value??0)} onChange={(e)=>onChange(Number(e.target.value))} className="w-full accent-primary-600"/><p className="mt-1 text-sm font-semibold text-primary-700">Pain level: {Number(value??0)}/10</p></div>:type==='number'?<input type="number" value={text(value)} onChange={(e)=>onChange(e.target.value===''?'':Number(e.target.value))} className={inputClass}/>:type==='date'?<input type="date" value={text(value)} onChange={(e)=>onChange(e.target.value)} className={inputClass}/>:type==='yes_no'?<div className="flex gap-3">{['yes','no'].map((option)=><button key={option} type="button" onClick={()=>onChange(option)} className={cn('min-h-11 min-w-24 rounded-lg border px-5 text-sm font-semibold capitalize',value===option?'border-primary-600 bg-primary-600 text-white':'border-neutral-300 bg-white text-neutral-700')}>{option}</button>)}</div>:type==='single_choice'?<div className="relative"><select value={text(value)} onChange={(e)=>onChange(e.target.value)} className={cn(inputClass,'appearance-none pr-10')}><option value="">Select an answer</option>{options.map((option,optionIndex)=>{const optionValue=text(option.value||option.label);return <option key={`${optionValue}-${optionIndex}`} value={optionValue}>{text(option.label||option.value)}</option>})}</select><ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400"/></div>:type==='multiple_choice'?<div className="space-y-2">{options.map((option,optionIndex)=>{const optionValue=text(option.value||option.label);const current=Array.isArray(value)?value.map(String):[];return <label key={`${optionValue}-${optionIndex}`} className="flex cursor-pointer items-center gap-2 text-sm text-neutral-700"><input type="checkbox" checked={current.includes(optionValue)} onChange={(e)=>onChange(e.target.checked?[...current,optionValue]:current.filter((item)=>item!==optionValue))} className="h-4 w-4 rounded text-primary-600"/>{text(option.label||option.value)}</label>})}</div>:<textarea value={text(value)} onChange={(e)=>onChange(e.target.value)} className={cn(inputClass,'min-h-24 resize-y')} placeholder="Type your answer here"/>}</div></div>}
+function buildAssessmentAnswers(questions:ApiRecord[],answers:Record<string,unknown>){return questions.map((question)=>({question:text(question._id||question.id),answer:answers[text(question._id||question.id)]})).filter((item)=>item.answer!==undefined&&item.answer!==''&&(!Array.isArray(item.answer)||item.answer.length>0))}
+function loadRazorpayScript(){return new Promise<void>((resolve,reject)=>{if(window.Razorpay)return resolve();const existing=document.querySelector<HTMLScriptElement>('script[src="https://checkout.razorpay.com/v1/checkout.js"]');if(existing){existing.addEventListener('load',()=>resolve(),{once:true});existing.addEventListener('error',()=>reject(new Error('Unable to load Razorpay checkout.')),{once:true});return;}const script=document.createElement('script');script.src='https://checkout.razorpay.com/v1/checkout.js';script.async=true;script.onload=()=>resolve();script.onerror=()=>reject(new Error('Unable to load Razorpay checkout.'));document.body.appendChild(script);})}
+function openRazorpayCheckout({order,patient,onVerify}:{order:ApiRecord;patient:ApiRecord;onVerify:(payload:{razorpay_order_id:string;razorpay_payment_id:string;razorpay_signature:string})=>Promise<void>}){return new Promise<void>((resolve,reject)=>{const RazorpayConstructor=window.Razorpay;if(!RazorpayConstructor)return reject(new Error('Razorpay checkout script is not loaded.'));const checkout=new RazorpayConstructor({key:order.key,amount:order.amount,currency:order.currency||'INR',name:'PhysioQR',description:'Digital rehabilitation programme',order_id:order.orderId,prefill:{name:text(patient.fullName||patient.name),contact:text(patient.mobile),email:text(patient.email)},handler:async(response:ApiRecord)=>{try{await onVerify({razorpay_order_id:text(response.razorpay_order_id),razorpay_payment_id:text(response.razorpay_payment_id),razorpay_signature:text(response.razorpay_signature)});resolve();}catch(err){reject(err);}},modal:{ondismiss:()=>reject(new Error('Payment cancelled'))}});checkout.open();})}
+const inputClass='min-h-12 w-full rounded-lg border border-neutral-300 bg-white px-3.5 py-2.5 text-base text-neutral-900 outline-none placeholder:text-neutral-400 focus:border-primary-500 focus:ring-2 focus:ring-primary-100';
+const secondaryButton='min-h-12 shrink-0 rounded-lg border border-neutral-300 bg-white px-5 text-sm font-semibold text-neutral-800 disabled:opacity-60';
+const primaryInline='min-h-12 shrink-0 rounded-lg bg-primary-600 px-6 text-sm font-semibold text-white disabled:opacity-60';
+function Field({label,error,children}:{label:string;error?:string;children:React.ReactNode}){return <label className="block"><span className="mb-1.5 block text-sm font-semibold text-neutral-700">{label}</span>{children}{error&&<p className="mt-1.5 text-xs font-medium text-rose-600">{error}</p>}</label>}
+function PrimaryButton({children,loading,type='button'}:{children:React.ReactNode;loading?:boolean;type?:'button'|'submit'}){return <button type={type} disabled={loading} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60">{loading?'Please wait...':children}<ChevronRight className="h-4 w-4"/></button>}
+function NavButtons({onBack,onNext,nextDisabled,nextLabel='Continue'}:{onBack:()=>void;onNext:()=>void;nextDisabled?:boolean;nextLabel?:string}){return <div className="flex flex-col gap-3 border-t border-neutral-100 pt-5 sm:flex-row"><button onClick={onBack} type="button" className="flex min-h-12 items-center justify-center gap-1 rounded-lg border border-neutral-300 bg-white px-5 text-sm font-semibold text-neutral-700"><ChevronLeft className="h-4 w-4"/>Back</button><button onClick={onNext} disabled={nextDisabled} type="button" className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-lg bg-primary-600 px-5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">{nextLabel}<ChevronRight className="h-4 w-4"/></button></div>}
+function SuccessBox({children}:{children:React.ReactNode}){return <div className="flex items-center gap-2 border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700"><Check className="h-4 w-4"/>{children}</div>}
+function Badge({children}:{children:React.ReactNode}){return <span className="rounded-full border border-neutral-200 bg-white px-2.5 py-1 text-xs font-medium text-neutral-700">{children}</span>}
+function AmountRow({label,value,strong}:{label:string;value:number;strong?:boolean}){return <div className={cn('flex justify-between gap-4 text-sm',strong&&'text-base font-bold')}><span className="text-neutral-600">{label}</span><span className={strong?'text-primary-700':'font-medium text-neutral-900'}>{formatCurrency(value)}</span></div>}
+function EmptyConfig({text}:{text:string}){return <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">{text}</div>}
+function extractItems(payload:unknown):ApiRecord[]{if(Array.isArray(payload))return payload as ApiRecord[];const record=asRecord(payload);if(Array.isArray(record.items))return record.items as ApiRecord[];if(Array.isArray(record.data))return record.data as ApiRecord[];return []}
+function asRecord(value:unknown):ApiRecord{return value&&typeof value==='object'?value as ApiRecord:{}}
+function text(value:unknown,fallback=''){return value===undefined||value===null||value===''?fallback:String(value)}
+function labelize(value:unknown){return text(value,'-').replace(/_/g,' ')}
+function mutationError(error:unknown){if(!error)return '';const response=asRecord(asRecord(error).response);const data=asRecord(response.data);return text(data.message||asRecord(error).message,'Request failed.')}
