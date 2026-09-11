@@ -1,4 +1,5 @@
 const AssessmentQuestion = require('../../models/AssessmentQuestion.model');
+const CaseType = require('../../models/CaseType.model');
 const PainCategory = require('../../models/PainCategory.model');
 const SurgeryType = require('../../models/SurgeryType.model');
 const { writeAuditLog } = require('../../utils/auditLogger');
@@ -9,7 +10,7 @@ const QUESTION_TYPES = ['single_choice', 'multiple_choice', 'yes_no', 'pain_scal
 const CHOICE_TYPES = ['single_choice', 'multiple_choice'];
 const RED_FLAG_TYPES = ['single_choice', 'multiple_choice', 'yes_no', 'pain_scale', 'number'];
 const RULE_OPERATORS = ['any_answer', 'equals', 'not_equals', 'includes', 'gte', 'lte', 'between'];
-const SCOPE_TYPES = ['common', 'body_region', 'surgery_type'];
+const SCOPE_TYPES = ['common', 'case_type', 'body_region', 'surgery_type'];
 
 const cleanOption = (option = {}, index = 0) => {
   const label = String(option.label ?? '').trim();
@@ -28,6 +29,7 @@ const normalizePayload = (body = {}) => {
 
   if (body.questionType !== undefined) payload.questionType = body.questionType;
   if (body.scopeType !== undefined) payload.scopeType = body.scopeType;
+  if (body.caseType !== undefined) payload.caseType = body.caseType || null;
   if (body.bodyRegion !== undefined) payload.bodyRegion = body.bodyRegion || null;
   if (body.surgeryType !== undefined) payload.surgeryType = body.surgeryType || null;
   if (body.isRedFlag !== undefined) payload.isRedFlag = Boolean(body.isRedFlag);
@@ -47,7 +49,6 @@ const validateOptions = (payload, { partial = false } = {}) => {
   if (!payload.questionType) return null;
   if (!CHOICE_TYPES.includes(payload.questionType)) return null;
   if (partial && payload.options === undefined) return null;
-
   if (!Array.isArray(payload.options) || payload.options.length < 2) return 'Single and multiple choice questions require at least two answer options';
   if (payload.options.some((option) => !option.label || !option.value)) return 'Every answer option requires an English label';
   const values = payload.options.map((option) => String(option.value).trim().toLowerCase());
@@ -84,6 +85,18 @@ const applyAndValidateScope = async (payload, existing = null) => {
   payload.scopeType = scopeType;
 
   if (scopeType === 'common') {
+    payload.caseType = null;
+    payload.bodyRegion = null;
+    payload.surgeryType = null;
+    return null;
+  }
+
+  if (scopeType === 'case_type') {
+    const caseTypeId = payload.caseType ?? existing?.caseType;
+    if (!caseTypeId) return 'Select a case type for this question';
+    const caseType = await CaseType.findOne({ _id: caseTypeId, isActive: true }).select('_id').lean();
+    if (!caseType) return 'Selected case type was not found or is inactive';
+    payload.caseType = caseType._id;
     payload.bodyRegion = null;
     payload.surgeryType = null;
     return null;
@@ -94,6 +107,7 @@ const applyAndValidateScope = async (payload, existing = null) => {
     if (!bodyRegionId) return 'Select a body region for this question';
     const region = await PainCategory.findOne({ _id: bodyRegionId, isActive: true }).select('_id').lean();
     if (!region) return 'Selected body region was not found or is inactive';
+    payload.caseType = null;
     payload.bodyRegion = region._id;
     payload.surgeryType = null;
     return null;
@@ -103,6 +117,7 @@ const applyAndValidateScope = async (payload, existing = null) => {
   if (!surgeryTypeId) return 'Select a surgery type for this question';
   const surgery = await SurgeryType.findOne({ _id: surgeryTypeId, isActive: true }).select('_id bodyRegion').lean();
   if (!surgery) return 'Selected surgery type was not found or is inactive';
+  payload.caseType = null;
   payload.surgeryType = surgery._id;
   payload.bodyRegion = surgery.bodyRegion;
   return null;
@@ -122,7 +137,6 @@ const validatePayload = async (payload, { partial = false, existing = null } = {
   if (optionError) return optionError;
   const redFlagError = validateRedFlag(payload, { partial });
   if (redFlagError) return redFlagError;
-
   if (payload.showIfQuestion && !(await AssessmentQuestion.exists({ _id: payload.showIfQuestion, isActive: true }))) return 'Conditional parent question not found or inactive';
   return null;
 };
@@ -158,6 +172,7 @@ const getAssessmentQuestions = asyncHandler(async (req, res) => {
     query: req.query,
     sort: buildSort(req.query.sortBy, req.query.sortOrder, ['displayOrder', 'createdAt', 'questionText', 'questionType', 'scopeType']),
     populate: [
+      { path: 'caseType', select: 'name code isActive' },
       { path: 'bodyRegion', select: 'name nameHindi isActive' },
       { path: 'surgeryType', select: 'name code isActive bodyRegion' },
       { path: 'showIfQuestion', select: 'questionText questionType isActive' },
@@ -165,22 +180,24 @@ const getAssessmentQuestions = asyncHandler(async (req, res) => {
     ],
   });
 
-  const [total, active, inactive, redFlags, conditional, common, bodyRegion, surgery] = await Promise.all([
+  const [total, active, inactive, redFlags, conditional, common, caseType, bodyRegion, surgery] = await Promise.all([
     AssessmentQuestion.countDocuments(),
     AssessmentQuestion.countDocuments({ isActive: true }),
     AssessmentQuestion.countDocuments({ isActive: false }),
     AssessmentQuestion.countDocuments({ isActive: true, isRedFlag: true }),
     AssessmentQuestion.countDocuments({ isActive: true, $or: [{ showIfQuestion: { $ne: null } }, { 'conditionalLogic.dependsOnQuestion': { $ne: null } }] }),
     AssessmentQuestion.countDocuments({ isActive: true, $or: [{ scopeType: 'common' }, { scopeType: { $exists: false } }] }),
+    AssessmentQuestion.countDocuments({ isActive: true, scopeType: 'case_type' }),
     AssessmentQuestion.countDocuments({ isActive: true, scopeType: 'body_region' }),
     AssessmentQuestion.countDocuments({ isActive: true, scopeType: 'surgery_type' }),
   ]);
 
-  res.json({ ...result, summary: { total, active, inactive, redFlags, conditional, common, bodyRegion, surgery } });
+  res.json({ ...result, summary: { total, active, inactive, redFlags, conditional, common, caseType, bodyRegion, surgery } });
 });
 
 const getAssessmentQuestionById = asyncHandler(async (req, res) => {
   const question = await AssessmentQuestion.findById(req.params.id)
+    .populate('caseType', 'name code isActive')
     .populate('bodyRegion', 'name nameHindi isActive')
     .populate('surgeryType', 'name code isActive bodyRegion')
     .populate('showIfQuestion', 'questionText questionType isActive')
@@ -212,6 +229,7 @@ const updateAssessmentQuestion = asyncHandler(async (req, res) => {
   const previousValue = question.toObject();
   Object.assign(question, payload, {
     scopeType: effectiveForValidation.scopeType,
+    caseType: effectiveForValidation.caseType,
     bodyRegion: effectiveForValidation.bodyRegion,
     surgeryType: effectiveForValidation.surgeryType,
   });
