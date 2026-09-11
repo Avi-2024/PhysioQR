@@ -8,7 +8,7 @@ const { getDoctors, getDoctorById } = require('../controllers/admin/doctors.cont
 const { getClinics, getClinicById, updateClinic } = require('../controllers/admin/clinics.controller');
 const { getReferrals, getReferralById } = require('../controllers/admin/referrals.controller');
 const { getClinicVisits, getClinicVisitById } = require('../controllers/admin/clinic-visits.controller');
-const { getPatients, getPatientById, updatePatientStatus } = require('../controllers/admin/patients.controller');
+const { getPatients, getPatientById, updatePatientStatus, deletePatient } = require('../controllers/admin/patients.controller');
 const { getAssessmentQuestions, getAssessmentQuestionById, createAssessmentQuestion, updateAssessmentQuestion, deactivateAssessmentQuestion, reactivateAssessmentQuestion } = require('../controllers/admin/assessment-questions.controller');
 const { getPainCategories, getPainCategoryById, createPainCategory, updatePainCategory, setPainCategoryStatus } = require('../controllers/admin/pain-categories.controller');
 const { getPrograms, getProgramById, createProgram, updateProgram, setProgramStatus } = require('../controllers/admin/programs.controller');
@@ -50,6 +50,7 @@ router.patch('/clinics/:id', validateSchema({ body: { clinicName:{type:'string',
 router.get('/referrals', getReferrals); router.get('/referrals/:id', getReferralById);
 router.get('/patients', getPatients); router.get('/patients/:id', getPatientById);
 router.patch('/patients/:id/status', validateSchema({ body:{ status:{type:'enum',values:['active','inactive','blocked'],required:true}, reason:{type:'string',max:500,required:true} } }), updatePatientStatus);
+router.delete('/patients/:id', validateSchema({ body:{ confirmation:{type:'string',max:40,required:true}, reason:{type:'string',max:500,required:true} } }), deletePatient);
 router.get('/assessment-questions', getAssessmentQuestions); router.get('/assessment-questions/:id', getAssessmentQuestionById);
 router.post('/assessment-questions', validateSchema({ body:{ questionText:{type:'string',max:1000,required:true}, questionTextHindi:{type:'string',max:1000}, questionType:{type:'enum',values:['single_choice','multiple_choice','yes_no','pain_scale','number','text','date','image'],required:true}, isRedFlag:{type:'boolean'}, redFlagOperator:{type:'enum',values:['any_answer','equals','not_equals','includes','gte','lte','between']}, redFlagSafetyMessage:{type:'string',max:1000}, displayOrder:{type:'number',min:0,max:100000} } }), createAssessmentQuestion);
 router.patch('/assessment-questions/:id', updateAssessmentQuestion);
