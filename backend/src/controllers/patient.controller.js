@@ -60,7 +60,13 @@ const getOnboardingStatus = asyncHandler(async (req, res) => {
   const patientId = req.user._id;
   const [patient, assessment, patientProgram, verifiedPayment] = await Promise.all([
     Patient.findById(patientId).select('patientId fullName mobile mobileVerified consentAccepted referringDoctor referralLocked status').lean(),
-    PatientAssessment.findOne({ patient: patientId }).sort({ createdAt: -1 }).select('_id painCategory hasRedFlag status createdAt').populate('painCategory', 'name').lean(),
+    PatientAssessment.findOne({ patient: patientId })
+      .sort({ createdAt: -1 })
+      .select('_id caseType painCategory surgeryType surgeryDate side postOpDayAtAssessment requiresPhysioReview reviewType hasRedFlag status createdAt')
+      .populate('caseType', 'code name requiresSurgeryDetails requiresPhysioReview')
+      .populate('painCategory', 'name')
+      .populate('surgeryType', 'code name')
+      .lean(),
     PatientProgram.findOne({ patient: patientId }).sort({ createdAt: -1 }).select('_id program status payment startDate expiryDate').lean(),
     Payment.findOne({ patient: patientId, status: { $in: ['successful', 'manually_verified', 'partially_refunded', 'refunded'] }, duplicateOf: { $exists: false } }).sort({ verifiedAt: -1, createdAt: -1 }).select('_id status verifiedAt').lean(),
   ]);
@@ -77,7 +83,12 @@ const getOnboardingStatus = asyncHandler(async (req, res) => {
   let nextAction = 'basic_details';
   if (patient.mobileVerified) { nextStep = 3; nextAction = 'consent'; }
   if (patient.mobileVerified && patient.consentAccepted) { nextStep = 4; nextAction = 'assessment'; }
-  if (assessmentCompleted) { nextStep = 5; nextAction = reviewPending ? 'risk_review' : reviewBlocked ? 'assessment_blocked' : 'programme'; }
+  if (assessmentCompleted) {
+    nextStep = 5;
+    nextAction = reviewPending
+      ? assessment.reviewType === 'physio_review' ? 'clinical_review' : 'risk_review'
+      : reviewBlocked ? 'assessment_blocked' : 'programme';
+  }
   if (assessmentCleared && !paymentCompleted) { nextStep = 5; nextAction = 'programme'; }
   if (assessmentCleared && patientProgram?.status === 'pending_payment') { nextStep = 6; nextAction = 'payment'; }
   if (paymentCompleted && !programActivated) { nextStep = 6; nextAction = 'activation_pending'; }
@@ -103,11 +114,32 @@ const getOnboardingStatus = asyncHandler(async (req, res) => {
 });
 
 const getOnboardingQuote = asyncHandler(async (req, res) => {
-  const { painCategoryId } = req.query;
-  const patient = await Patient.findById(req.user._id).populate('referringDoctor', 'doctorId fullName clinicName status qrCodeActive approvedPatientFee revenueModel');
+  const requestedPainCategoryId = String(req.query.painCategoryId || '').trim();
+  const [patient, assessment] = await Promise.all([
+    Patient.findById(req.user._id).populate('referringDoctor', 'doctorId fullName clinicName status qrCodeActive approvedPatientFee revenueModel'),
+    PatientAssessment.findOne({ patient: req.user._id }).sort({ createdAt: -1 }).select('painCategory status reviewType requiresPhysioReview').lean(),
+  ]);
   if (!patient) return res.status(404).json({ message: 'Patient not found' });
+  if (!assessment) return res.status(400).json({ message: 'Complete your assessment before selecting a rehabilitation programme' });
+  if (assessment.status === 'pending_review') {
+    return res.status(409).json({
+      code: 'CLINICAL_REVIEW_PENDING',
+      message: assessment.reviewType === 'physio_review'
+        ? 'Your physiotherapy assessment is awaiting clinical review before a programme can be assigned.'
+        : 'Your assessment is awaiting safety review before a programme can be assigned.',
+    });
+  }
+  if (assessment.status === 'blocked') return res.status(409).json({ code: 'ASSESSMENT_BLOCKED', message: 'A rehabilitation programme cannot be assigned until the clinical review is cleared.' });
+  if (assessment.status !== 'cleared') return res.status(409).json({ message: 'Assessment must be clinically cleared before programme selection' });
+
   if (!patient.referringDoctor) return res.status(400).json({ message: 'Patient is not linked to a referring doctor' });
   if (patient.referringDoctor.status !== 'approved' || !patient.referringDoctor.qrCodeActive) return res.status(400).json({ message: 'Referring doctor is not active for new program payments' });
+
+  const assessmentPainCategoryId = String(assessment.painCategory || '');
+  if (requestedPainCategoryId && assessmentPainCategoryId && requestedPainCategoryId !== assessmentPainCategoryId) {
+    return res.status(400).json({ message: 'Selected body region does not match the latest cleared assessment' });
+  }
+  const painCategoryId = assessmentPainCategoryId || requestedPainCategoryId;
 
   const programFilter = { isActive: true };
   if (painCategoryId) programFilter.painCategory = painCategoryId;
