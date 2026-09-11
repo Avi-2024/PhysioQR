@@ -2,6 +2,7 @@ require('dotenv').config();
 
 const mongoose = require('mongoose');
 const AssessmentQuestion = require('../src/models/AssessmentQuestion.model');
+const CaseType = require('../src/models/CaseType.model');
 const PainCategory = require('../src/models/PainCategory.model');
 const SurgeryType = require('../src/models/SurgeryType.model');
 
@@ -27,6 +28,17 @@ const common = (seedKey, questionText, questionType, displayOrder, extra = {}) =
   questionType,
   displayOrder,
   scopeType: 'common',
+  isActive: true,
+  ...extra,
+});
+
+const caseScoped = (seedKey, questionText, questionType, displayOrder, caseType, extra = {}) => ({
+  seedKey,
+  questionText,
+  questionType,
+  displayOrder,
+  scopeType: 'case_type',
+  caseType,
   isActive: true,
   ...extra,
 });
@@ -74,38 +86,9 @@ async function findRegion(name) {
   }).select('_id name isActive').lean();
 }
 
-async function seedCommonQuestions() {
-  const items = [
-    common('common_problem_start', 'When did your problem start?', 'single_choice', 10, {
-      options: options([
-        ['Today', 'today'],
-        ['1–7 days ago', '1_7_days'],
-        ['1–4 weeks ago', '1_4_weeks'],
-        ['1–3 months ago', '1_3_months'],
-        ['More than 3 months ago', 'more_than_3_months'],
-        ['Not sure', 'not_sure'],
-      ]),
-    }),
-    common('common_problem_onset', 'How did the problem start?', 'single_choice', 20, {
-      options: options([
-        ['Suddenly', 'suddenly'],
-        ['Gradually', 'gradually'],
-        ['After exercise or sport', 'after_exercise_sport'],
-        ['After lifting', 'after_lifting'],
-        ['After a fall or injury', 'after_fall_injury'],
-        ['After work or another activity', 'after_work_activity'],
-        ['No specific reason', 'no_specific_reason'],
-        ['Other', 'other'],
-      ]),
-    }),
+async function seedBaseQuestions() {
+  const globalItems = [
     common('common_current_pain', 'How much pain do you have right now? (0 = no pain, 10 = worst pain)', 'pain_scale', 30),
-    common('common_worst_pain_7_days', 'What was your worst pain in the last 7 days? (0–10)', 'pain_scale', 40),
-    common('common_symptoms_worse', 'What makes your symptoms worse?', 'multiple_choice', 50, {
-      options: options(['Sitting', 'Standing', 'Walking', 'Bending', 'Lifting', 'Stairs', 'Exercise', 'Work', 'Sleeping', 'Other']),
-    }),
-    common('common_symptoms_better', 'What makes your symptoms better?', 'multiple_choice', 60, {
-      options: options(['Rest', 'Movement', 'Exercise', 'Heat', 'Ice', 'Medication', 'Changing position', 'Other']),
-    }),
     common('common_daily_activity_impact', 'How much does this problem affect your daily activities? Enter a number from 0 to 10.', 'number', 70),
     common('common_biggest_difficulty', 'What is the biggest thing you cannot do comfortably because of this problem?', 'text', 80),
     common('common_medical_conditions', 'Do you have any medical conditions your physiotherapist should know about?', 'multiple_choice', 90, {
@@ -131,7 +114,7 @@ async function seedCommonQuestions() {
   ];
 
   const saved = [];
-  for (const item of items) saved.push(await upsertQuestion(item));
+  for (const item of globalItems) saved.push(await upsertQuestion(item));
 
   const restrictions = saved.find((item) => item.seedKey === 'common_doctor_restrictions');
   await upsertQuestion(common('common_doctor_restrictions_detail', 'Please describe the exercise or movement restrictions your doctor gave you.', 'text', 110, {
@@ -143,6 +126,46 @@ async function seedCommonQuestions() {
       value: 'yes',
     },
   }));
+
+  const msk = await CaseType.findOne({ code: 'msk', isActive: true }).select('_id code').lean();
+  if (!msk) {
+    console.warn('Skipping MSK-specific questions: case type msk is not configured.');
+    return;
+  }
+
+  const mskItems = [
+    caseScoped('msk_problem_start', 'When did your problem start?', 'single_choice', 10, msk._id, {
+      options: options([
+        ['Today', 'today'],
+        ['1–7 days ago', '1_7_days'],
+        ['1–4 weeks ago', '1_4_weeks'],
+        ['1–3 months ago', '1_3_months'],
+        ['More than 3 months ago', 'more_than_3_months'],
+        ['Not sure', 'not_sure'],
+      ]),
+    }),
+    caseScoped('msk_problem_onset', 'How did the problem start?', 'single_choice', 20, msk._id, {
+      options: options([
+        ['Suddenly', 'suddenly'],
+        ['Gradually', 'gradually'],
+        ['After exercise or sport', 'after_exercise_sport'],
+        ['After lifting', 'after_lifting'],
+        ['After a fall or injury', 'after_fall_injury'],
+        ['After work or another activity', 'after_work_activity'],
+        ['No specific reason', 'no_specific_reason'],
+        ['Other', 'other'],
+      ]),
+    }),
+    caseScoped('msk_worst_pain_7_days', 'What was your worst pain in the last 7 days? (0–10)', 'pain_scale', 40, msk._id),
+    caseScoped('msk_symptoms_worse', 'What makes your symptoms worse?', 'multiple_choice', 50, msk._id, {
+      options: options(['Sitting', 'Standing', 'Walking', 'Bending', 'Lifting', 'Stairs', 'Exercise', 'Work', 'Sleeping', 'Other']),
+    }),
+    caseScoped('msk_symptoms_better', 'What makes your symptoms better?', 'multiple_choice', 60, msk._id, {
+      options: options(['Rest', 'Movement', 'Exercise', 'Heat', 'Ice', 'Medication', 'Changing position', 'Other']),
+    }),
+  ];
+
+  for (const item of mskItems) await upsertQuestion(item);
 }
 
 async function seedSafetyQuestions() {
@@ -242,14 +265,15 @@ async function run() {
   if (!uri) throw new Error('MONGODB_URI or MONGO_URI is required');
 
   await mongoose.connect(uri);
-  await seedCommonQuestions();
+  await seedBaseQuestions();
   await seedSafetyQuestions();
   await seedRegionQuestions();
   await seedSurgeryQuestions();
 
-  const [total, commonCount, regionCount, surgeryCount, redFlagCount] = await Promise.all([
+  const [total, commonCount, caseTypeCount, regionCount, surgeryCount, redFlagCount] = await Promise.all([
     AssessmentQuestion.countDocuments({ seedKey: { $exists: true } }),
     AssessmentQuestion.countDocuments({ seedKey: { $exists: true }, scopeType: 'common' }),
+    AssessmentQuestion.countDocuments({ seedKey: { $exists: true }, scopeType: 'case_type' }),
     AssessmentQuestion.countDocuments({ seedKey: { $exists: true }, scopeType: 'body_region' }),
     AssessmentQuestion.countDocuments({ seedKey: { $exists: true }, scopeType: 'surgery_type' }),
     AssessmentQuestion.countDocuments({ seedKey: { $exists: true }, isRedFlag: true }),
@@ -257,7 +281,7 @@ async function run() {
 
   console.log('Assessment question library seeded successfully.');
   console.log(`Seed-managed questions: ${total}`);
-  console.log(`Common: ${commonCount} | Body-region: ${regionCount} | Surgery-specific: ${surgeryCount} | Red flags: ${redFlagCount}`);
+  console.log(`Common: ${commonCount} | Case-type: ${caseTypeCount} | Body-region: ${regionCount} | Surgery-specific: ${surgeryCount} | Red flags: ${redFlagCount}`);
   await mongoose.disconnect();
 }
 
