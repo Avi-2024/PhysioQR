@@ -20,6 +20,7 @@ const AdminReferralsPage = lazy(() => import('@/features/admin/pages/clinics/Adm
 const AdminReferralDetailPage = lazy(() => import('@/features/admin/pages/clinics/AdminReferralDetailPage'));
 const AdminAssessmentsPage = lazy(() => import('@/features/admin/pages/assessments/AdminAssessmentsPage'));
 const AdminAssessmentDetailPage = lazy(() => import('@/features/admin/pages/assessments/AdminAssessmentDetailPage'));
+const AdminAssessmentPathwaysPage = lazy(() => import('@/features/admin/pages/assessments/AdminAssessmentPathwaysPage'));
 const AdminRiskReviewsPage = lazy(() => import('@/features/admin/pages/risk/AdminRiskReviewsPage'));
 const AdminRiskReviewDetailPage = lazy(() => import('@/features/admin/pages/risk/AdminRiskReviewDetailPage'));
 const AdminPainCategoriesPage = lazy(() => import('@/features/admin/pages/assessments/AdminPainCategoriesPage'));
@@ -66,6 +67,7 @@ export const adminRoutes: RouteObject = { path: '/admin', element: <ProtectedRou
   { path: 'clinics', element: withSuspense(<AdminClinicsPage />) }, { path: 'clinics/:clinicId', element: withSuspense(<AdminClinicDetailPage />) },
   { path: 'referrals', element: withSuspense(<AdminReferralsPage />) }, { path: 'referrals/:referralId', element: withSuspense(<AdminReferralDetailPage />) },
   { path: 'patients', element: withSuspense(<AdminPatientsPage />) }, { path: 'patients/:patientId', element: withSuspense(<AdminPatientDetailPage />) },
+  { path: 'assessment-pathways', element: withSuspense(<AdminAssessmentPathwaysPage />) },
   { path: 'assessments', element: withSuspense(<AdminAssessmentsPage />) }, { path: 'assessments/:assessmentId', element: withSuspense(<AdminAssessmentDetailPage />) },
   { path: 'risk-reviews', element: withSuspense(<AdminRiskReviewsPage />) }, { path: 'risk-reviews/:reviewId', element: withSuspense(<AdminRiskReviewDetailPage />) },
   { path: 'pain-categories', element: withSuspense(<AdminPainCategoriesPage />) }, { path: 'pain-categories/:categoryId', element: withSuspense(<AdminPainCategoryDetailPage />) },
