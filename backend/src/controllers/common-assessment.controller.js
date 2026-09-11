@@ -150,7 +150,24 @@ const notifyAssessmentReview = async (assessment, hasRedFlag) => {
 // Returns common questions plus the selected case/body-region/surgery layers.
 const getCommonQuestions = asyncHandler(async (req, res) => {
   const { caseTypeId, bodyRegionId, surgeryTypeId } = req.query;
-  const questions = await AssessmentQuestion.find(questionScopeFilter({ caseTypeId, bodyRegionId, surgeryTypeId }))
+  let resolvedCaseTypeId = caseTypeId;
+
+  // Current patient UI already tells this endpoint whether a surgery type was
+  // selected. Keep that flow backward-compatible while caseTypeId is rolled out
+  // explicitly to every client: surgery => post-op path, otherwise => MSK path.
+  if (!resolvedCaseTypeId) {
+    const inferredCaseType = await CaseType.findOne({
+      isActive: true,
+      requiresSurgeryDetails: Boolean(surgeryTypeId),
+    }).sort({ displayOrder: 1, createdAt: 1 }).select('_id').lean();
+    resolvedCaseTypeId = inferredCaseType?._id;
+  }
+
+  const questions = await AssessmentQuestion.find(questionScopeFilter({
+    caseTypeId: resolvedCaseTypeId,
+    bodyRegionId,
+    surgeryTypeId,
+  }))
     .sort({ displayOrder: 1, createdAt: 1 })
     .lean();
   res.json(questions);
