@@ -4,9 +4,8 @@ const QrScan = require('../models/QrScan.model');
 const PatientProgram = require('../models/PatientProgram.model');
 const ProgramProgress = require('../models/ProgramProgress.model');
 const PatientAssessment = require('../models/PatientAssessment.model');
-const { Order, Payment } = require('../models/Payment.model');
+const { Payment } = require('../models/Payment.model');
 const Program = require('../models/Program.model');
-const { writeAuditLog } = require('../utils/auditLogger');
 const asyncHandler = require('../utils/asyncHandler');
 
 // POST /api/patients/register
@@ -20,9 +19,6 @@ const registerPatient = asyncHandler(async (req, res) => {
     if (!referringDoctor) return res.status(400).json({ message: 'Invalid or inactive doctor QR code' });
   }
 
-  // A mobile number identifies one patient account. Registration is create-only.
-  // Existing patients must prove ownership with OTP and continue their existing onboarding.
-  // Never mutate an existing patient's referral from this unauthenticated endpoint.
   const existing = await Patient.findOne({ mobile }).select('_id mobileVerified consentAccepted referralLocked status');
   if (existing) {
     return res.status(409).json({
@@ -55,17 +51,17 @@ const recordConsent = asyncHandler(async (req, res) => {
 });
 
 // GET /api/patients/me/onboarding-status
-// DB-backed source of truth used to resume patient onboarding after refresh/re-login.
 const getOnboardingStatus = asyncHandler(async (req, res) => {
   const patientId = req.user._id;
   const [patient, assessment, patientProgram, verifiedPayment] = await Promise.all([
     Patient.findById(patientId).select('patientId fullName mobile mobileVerified consentAccepted referringDoctor referralLocked status').lean(),
     PatientAssessment.findOne({ patient: patientId })
       .sort({ createdAt: -1 })
-      .select('_id caseType painCategory surgeryType surgeryDate side postOpDayAtAssessment requiresPhysioReview reviewType hasRedFlag status createdAt')
+      .select('_id caseType painCategory surgeryType surgeryDate side postOpDayAtAssessment requiresPhysioReview reviewType approvedProgram hasRedFlag status createdAt')
       .populate('caseType', 'code name requiresSurgeryDetails requiresPhysioReview')
       .populate('painCategory', 'name')
       .populate('surgeryType', 'code name')
+      .populate('approvedProgram', 'programCode name durationDays difficultyLevel')
       .lean(),
     PatientProgram.findOne({ patient: patientId }).sort({ createdAt: -1 }).select('_id program status payment startDate expiryDate').lean(),
     Payment.findOne({ patient: patientId, status: { $in: ['successful', 'manually_verified', 'partially_refunded', 'refunded'] }, duplicateOf: { $exists: false } }).sort({ verifiedAt: -1, createdAt: -1 }).select('_id status verifiedAt').lean(),
@@ -75,7 +71,7 @@ const getOnboardingStatus = asyncHandler(async (req, res) => {
   const assessmentCompleted = Boolean(assessment);
   const reviewPending = assessment?.status === 'pending_review';
   const reviewBlocked = assessment?.status === 'blocked';
-  const assessmentCleared = assessmentCompleted && !reviewPending && !reviewBlocked;
+  const assessmentCleared = assessment?.status === 'cleared';
   const paymentCompleted = Boolean(verifiedPayment);
   const programActivated = patientProgram?.status === 'active';
 
@@ -87,7 +83,9 @@ const getOnboardingStatus = asyncHandler(async (req, res) => {
     nextStep = 5;
     nextAction = reviewPending
       ? assessment.reviewType === 'physio_review' ? 'clinical_review' : 'risk_review'
-      : reviewBlocked ? 'assessment_blocked' : 'programme';
+      : reviewBlocked ? 'assessment_blocked'
+        : assessmentCleared ? 'programme'
+          : 'assessment';
   }
   if (assessmentCleared && !paymentCompleted) { nextStep = 5; nextAction = 'programme'; }
   if (assessmentCleared && patientProgram?.status === 'pending_payment') { nextStep = 6; nextAction = 'payment'; }
@@ -117,7 +115,7 @@ const getOnboardingQuote = asyncHandler(async (req, res) => {
   const requestedPainCategoryId = String(req.query.painCategoryId || '').trim();
   const [patient, assessment] = await Promise.all([
     Patient.findById(req.user._id).populate('referringDoctor', 'doctorId fullName clinicName status qrCodeActive approvedPatientFee revenueModel'),
-    PatientAssessment.findOne({ patient: req.user._id }).sort({ createdAt: -1 }).select('painCategory status reviewType requiresPhysioReview').lean(),
+    PatientAssessment.findOne({ patient: req.user._id }).sort({ createdAt: -1 }).select('painCategory status reviewType requiresPhysioReview approvedProgram').lean(),
   ]);
   if (!patient) return res.status(404).json({ message: 'Patient not found' });
   if (!assessment) return res.status(400).json({ message: 'Complete your assessment before selecting a rehabilitation programme' });
@@ -140,16 +138,29 @@ const getOnboardingQuote = asyncHandler(async (req, res) => {
     return res.status(400).json({ message: 'Selected body region does not match the latest cleared assessment' });
   }
   const painCategoryId = assessmentPainCategoryId || requestedPainCategoryId;
+  if (!painCategoryId) return res.status(400).json({ message: 'Assessment body region is not configured' });
 
-  const programFilter = { isActive: true };
-  if (painCategoryId) programFilter.painCategory = painCategoryId;
-  let program = await Program.findOne(programFilter).populate('painCategory', 'name').sort({ createdAt: -1 });
-  if (!program && painCategoryId) program = await Program.findOne({ isActive: true }).populate('painCategory', 'name').sort({ createdAt: -1 });
-  if (!program) return res.status(404).json({ message: 'No active rehabilitation program is available' });
+  let program;
+  if (assessment.requiresPhysioReview) {
+    if (!assessment.approvedProgram) {
+      return res.status(409).json({ code: 'PROGRAM_APPROVAL_REQUIRED', message: 'The physiotherapist must approve a rehabilitation programme before payment can continue.' });
+    }
+    program = await Program.findOne({ _id: assessment.approvedProgram, isActive: true, painCategory: painCategoryId }).populate('painCategory', 'name');
+    if (!program) return res.status(409).json({ code: 'APPROVED_PROGRAM_UNAVAILABLE', message: 'The clinically approved programme is no longer active for this body region. A new clinical review is required.' });
+  } else {
+    program = await Program.findOne({ isActive: true, painCategory: painCategoryId }).populate('painCategory', 'name').sort({ createdAt: -1 });
+    if (!program) return res.status(404).json({ message: 'No active rehabilitation programme is mapped to this body region' });
+  }
 
   const amount = patient.referringDoctor.approvedPatientFee || program.defaultPrice || 0;
   if (amount <= 0) return res.status(400).json({ message: 'Program price is not configured for this doctor' });
-  res.json({ patient: { id: patient._id, patientId: patient.patientId, fullName: patient.fullName, mobile: patient.mobile, mobileVerified: patient.mobileVerified, consentAccepted: patient.consentAccepted }, doctor: { id: patient.referringDoctor._id, doctorId: patient.referringDoctor.doctorId, fullName: patient.referringDoctor.fullName, clinicName: patient.referringDoctor.clinicName, revenueModel: patient.referringDoctor.revenueModel }, program: { id: program._id, programCode: program.programCode, name: program.name, description: program.description, difficultyLevel: program.difficultyLevel, durationDays: program.durationDays, sessionsPerDay: program.sessionsPerDay, painCategory: program.painCategory }, pricing: { originalAmount: amount, discountAmount: 0, taxAmount: 0, finalAmount: amount, currency: 'INR' } });
+  res.json({
+    patient: { id: patient._id, patientId: patient.patientId, fullName: patient.fullName, mobile: patient.mobile, mobileVerified: patient.mobileVerified, consentAccepted: patient.consentAccepted },
+    doctor: { id: patient.referringDoctor._id, doctorId: patient.referringDoctor.doctorId, fullName: patient.referringDoctor.fullName, clinicName: patient.referringDoctor.clinicName, revenueModel: patient.referringDoctor.revenueModel },
+    program: { id: program._id, programCode: program.programCode, name: program.name, description: program.description, difficultyLevel: program.difficultyLevel, durationDays: program.durationDays, sessionsPerDay: program.sessionsPerDay, painCategory: program.painCategory },
+    pricing: { originalAmount: amount, discountAmount: 0, taxAmount: 0, finalAmount: amount, currency: 'INR' },
+    assignment: { source: assessment.requiresPhysioReview ? 'clinical_review' : 'body_region_auto_mapping' },
+  });
 });
 
 const getMyProgram = asyncHandler(async (req, res) => {
