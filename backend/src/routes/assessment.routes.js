@@ -14,14 +14,17 @@ const {
   reviewAssessment,
 } = require('../controllers/assessment.controller');
 const { getCommonQuestions, submitCommonAssessment } = require('../controllers/common-assessment.controller');
+const { getPathwayOptions, getSurgeryTypes } = require('../controllers/assessment-pathways.controller');
+
+router.get('/pathways', getPathwayOptions);
+router.get('/surgery-types', getSurgeryTypes);
 
 router.get('/categories', getPainCategories);
 router.post('/categories', protect, authorize('admin'), requireFields('name'), createPainCategory);
 router.put('/categories/:id', protect, authorize('admin'), updatePainCategory);
 router.delete('/categories/:id', protect, authorize('admin'), deletePainCategory);
 
-// Every patient receives the same active assessment question set. Pain category
-// selection is part of that assessment experience, not a question-set filter.
+// Questions are dynamically layered: common + body-region + surgery-specific.
 router.get('/questions', getCommonQuestions);
 router.post(
   '/questions',
@@ -34,7 +37,7 @@ router.post(
 router.put('/questions/:id', protect, authorize('admin'), updateQuestion);
 router.delete('/questions/:id', protect, authorize('admin'), deleteQuestion);
 
-router.post('/submit', protect, requireFields('patientId', 'painCategoryId', 'answers'), submitCommonAssessment);
+router.post('/submit', protect, requireFields('patientId', 'caseTypeId', 'painCategoryId', 'answers'), submitCommonAssessment);
 router.get('/red-flags', protect, authorize('admin'), listRedFlagAssessments);
 router.patch(
   '/:id/review',
