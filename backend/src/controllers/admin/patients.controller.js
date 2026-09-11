@@ -1,6 +1,15 @@
 const Patient = require('../../models/Patient.model');
 const PatientProgram = require('../../models/PatientProgram.model');
 const PatientAssessment = require('../../models/PatientAssessment.model');
+const ProgramProgress = require('../../models/ProgramProgress.model');
+const PatientConsent = require('../../models/PatientConsent.model');
+const QrScan = require('../../models/QrScan.model');
+const Notification = require('../../models/Notification.model');
+const WebPushSubscription = require('../../models/WebPushSubscription.model');
+const AuthSession = require('../../models/AuthSession.model');
+const SupportTicket = require('../../models/SupportTicket.model');
+const FraudCase = require('../../models/FraudCase.model');
+const Refund = require('../../models/Refund.model');
 const { Payment, Order } = require('../../models/Payment.model');
 const { buildSearchFilter, buildSort, paginateModel } = require('../../utils/queryHelpers');
 const { writeAuditLog } = require('../../utils/auditLogger');
@@ -8,6 +17,15 @@ const asyncHandler = require('../../utils/asyncHandler');
 
 const isObjectId = (value) => /^[a-f\d]{24}$/i.test(String(value));
 const VERIFIED_PAYMENT_STATUSES = ['successful', 'manually_verified'];
+const FINANCIAL_HISTORY_STATUSES = [
+  'successful',
+  'manually_verified',
+  'refunded',
+  'partially_refunded',
+  'disputed',
+  'chargeback',
+  'duplicate_captured',
+];
 
 const resolvePatient = (id) => Patient.findOne({
   $or: [
@@ -140,4 +158,84 @@ const updatePatientStatus = asyncHandler(async (req, res) => {
   res.json({ message: `Patient status changed to ${status}`, patient });
 });
 
-module.exports = { getPatients, getPatientById, updatePatientStatus };
+const deletePatient = asyncHandler(async (req, res) => {
+  const { confirmation, reason } = req.body;
+  const patient = await resolvePatient(req.params.id);
+  if (!patient) return res.status(404).json({ message: 'Patient not found' });
+
+  if (!String(reason || '').trim()) {
+    return res.status(400).json({ message: 'Reason is required to delete a patient' });
+  }
+
+  const expectedConfirmation = String(patient.mobile || patient.patientId || '').trim();
+  if (!expectedConfirmation || String(confirmation || '').trim() !== expectedConfirmation) {
+    return res.status(400).json({
+      message: `Type the patient mobile number (${expectedConfirmation}) to confirm deletion`,
+      code: 'PATIENT_DELETE_CONFIRMATION_MISMATCH',
+    });
+  }
+
+  const [financialPayment, refund] = await Promise.all([
+    Payment.findOne({ patient: patient._id, status: { $in: FINANCIAL_HISTORY_STATUSES } }).select('_id status invoiceNumber').lean(),
+    Refund.findOne({ patient: patient._id }).select('_id status').lean(),
+  ]);
+
+  if (financialPayment || refund || patient.referralLocked) {
+    return res.status(409).json({
+      message: 'This patient has financial or locked referral history and cannot be permanently deleted. Set the patient inactive or blocked instead.',
+      code: 'PATIENT_DELETE_FINANCIAL_HISTORY',
+    });
+  }
+
+  const snapshot = {
+    patientId: patient.patientId,
+    fullName: patient.fullName,
+    mobile: patient.mobile,
+    status: patient.status,
+    referringDoctor: patient.referringDoctor,
+    createdAt: patient.createdAt,
+  };
+
+  const patientPrograms = await PatientProgram.find({ patient: patient._id }).select('_id').lean();
+  const patientProgramIds = patientPrograms.map((item) => item._id);
+
+  const cleanupResults = await Promise.all([
+    ProgramProgress.deleteMany({ $or: [{ patient: patient._id }, { patientProgram: { $in: patientProgramIds } }] }),
+    PatientProgram.deleteMany({ patient: patient._id }),
+    PatientAssessment.deleteMany({ patient: patient._id }),
+    PatientConsent.deleteMany({ patient: patient._id }),
+    Notification.deleteMany({ patient: patient._id }),
+    WebPushSubscription.deleteMany({ patient: patient._id }),
+    AuthSession.deleteMany({ ownerType: 'patient', patient: patient._id }),
+    SupportTicket.deleteMany({ patient: patient._id }),
+    FraudCase.deleteMany({ patient: patient._id }),
+    Payment.deleteMany({ patient: patient._id }),
+    Order.deleteMany({ patient: patient._id }),
+    QrScan.updateMany(
+      { patient: patient._id },
+      { $unset: { patient: '', registrationDate: '' }, $set: { paymentStatus: 'pending' } },
+    ),
+  ]);
+
+  await Patient.deleteOne({ _id: patient._id });
+
+  await writeAuditLog({
+    req,
+    action: 'patient_deleted',
+    module: 'Patient',
+    recordId: patient._id,
+    previousValue: snapshot,
+    newValue: {
+      deleted: true,
+      linkedRecordsAffected: cleanupResults.reduce((sum, result) => sum + Number(result.deletedCount || result.modifiedCount || 0), 0),
+    },
+    reason: String(reason).trim(),
+  });
+
+  res.json({
+    message: 'Patient permanently deleted',
+    deletedPatient: snapshot,
+  });
+});
+
+module.exports = { getPatients, getPatientById, updatePatientStatus, deletePatient };
