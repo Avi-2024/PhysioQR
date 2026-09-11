@@ -16,13 +16,14 @@ const assessmentQuestionSchema = new mongoose.Schema({
   seedKey: { type: String, unique: true, sparse: true, trim: true },
 
   // Existing questions default to common so current production data remains valid.
-  // Admin can scope new questions to a body region or a surgery type without
-  // creating a separate hardcoded frontend form for every pathway.
+  // Scoped questions let Admin configure pathway-specific assessment layers
+  // without hardcoding a separate frontend form for every pathway.
   scopeType: {
     type: String,
-    enum: ['common', 'body_region', 'surgery_type'],
+    enum: ['common', 'case_type', 'body_region', 'surgery_type'],
     default: 'common',
   },
+  caseType: { type: mongoose.Schema.Types.ObjectId, ref: 'CaseType' },
   bodyRegion: { type: mongoose.Schema.Types.ObjectId, ref: 'PainCategory' },
   surgeryType: { type: mongoose.Schema.Types.ObjectId, ref: 'SurgeryType' },
 
@@ -55,6 +56,6 @@ const assessmentQuestionSchema = new mongoose.Schema({
   },
 }, { timestamps: true });
 
-assessmentQuestionSchema.index({ isActive: 1, scopeType: 1, bodyRegion: 1, surgeryType: 1, displayOrder: 1 });
+assessmentQuestionSchema.index({ isActive: 1, scopeType: 1, caseType: 1, bodyRegion: 1, surgeryType: 1, displayOrder: 1 });
 
 module.exports = mongoose.model('AssessmentQuestion', assessmentQuestionSchema);
