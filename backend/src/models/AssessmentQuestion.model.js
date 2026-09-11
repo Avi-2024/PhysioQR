@@ -10,6 +10,11 @@ const assessmentQuestionSchema = new mongoose.Schema({
   },
   options: [{ label: String, labelHindi: String, value: String }],
 
+  // Stable key used only by system seed scripts. Admin-created questions do not
+  // need one. This makes the default clinical library safe to re-run without
+  // creating duplicate questions.
+  seedKey: { type: String, unique: true, sparse: true, trim: true },
+
   // Existing questions default to common so current production data remains valid.
   // Admin can scope new questions to a body region or a surgery type without
   // creating a separate hardcoded frontend form for every pathway.
