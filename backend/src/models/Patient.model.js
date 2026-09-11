@@ -1,7 +1,8 @@
 const mongoose = require('mongoose');
+const Counter = require('./Counter.model');
 
 const patientSchema = new mongoose.Schema({
-  patientId: { type: String, unique: true },  // e.g. PT001
+  patientId: { type: String, unique: true },  // e.g. PT00001
   fullName: { type: String, required: true },
   mobile: { type: String, required: true, unique: true },
   whatsapp: String,
@@ -32,12 +33,59 @@ const patientSchema = new mongoose.Schema({
   status: { type: String, enum: ['active', 'inactive', 'blocked'], default: 'active' },
 }, { timestamps: true });
 
-// Auto-generate patientId like PT00001 before saving
+const PATIENT_COUNTER_KEY = 'patient_id';
+
+const getHighestExistingPatientSequence = async () => {
+  const latest = await mongoose.model('Patient')
+    .findOne({ patientId: /^PT\d+$/ })
+    .sort({ patientId: -1 })
+    .select('patientId')
+    .lean();
+
+  if (!latest?.patientId) return 0;
+  const sequence = Number(String(latest.patientId).replace(/^PT/, ''));
+  return Number.isFinite(sequence) ? sequence : 0;
+};
+
+const nextPatientSequence = async () => {
+  // Keep the counter at least as high as existing data. This also lets older
+  // databases migrate safely from the previous countDocuments()+1 strategy.
+  const highestExisting = await getHighestExistingPatientSequence();
+
+  try {
+    await Counter.findOneAndUpdate(
+      { key: PATIENT_COUNTER_KEY },
+      { $max: { sequence: highestExisting } },
+      { upsert: true, setDefaultsOnInsert: true },
+    );
+  } catch (error) {
+    // Two concurrent first registrations can race while creating the counter.
+    // The unique key guarantees one wins; the loser can safely continue.
+    if (error?.code !== 11000) throw error;
+  }
+
+  const counter = await Counter.findOneAndUpdate(
+    { key: PATIENT_COUNTER_KEY },
+    { $inc: { sequence: 1 } },
+    { new: true },
+  );
+
+  if (!counter) throw new Error('Unable to allocate patient ID');
+  return counter.sequence;
+};
+
+// Auto-generate a monotonic patientId like PT00001. IDs are never derived from
+// the current patient count, so deleting a patient cannot make an old ID repeat.
 patientSchema.pre('save', async function (next) {
   if (this.patientId) return next();
-  const count = await mongoose.model('Patient').countDocuments();
-  this.patientId = `PT${String(count + 1).padStart(5, '0')}`;
-  next();
+
+  try {
+    const sequence = await nextPatientSequence();
+    this.patientId = `PT${String(sequence).padStart(5, '0')}`;
+    next();
+  } catch (error) {
+    next(error);
+  }
 });
 
 module.exports = mongoose.model('Patient', patientSchema);
