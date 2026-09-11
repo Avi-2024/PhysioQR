@@ -2,7 +2,20 @@ const mongoose = require('mongoose');
 
 const patientAssessmentSchema = new mongoose.Schema({
   patient: { type: mongoose.Schema.Types.ObjectId, ref: 'Patient', required: true },
+  caseType: { type: mongoose.Schema.Types.ObjectId, ref: 'CaseType' },
   painCategory: { type: mongoose.Schema.Types.ObjectId, ref: 'PainCategory' },
+  surgeryType: { type: mongoose.Schema.Types.ObjectId, ref: 'SurgeryType' },
+  surgeryDate: Date,
+  side: {
+    type: String,
+    enum: ['right', 'left', 'both', 'not_applicable'],
+  },
+  postOpDayAtAssessment: Number,
+  requiresPhysioReview: { type: Boolean, default: false },
+  reviewType: {
+    type: String,
+    enum: ['red_flag', 'physio_review'],
+  },
   answers: [
     {
       question: { type: mongoose.Schema.Types.ObjectId, ref: 'AssessmentQuestion' },
@@ -29,5 +42,8 @@ const patientAssessmentSchema = new mongoose.Schema({
   reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   reviewedAt: Date,
 }, { timestamps: true });
+
+patientAssessmentSchema.index({ patient: 1, createdAt: -1 });
+patientAssessmentSchema.index({ status: 1, reviewType: 1, createdAt: -1 });
 
 module.exports = mongoose.model('PatientAssessment', patientAssessmentSchema);
