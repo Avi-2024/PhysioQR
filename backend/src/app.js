@@ -67,6 +67,7 @@ app.use(maintenanceModeGuard);
 
 app.use('/api/auth', require('./routes/auth.routes'));
 app.use('/api/admin', require('./routes/admin.routes'));
+app.use('/api/admin/assessment-pathways', require('./routes/adminAssessmentPathway.routes'));
 app.use('/api/agents', require('./routes/agent.routes'));
 app.use('/api/doctors', require('./routes/doctor.routes'));
 app.use('/api/patients', require('./routes/patient.routes'));
