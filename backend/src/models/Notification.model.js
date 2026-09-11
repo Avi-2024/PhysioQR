@@ -28,6 +28,7 @@ const notificationSchema = new mongoose.Schema({
       'doctor_submitted', 'doctor_approved', 'doctor_rejected',
       'follow_up_due', 'clinic_visit_reminder', 'monthly_performance',
       'new_doctor_registration', 'doctor_docs_submitted', 'high_risk_assessment',
+      'clinical_review_required',
       'payment_dispute', 'refund_request', 'withdrawal_request',
       'failed_payout', 'suspicious_activity', 'youtube_video_unavailable',
       'support_ticket_created',
