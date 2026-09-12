@@ -17,31 +17,44 @@ export default function PatientContinuePaymentPage() {
 
   const status = asRecord(statusQuery.data);
   const patient = asRecord(status.patient);
-  const assessment = asRecord(status.assessment);
-  const painCategory = asRecord(assessment.painCategory);
-  const painCategoryId = text(painCategory._id || painCategory.id || assessment.painCategory);
   const nextAction = text(status.nextAction);
-  const canContinue = Boolean(status.assessmentCompleted) && !Boolean(status.reviewPending) && !Boolean(status.reviewBlocked) && !Boolean(status.paymentCompleted);
+  const canContinue = Boolean(status.assessmentCompleted)
+    && !Boolean(status.reviewPending)
+    && !Boolean(status.reviewBlocked)
+    && !Boolean(status.paymentCompleted);
 
   const quoteQuery = useQuery({
-    queryKey: ['patient-onboarding-quote', 'payment-continuation', painCategoryId],
-    enabled: canContinue && Boolean(painCategoryId),
-    queryFn: async () => (await apiClient.get('/patients/me/onboarding-quote', { params: { painCategoryId } })).data,
+    queryKey: ['patient-purchase-quote', 'payment-continuation'],
+    enabled: canContinue,
+    queryFn: async () => (await apiClient.get('/patients/me/purchase-quote')).data,
   });
 
   const quote = asRecord(quoteQuery.data);
   const program = asRecord(quote.program);
   const doctor = asRecord(quote.doctor);
   const pricing = asRecord(quote.pricing);
+  const purchaseMode = text(quote.purchaseMode, 'doctor_referral');
+  const isDirect = purchaseMode === 'direct';
   const payable = Number(pricing.finalAmount || 0);
+  const patientId = text(patient.id || patient._id);
+  const programId = text(program.id || program._id);
+  const doctorId = text(doctor.id || doctor._id);
+
+  const verifyGatewayPayment = async (
+    payload:{razorpay_order_id:string;razorpay_payment_id:string;razorpay_signature:string},
+  ) => {
+    const endpoint = isDirect ? '/payments/direct/verify' : '/payments/verify';
+    await apiClient.post(endpoint, payload);
+  };
 
   const paymentMutation = useMutation({
     mutationFn: async () => {
-      const orderResponse = await apiClient.post('/payments/create-order', {
-        patientId: text(patient.id || patient._id),
-        programId: text(program.id || program._id),
-        doctorId: text(doctor.id || doctor._id),
-        idempotencyKey: `patient-${text(patient.id || patient._id)}-${text(program.id || program._id)}-${Date.now()}`,
+      const endpoint = isDirect ? '/payments/direct/create-order' : '/payments/create-order';
+      const orderResponse = await apiClient.post(endpoint, {
+        patientId,
+        programId,
+        ...(isDirect ? {} : { doctorId }),
+        idempotencyKey: `patient-${patientId}-${programId}-${Date.now()}`,
       });
       const order = asRecord(orderResponse.data);
       if (order.key) {
@@ -58,10 +71,6 @@ export default function PatientContinuePaymentPage() {
     onSuccess: () => navigate('/payment-success', { replace: true }),
   });
 
-  const verifyGatewayPayment = async (payload:{razorpay_order_id:string;razorpay_payment_id:string;razorpay_signature:string}) => {
-    await apiClient.post('/payments/verify', payload);
-  };
-
   if (statusQuery.isLoading) return <Loading text="Loading your saved rehabilitation journey..." />;
   if (statusQuery.isError) return <Message title="Unable to load your account" body="Please try again from your patient dashboard." />;
   if (nextAction === 'dashboard' || Boolean(status.programActivated)) {
@@ -71,6 +80,8 @@ export default function PatientContinuePaymentPage() {
     return <Message title="Clinical review is not cleared" body="Payment stays locked until the clinical review is cleared." action="Back to dashboard" onAction={() => navigate('/patient/dashboard')} />;
   }
   if (!canContinue) return <Message title="Payment is not available yet" body="Complete the required onboarding steps before payment." action="Back to dashboard" onAction={() => navigate('/patient/dashboard')} />;
+
+  const paymentReady = Boolean(payable && programId && (isDirect || doctorId));
 
   return (
     <div className="mx-auto max-w-3xl py-6 sm:py-10">
@@ -84,13 +95,22 @@ export default function PatientContinuePaymentPage() {
           <>
             <div className="mt-6 rounded-xl border border-neutral-200 bg-neutral-50 p-5">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div><p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Assigned programme</p><h2 className="mt-1 text-lg font-bold text-neutral-950">{text(program.name, 'Rehabilitation programme')}</h2><p className="mt-1 text-sm text-neutral-600">{text(program.description, 'Doctor-guided rehabilitation programme')}</p><p className="mt-3 text-sm text-neutral-600">Doctor: <span className="font-semibold text-neutral-900">{text(doctor.fullName, 'Referring doctor')}</span></p></div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Assigned programme</p>
+                  <h2 className="mt-1 text-lg font-bold text-neutral-950">{text(program.name, 'Rehabilitation programme')}</h2>
+                  <p className="mt-1 text-sm text-neutral-600">{text(program.description, 'Guided rehabilitation programme')}</p>
+                  <p className="mt-3 text-sm text-neutral-600">
+                    {isDirect ? 'Access type: ' : 'Doctor: '}
+                    <span className="font-semibold text-neutral-900">{isDirect ? 'PhysioQR Direct' : text(doctor.fullName, 'Referring doctor')}</span>
+                  </p>
+                  {isDirect && <p className="mt-1 text-xs leading-5 text-neutral-500">This programme is purchased directly from PhysioQR. No doctor commission or wallet share is created.</p>}
+                </div>
                 <div className="sm:text-right"><p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Amount payable</p><p className="mt-1 text-2xl font-bold text-primary-700">{formatCurrency(payable)}</p></div>
               </div>
             </div>
             <div className="mt-5 flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0"/><span>Exercise access unlocks only after the backend verifies payment and activates your programme.</span></div>
             {paymentMutation.isError && <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm font-medium text-rose-700">{requestError(paymentMutation.error)}</div>}
-            <button type="button" disabled={paymentMutation.isPending || !payable || !program.id || !doctor.id} onClick={() => paymentMutation.mutate()} className="mt-6 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-primary-600 px-5 text-sm font-bold text-white hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60">{paymentMutation.isPending ? <><LoaderCircle className="h-4 w-4 animate-spin"/>Processing...</> : <><CreditCard className="h-4 w-4"/>Pay {formatCurrency(payable)} & Activate</>}</button>
+            <button type="button" disabled={paymentMutation.isPending || !paymentReady} onClick={() => paymentMutation.mutate()} className="mt-6 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-primary-600 px-5 text-sm font-bold text-white hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60">{paymentMutation.isPending ? <><LoaderCircle className="h-4 w-4 animate-spin"/>Processing...</> : <><CreditCard className="h-4 w-4"/>Pay {formatCurrency(payable)} & Activate</>}</button>
           </>
         )}
       </section>
