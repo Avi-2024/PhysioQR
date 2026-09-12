@@ -2,6 +2,7 @@ const PatientAssessment = require('../../models/PatientAssessment.model');
 const Patient = require('../../models/Patient.model');
 const Program = require('../../models/Program.model');
 const { Payment } = require('../../models/Payment.model');
+const notificationService = require('../../services/notification.service');
 const { writeAuditLog } = require('../../utils/auditLogger');
 const { paginateModel } = require('../../utils/queryHelpers');
 const asyncHandler = require('../../utils/asyncHandler');
@@ -80,12 +81,14 @@ const updateRiskReview = asyncHandler(async (req, res) => {
   if (!assessment) return res.status(404).json({ message: 'Clinical review not found' });
 
   const programmeCorrection = assessment.status === 'cleared' && status === 'cleared';
+  const shouldSendClearanceSms = assessment.status === 'pending_review' && status === 'cleared';
   if (assessment.status !== 'pending_review' && !programmeCorrection) {
     return res.status(409).json({ message: 'Only pending reviews can receive a decision. Cleared reviews can only update programme assignment or direct-patient fee before payment.' });
   }
 
   const patient = await Patient.findById(assessment.patient);
   if (!patient) return res.status(404).json({ message: 'Patient not found' });
+  const previousDirectPatientFee = patient.directPatientFee;
 
   const paid = await Payment.exists({ patient: assessment.patient, status: { $in: FINANCIAL_STATUSES } });
   if (programmeCorrection && paid) {
@@ -128,7 +131,7 @@ const updateRiskReview = asyncHandler(async (req, res) => {
     adminReviewNote: assessment.adminReviewNote,
     approvedProgram: assessment.approvedProgram,
     approvedPrograms: assessment.approvedPrograms,
-    directPatientFee: patient.directPatientFee,
+    directPatientFee: previousDirectPatientFee,
     reviewedBy: assessment.reviewedBy,
     reviewedAt: assessment.reviewedAt,
   };
@@ -173,8 +176,28 @@ const updateRiskReview = asyncHandler(async (req, res) => {
     reason: note,
   });
 
+  let sms;
+  if (shouldSendClearanceSms) {
+    sms = await notificationService.createNotification({
+      recipientType: 'patient',
+      patient: assessment.patient,
+      type: 'assessment_review_cleared',
+      channel: 'sms',
+      title: 'Assessment review cleared',
+      message: 'PhysioQR: Your assessment has been reviewed and cleared. Please log in to continue with payment and your approved rehabilitation plan.',
+      metadata: { assessmentId: assessment._id, reviewedAt: assessment.reviewedAt },
+    });
+    await writeAuditLog({
+      req,
+      action: 'assessment_clearance_sms_queued',
+      module: 'Notification',
+      recordId: sms._id,
+      newValue: { assessmentId: assessment._id, patientId: assessment.patient, status: sms.status, provider: sms.provider, providerMessageId: sms.providerMessageId, failureReason: sms.failureReason },
+    });
+  }
+
   const updated = await PatientAssessment.findById(assessment._id).populate(populate).lean();
-  res.json(updated);
+  res.json({ ...updated, sms: sms ? { notificationId: sms._id, status: sms.status, provider: sms.provider, providerMessageId: sms.providerMessageId, failureReason: sms.failureReason } : undefined });
 });
 
 module.exports = { getRiskReviews, getRiskReviewById, updateRiskReview };
