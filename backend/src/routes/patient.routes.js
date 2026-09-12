@@ -13,6 +13,7 @@ const {
   getMyPayments,
 } = require('../controllers/patient.controller');
 const { getClinicalAccess } = require('../controllers/patient-clinical-access.controller');
+const { getMyPrescription } = require('../controllers/patientPrescription.controller');
 
 router.post('/register', validateSchema({
   body: {
@@ -33,6 +34,7 @@ router.get('/me/onboarding-status', getOnboardingStatus);
 router.get('/me/clinical-access', getClinicalAccess);
 router.get('/me/onboarding-quote', getOnboardingQuote);
 router.get('/me/program', getMyProgram);
+router.get('/me/prescription', getMyPrescription);
 router.get('/me/progress', getMyProgress);
 router.get('/me/payments', getMyPayments);
 
