@@ -8,13 +8,8 @@ const { getPagination } = require('../../utils/queryHelpers');
 const asyncHandler = require('../../utils/asyncHandler');
 
 const DIFFICULTY_LEVELS = [
-  'beginner',
-  'intermediate',
-  'advanced',
-  'senior_friendly',
-  'post_operative',
-  'general_mobility',
-  'condition_specific',
+  'beginner', 'intermediate', 'advanced', 'senior_friendly',
+  'post_operative', 'general_mobility', 'condition_specific',
 ];
 
 const cleanString = (value) => String(value ?? '').trim();
@@ -37,7 +32,6 @@ const normalizePayload = (body = {}) => {
   if (body.difficultyLevel !== undefined) payload.difficultyLevel = body.difficultyLevel || undefined;
   if (body.durationDays !== undefined && body.durationDays !== '') payload.durationDays = Number(body.durationDays);
   if (body.sessionsPerDay !== undefined && body.sessionsPerDay !== '') payload.sessionsPerDay = Number(body.sessionsPerDay);
-  if (body.defaultPrice !== undefined && body.defaultPrice !== '') payload.defaultPrice = Number(body.defaultPrice);
   if (body.isActive !== undefined) payload.isActive = Boolean(body.isActive);
 
   ['eligibleConditions', 'excludedConditions', 'requiredEquipment'].forEach((field) => {
@@ -56,7 +50,6 @@ const validatePayload = async (payload, { partial = false, programId = null } = 
   if (!partial && (!Number.isFinite(payload.durationDays) || payload.durationDays < 1)) return 'Duration must be at least 1 day';
   if (payload.durationDays !== undefined && (!Number.isFinite(payload.durationDays) || payload.durationDays < 1 || payload.durationDays > 365)) return 'Duration must be between 1 and 365 days';
   if (payload.sessionsPerDay !== undefined && (!Number.isFinite(payload.sessionsPerDay) || payload.sessionsPerDay < 1 || payload.sessionsPerDay > 10)) return 'Sessions per day must be between 1 and 10';
-  if (payload.defaultPrice !== undefined && (!Number.isFinite(payload.defaultPrice) || payload.defaultPrice < 0)) return 'Default price cannot be negative';
   if (payload.difficultyLevel !== undefined && payload.difficultyLevel && !DIFFICULTY_LEVELS.includes(payload.difficultyLevel)) return 'Invalid difficulty level';
 
   if (payload.painCategory) {
@@ -69,7 +62,6 @@ const validatePayload = async (payload, { partial = false, programId = null } = 
     if (programId) duplicateFilter._id = { $ne: programId };
     if (await Program.exists(duplicateFilter)) return 'Program code already exists';
   }
-
   return null;
 };
 
@@ -119,12 +111,7 @@ const getPrograms = asyncHandler(async (req, res) => {
   if (req.query.difficultyLevel) filter.difficultyLevel = req.query.difficultyLevel;
 
   const [items, total, summary] = await Promise.all([
-    Program.find(filter)
-      .populate('painCategory', 'name nameHindi isActive')
-      .sort({ isActive: -1, createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .lean(),
+    Program.find(filter).populate('painCategory', 'name nameHindi isActive').sort({ isActive: -1, createdAt: -1 }).skip(skip).limit(limit).lean(),
     Program.countDocuments(filter),
     Promise.all([
       Program.countDocuments(),
@@ -136,14 +123,9 @@ const getPrograms = asyncHandler(async (req, res) => {
 
   const metrics = await listMetrics(items.map((item) => item._id));
   res.json({
-    items: items.map((item) => ({ ...item, metrics: metrics.get(String(item._id)) })),
+    items: items.map((item) => ({ ...item, defaultPrice: undefined, metrics: metrics.get(String(item._id)) })),
     meta: { page, limit, total, totalPages: Math.max(1, Math.ceil(total / limit)) },
-    summary: {
-      total: summary[0],
-      active: summary[1],
-      inactive: summary[2],
-      mappedCategories: summary[3].length,
-    },
+    summary: { total: summary[0], active: summary[1], inactive: summary[2], mappedCategories: summary[3].length },
   });
 });
 
@@ -151,13 +133,13 @@ const getProgramById = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid program id' });
   const program = await Program.findById(req.params.id).populate('painCategory', 'name nameHindi description isActive').lean();
   if (!program) return res.status(404).json({ message: 'Program not found' });
+  delete program.defaultPrice;
 
   const [days, enrollmentSummary] = await Promise.all([
     ProgramDay.find({ program: program._id, isActive: true })
       .select('dayNumber title exercises isActive')
       .populate('exercises.exercise', 'name nameHindi thumbnail videoUrl youtubeVideoId isActive')
-      .sort({ dayNumber: 1 })
-      .lean(),
+      .sort({ dayNumber: 1 }).lean(),
     PatientProgram.aggregate([
       { $match: { program: program._id } },
       { $group: {
@@ -189,7 +171,6 @@ const createProgram = asyncHandler(async (req, res) => {
   const payload = normalizePayload(req.body);
   const error = await validatePayload(payload);
   if (error) return res.status(400).json({ message: error });
-
   const program = await Program.create(payload);
   await writeAuditLog({ req, action: 'program_created', module: 'Program', recordId: program._id, newValue: program });
   res.status(201).json(program);
@@ -206,6 +187,8 @@ const updateProgram = asyncHandler(async (req, res) => {
 
   const previousValue = program.toObject();
   Object.assign(program, payload);
+  // Keep any historical field out of active content configuration.
+  program.defaultPrice = undefined;
   await program.save();
   await writeAuditLog({ req, action: 'program_updated', module: 'Program', recordId: program._id, previousValue, newValue: payload });
   res.json(program);
@@ -217,9 +200,7 @@ const setProgramStatus = asyncHandler(async (req, res) => {
   if (!program) return res.status(404).json({ message: 'Program not found' });
 
   const nextActive = req.params.action === 'reactivate';
-  if (program.isActive === nextActive) {
-    return res.status(409).json({ message: `Program is already ${nextActive ? 'active' : 'inactive'}` });
-  }
+  if (program.isActive === nextActive) return res.status(409).json({ message: `Program is already ${nextActive ? 'active' : 'inactive'}` });
 
   const previousValue = { isActive: program.isActive };
   program.isActive = nextActive;
@@ -227,11 +208,7 @@ const setProgramStatus = asyncHandler(async (req, res) => {
   await writeAuditLog({
     req,
     action: nextActive ? 'program_reactivated' : 'program_deactivated',
-    module: 'Program',
-    recordId: program._id,
-    previousValue,
-    newValue: { isActive: nextActive },
-    reason: cleanString(req.body.reason),
+    module: 'Program', recordId: program._id, previousValue, newValue: { isActive: nextActive }, reason: cleanString(req.body.reason),
   });
   res.json({ message: `Program ${nextActive ? 'reactivated' : 'deactivated'}`, program });
 });
