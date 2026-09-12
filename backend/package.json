@@ -12,6 +12,8 @@
     "seed:assessment-pathways": "node scripts/seedAssessmentPathways.js",
     "seed:assessment-questions": "node scripts/seedAssessmentQuestions.js",
     "seed:assessment-content": "npm run seed:assessment-pathways && npm run seed:assessment-questions",
+    "seed:rehab-programs": "node scripts/seedRehabPrograms.js",
+    "seed:clinical-content": "npm run seed:assessment-pathways && npm run seed:assessment-questions && npm run seed:rehab-programs",
     "reset:all-except-admin": "node scripts/resetAllExceptAdmin.js",
     "test:integration": "node scripts/integrationSmoke.js",
     "worker:notifications": "node scripts/notificationWorker.js"
@@ -21,7 +23,7 @@
     "@aws-sdk/s3-request-presigner": "^3.1109.0",
     "@sentry/node": "^10.70.0",
     "bcryptjs": "^2.4.3",
-    "cors": "^2.8.5",
+    "cors": "^4.18.2",
     "express": "^4.18.2",
     "express-mongo-sanitize": "^2.2.0",
     "express-rate-limit": "^7.1.5",
