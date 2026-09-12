@@ -10,6 +10,7 @@ const PatientProgrammePage = lazy(() => import('@/features/patients/pages/progra
 const ProgrammeDayPage = lazy(() => import('@/features/patients/pages/program/ProgrammeDayPage'));
 const PatientProgressPage = lazy(() => import('@/features/patients/pages/progress/PatientProgressPage'));
 const PatientPaymentsPage = lazy(() => import('@/features/patients/pages/payments/PatientPaymentsPage'));
+const PatientContinuePaymentPage = lazy(() => import('@/features/patients/pages/payments/PatientContinuePaymentPage'));
 const PatientSupportPage = lazy(() => import('@/features/patients/pages/support/PatientSupportPage'));
 
 const clinicalGate = (element: React.ReactNode) => (
@@ -31,6 +32,7 @@ export const patientRoutes: RouteObject = {
     { path: 'programme', element: clinicalGate(withSuspense(<PatientProgrammePage />)) },
     { path: 'programme/day/:dayNumber', element: clinicalGate(withSuspense(<ProgrammeDayPage />)) },
     { path: 'progress', element: clinicalGate(withSuspense(<PatientProgressPage />)) },
+    { path: 'continue-payment', element: withSuspense(<PatientContinuePaymentPage />) },
     { path: 'payments', element: withSuspense(<PatientPaymentsPage />) },
     { path: 'support', element: withSuspense(<PatientSupportPage />) },
   ],
