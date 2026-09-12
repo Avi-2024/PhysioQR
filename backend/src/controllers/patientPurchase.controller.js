@@ -16,7 +16,7 @@ const getPurchaseQuote = asyncHandler(async (req, res) => {
     ),
     PatientAssessment.findOne({ patient: patientId })
       .sort({ createdAt: -1 })
-      .select('painCategory status reviewType requiresPhysioReview approvedProgram')
+      .select('painCategory status reviewType requiresPhysioReview approvedProgram hasRedFlag')
       .lean(),
   ]);
 
@@ -44,13 +44,11 @@ const getPurchaseQuote = asyncHandler(async (req, res) => {
   if (!painCategoryId) return res.status(400).json({ message: 'Assessment body region is not configured' });
 
   let program;
-  if (assessment.requiresPhysioReview) {
-    if (!assessment.approvedProgram) {
-      return res.status(409).json({
-        code: 'PROGRAM_APPROVAL_REQUIRED',
-        message: 'The physiotherapist must approve a rehabilitation programme before payment can continue.',
-      });
-    }
+  let assignmentSource = 'body_region_auto_mapping';
+
+  // A clinician-selected programme always takes precedence, whether the review
+  // was a red-flag review or a post-surgery/physio review.
+  if (assessment.approvedProgram) {
     program = await Program.findOne({
       _id: assessment.approvedProgram,
       isActive: true,
@@ -59,9 +57,15 @@ const getPurchaseQuote = asyncHandler(async (req, res) => {
     if (!program) {
       return res.status(409).json({
         code: 'APPROVED_PROGRAM_UNAVAILABLE',
-        message: 'The clinically approved programme is no longer active for this body region. A new clinical review is required.',
+        message: 'The clinically approved programme is no longer active for this body region. Admin must assign another programme before payment can continue.',
       });
     }
+    assignmentSource = 'clinical_review';
+  } else if (assessment.requiresPhysioReview || assessment.hasRedFlag) {
+    return res.status(409).json({
+      code: 'PROGRAM_APPROVAL_REQUIRED',
+      message: 'Admin must approve a rehabilitation programme for this cleared clinical review before payment can continue.',
+    });
   } else {
     program = await Program.findOne({ isActive: true, painCategory: painCategoryId })
       .populate('painCategory', 'name')
@@ -121,9 +125,7 @@ const getPurchaseQuote = asyncHandler(async (req, res) => {
       currency: 'INR',
       source: doctor ? 'doctor_pricing' : 'program_default_price',
     },
-    assignment: {
-      source: assessment.requiresPhysioReview ? 'clinical_review' : 'body_region_auto_mapping',
-    },
+    assignment: { source: assignmentSource },
   });
 });
 
