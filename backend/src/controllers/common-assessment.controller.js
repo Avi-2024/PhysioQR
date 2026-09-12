@@ -208,17 +208,29 @@ const submitCommonAssessment = asyncHandler(async (req, res) => {
     surgeryTypeId: context.surgeryType?._id,
   })).sort({ displayOrder: 1, createdAt: 1 });
 
-  const visibleQuestions = questions.filter((question) => isQuestionVisible(question, answerMap));
-  const visibleQuestionIds = new Set(visibleQuestions.map((question) => question._id.toString()));
-  const invalidAnswer = answers.find((answer) => !visibleQuestionIds.has(answer.question?.toString()));
-  if (invalidAnswer) {
+  // Reject only answers that do not belong to the selected active pathway at all.
+  // A same-pathway conditional question may have been answered before its parent
+  // answer changed; those now-hidden answers are safely discarded below instead
+  // of failing the whole assessment submission.
+  const scopedQuestionIds = new Set(questions.map((question) => question._id.toString()));
+  const unrelatedAnswer = answers.find((answer) => !scopedQuestionIds.has(answer.question?.toString()));
+  if (unrelatedAnswer) {
     return res.status(400).json({
-      message: 'Submitted answer contains an inactive, hidden, or unrelated pathway question',
-      question: invalidAnswer.question,
+      message: 'Submitted answer contains an inactive or unrelated pathway question',
+      question: unrelatedAnswer.question,
     });
   }
 
-  const redFlagDetails = getRedFlagDetails(visibleQuestions, answerMap);
+  const visibleQuestions = questions.filter((question) => isQuestionVisible(question, answerMap));
+  const visibleQuestionIds = new Set(visibleQuestions.map((question) => question._id.toString()));
+  const sanitizedAnswers = answers.filter((answer) => visibleQuestionIds.has(answer.question?.toString()));
+  const sanitizedAnswerMap = new Map(sanitizedAnswers.map((answer) => [answer.question?.toString(), answer]));
+
+  if (!sanitizedAnswers.length) {
+    return res.status(400).json({ message: 'Please answer at least one visible assessment question' });
+  }
+
+  const redFlagDetails = getRedFlagDetails(visibleQuestions, sanitizedAnswerMap);
   const hasRedFlag = redFlagDetails.length > 0;
   const requiresPhysioReview = Boolean(context.caseType?.requiresPhysioReview || context.surgeryType?.requiresPhysioReview);
   const reviewRequired = hasRedFlag || requiresPhysioReview;
@@ -236,7 +248,7 @@ const submitCommonAssessment = asyncHandler(async (req, res) => {
     postOpDayAtAssessment,
     requiresPhysioReview,
     reviewType: hasRedFlag ? 'red_flag' : requiresPhysioReview ? 'physio_review' : undefined,
-    answers,
+    answers: sanitizedAnswers,
     hasRedFlag,
     redFlagDetails,
     status: reviewRequired ? 'pending_review' : 'cleared',
