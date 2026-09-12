@@ -1,4 +1,5 @@
 const PatientAssessment = require('../../models/PatientAssessment.model');
+const Patient = require('../../models/Patient.model');
 const Program = require('../../models/Program.model');
 const { Payment } = require('../../models/Payment.model');
 const { writeAuditLog } = require('../../utils/auditLogger');
@@ -9,11 +10,16 @@ const reviewFilter = { $or: [{ hasRedFlag: true }, { requiresPhysioReview: true 
 const FINANCIAL_STATUSES = ['successful', 'manually_verified', 'partially_refunded', 'refunded', 'disputed', 'chargeback'];
 
 const populate = [
-  { path: 'patient', select: 'patientId fullName mobile status referringDoctor', populate: { path: 'referringDoctor', select: 'doctorId fullName clinicName' } },
+  {
+    path: 'patient',
+    select: 'patientId fullName mobile status referringDoctor directPatientFee directPatientFeeSetAt',
+    populate: { path: 'referringDoctor', select: 'doctorId fullName clinicName approvedPatientFee revenueModel' },
+  },
   { path: 'caseType', select: 'code name requiresSurgeryDetails requiresPhysioReview' },
   { path: 'painCategory', select: 'name' },
   { path: 'surgeryType', select: 'code name bodyRegion' },
-  { path: 'approvedProgram', select: 'programCode name durationDays difficultyLevel painCategory isActive defaultPrice' },
+  { path: 'approvedProgram', select: 'programCode name durationDays difficultyLevel painCategory isActive' },
+  { path: 'approvedPrograms', select: 'programCode name durationDays difficultyLevel painCategory isActive' },
   { path: 'reviewedBy', select: 'email mobile role' },
 ];
 
@@ -31,7 +37,9 @@ const getRiskReviews = asyncHandler(async (req, res) => {
       item.patient?.patientId, item.patient?.fullName, item.patient?.mobile,
       item.patient?.referringDoctor?.fullName, item.patient?.referringDoctor?.clinicName,
       item.caseType?.name, item.painCategory?.name, item.surgeryType?.name,
-      item.approvedProgram?.name, item.reviewType, item.adminReviewNote, item.status,
+      item.approvedProgram?.name,
+      ...(item.approvedPrograms || []).map((program) => program?.name),
+      item.reviewType, item.adminReviewNote, item.status,
       ...(item.redFlagDetails || []).flatMap((detail) => [detail.questionText, detail.answer, detail.reason]),
     ].filter((value) => value !== undefined && value !== null).some((value) => String(value).toLowerCase().includes(q)));
   }
@@ -55,8 +63,8 @@ const getRiskReviewById = asyncHandler(async (req, res) => {
   let availablePrograms = [];
   if (assessment.painCategory?._id) {
     availablePrograms = await Program.find({ isActive: true, painCategory: assessment.painCategory._id })
-      .select('programCode name durationDays difficultyLevel description painCategory defaultPrice')
-      .sort({ name: 1 })
+      .select('programCode name durationDays difficultyLevel description painCategory')
+      .sort({ durationDays: 1, name: 1 })
       .lean();
   }
 
@@ -64,7 +72,7 @@ const getRiskReviewById = asyncHandler(async (req, res) => {
 });
 
 const updateRiskReview = asyncHandler(async (req, res) => {
-  const { status, note, programId } = req.body;
+  const { status, note, programId, programIds, patientFee } = req.body;
   if (!['cleared', 'blocked'].includes(status)) return res.status(400).json({ message: 'Decision must be cleared or blocked' });
   if (!String(note || '').trim()) return res.status(400).json({ message: 'Clinical review note is required' });
 
@@ -73,19 +81,45 @@ const updateRiskReview = asyncHandler(async (req, res) => {
 
   const programmeCorrection = assessment.status === 'cleared' && status === 'cleared';
   if (assessment.status !== 'pending_review' && !programmeCorrection) {
-    return res.status(409).json({ message: 'Only pending reviews can receive a decision. Cleared reviews can only receive a programme assignment correction.' });
+    return res.status(409).json({ message: 'Only pending reviews can receive a decision. Cleared reviews can only update programme assignment or direct-patient fee before payment.' });
   }
 
-  let approvedProgram = null;
-  if (status === 'cleared') {
-    if (!programId) return res.status(400).json({ message: 'Select the rehabilitation programme approved for this clinical review' });
-    approvedProgram = await Program.findOne({ _id: programId, isActive: true, painCategory: assessment.painCategory })
-      .select('_id name programCode defaultPrice');
-    if (!approvedProgram) return res.status(400).json({ message: 'Select an active programme mapped to this body region' });
+  const patient = await Patient.findById(assessment.patient);
+  if (!patient) return res.status(404).json({ message: 'Patient not found' });
 
-    if (programmeCorrection) {
-      const paid = await Payment.exists({ patient: assessment.patient, status: { $in: FINANCIAL_STATUSES } });
-      if (paid) return res.status(409).json({ message: 'Programme assignment is locked after verified payment' });
+  const paid = await Payment.exists({ patient: assessment.patient, status: { $in: FINANCIAL_STATUSES } });
+  if (programmeCorrection && paid) {
+    return res.status(409).json({ message: 'Programme assignment and patient fee are locked after verified payment' });
+  }
+
+  let approvedPrograms = [];
+  if (status === 'cleared') {
+    const ids = [...new Set([
+      ...(Array.isArray(programIds) ? programIds : []),
+      ...(programId ? [programId] : []),
+    ].map((value) => String(value)).filter(Boolean))];
+
+    if (!ids.length) return res.status(400).json({ message: 'Select at least one rehabilitation programme for this clinical review' });
+
+    approvedPrograms = await Program.find({
+      _id: { $in: ids },
+      isActive: true,
+      painCategory: assessment.painCategory,
+    }).select('_id name programCode durationDays');
+
+    if (approvedPrograms.length !== ids.length) {
+      return res.status(400).json({ message: 'Every selected programme must be active and mapped to this body region' });
+    }
+
+    if (!patient.referringDoctor) {
+      const fee = Number(patientFee ?? patient.directPatientFee);
+      if (!Number.isFinite(fee) || fee <= 0) {
+        return res.status(400).json({ message: 'Admin must set the patient fee for a direct PhysioQR patient before clearance' });
+      }
+      patient.directPatientFee = fee;
+      patient.directPatientFeeSetBy = req.user._id;
+      patient.directPatientFeeSetAt = new Date();
+      await patient.save();
     }
   }
 
@@ -93,21 +127,28 @@ const updateRiskReview = asyncHandler(async (req, res) => {
     status: assessment.status,
     adminReviewNote: assessment.adminReviewNote,
     approvedProgram: assessment.approvedProgram,
+    approvedPrograms: assessment.approvedPrograms,
+    directPatientFee: patient.directPatientFee,
     reviewedBy: assessment.reviewedBy,
     reviewedAt: assessment.reviewedAt,
   };
 
   if (!programmeCorrection) assessment.status = status;
   assessment.adminReviewNote = String(note).trim();
-  if (status === 'cleared') assessment.approvedProgram = approvedProgram._id;
-  else assessment.approvedProgram = undefined;
+  if (status === 'cleared') {
+    assessment.approvedPrograms = approvedPrograms.map((program) => program._id);
+    assessment.approvedProgram = approvedPrograms[0]._id;
+  } else {
+    assessment.approvedPrograms = [];
+    assessment.approvedProgram = undefined;
+  }
   assessment.reviewedBy = req.user._id;
   assessment.reviewedAt = new Date();
   await assessment.save();
 
   const isRedFlagReview = assessment.reviewType === 'red_flag' || assessment.hasRedFlag;
   const action = programmeCorrection
-    ? 'assessment_programme_assigned_after_clearance'
+    ? 'assessment_programme_bundle_updated_after_clearance'
     : status === 'cleared'
       ? isRedFlagReview ? 'assessment_red_flag_cleared' : 'assessment_physio_review_cleared'
       : isRedFlagReview ? 'assessment_red_flag_blocked' : 'assessment_physio_review_blocked';
@@ -122,7 +163,10 @@ const updateRiskReview = asyncHandler(async (req, res) => {
       status: assessment.status,
       adminReviewNote: assessment.adminReviewNote,
       approvedProgram: assessment.approvedProgram,
-      approvedProgramName: approvedProgram?.name,
+      approvedPrograms: assessment.approvedPrograms,
+      approvedProgramNames: approvedPrograms.map((program) => program.name),
+      directPatientFee: patient.referringDoctor ? undefined : patient.directPatientFee,
+      feeAuthority: patient.referringDoctor ? 'doctor' : 'admin',
       reviewedBy: req.user._id,
       reviewedAt: assessment.reviewedAt,
     },
