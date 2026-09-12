@@ -15,6 +15,7 @@ const {
 const { getClinicalAccess } = require('../controllers/patient-clinical-access.controller');
 const { getMyPrescription } = require('../controllers/patientPrescription.controller');
 const { getPurchaseQuote } = require('../controllers/patientPurchase.controller');
+const { listMyPrograms, getMyProgramByEnrollment } = require('../controllers/patientPrograms.controller');
 
 router.post('/register', validateSchema({
   body: {
@@ -36,6 +37,8 @@ router.get('/me/clinical-access', getClinicalAccess);
 router.get('/me/onboarding-quote', getOnboardingQuote);
 router.get('/me/purchase-quote', getPurchaseQuote);
 router.get('/me/program', getMyProgram);
+router.get('/me/programs', listMyPrograms);
+router.get('/me/programs/:enrollmentId', validateSchema({ params: { enrollmentId: { type: 'objectId', required: true } } }), getMyProgramByEnrollment);
 router.get('/me/prescription', getMyPrescription);
 router.get('/me/progress', getMyProgress);
 router.get('/me/payments', getMyPayments);
