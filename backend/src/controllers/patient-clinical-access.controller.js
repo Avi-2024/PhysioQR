@@ -7,12 +7,12 @@ const asyncHandler = require('../utils/asyncHandler');
 const ACTIVE_PAYMENT_STATUSES = ['successful', 'manually_verified', 'partially_refunded'];
 
 // GET /api/patients/me/clinical-access
-// Rehabilitation access requires clinical clearance + a financially valid payment
-// + activation of every clinically-approved programme in the bundle.
+// Rehabilitation access requires the current clinical clearance + a financially
+// valid payment made for/after that clearance + activation of the approved bundle.
 const getClinicalAccess = asyncHandler(async (req, res) => {
   const patientId = req.user._id;
 
-  const [blockedAssessment, pendingAssessment, latestAssessment, verifiedPayment] = await Promise.all([
+  const [blockedAssessment, pendingAssessment, latestAssessment] = await Promise.all([
     PatientAssessment.findOne({ patient: patientId, status: 'blocked' })
       .sort({ createdAt: -1 })
       .select('_id reviewType hasRedFlag status redFlagDetails adminReviewNote createdAt reviewedAt')
@@ -25,21 +25,25 @@ const getClinicalAccess = asyncHandler(async (req, res) => {
       .sort({ createdAt: -1 })
       .select('_id reviewType hasRedFlag status createdAt reviewedAt approvedProgram approvedPrograms')
       .lean(),
-    Payment.findOne({
-      patient: patientId,
-      status: { $in: ACTIVE_PAYMENT_STATUSES },
-      duplicateOf: { $exists: false },
-    })
-      .sort({ verifiedAt: -1, createdAt: -1 })
-      .select('_id status program programs doctor verifiedAt')
-      .lean(),
   ]);
+
+  const clearanceAt = latestAssessment?.reviewedAt || latestAssessment?.createdAt;
+  const paymentFilter = {
+    patient: patientId,
+    status: { $in: ACTIVE_PAYMENT_STATUSES },
+    duplicateOf: { $exists: false },
+  };
+  if (clearanceAt) paymentFilter.createdAt = { $gte: clearanceAt };
+
+  const verifiedPayment = await Payment.findOne(paymentFilter)
+    .sort({ verifiedAt: -1, createdAt: -1 })
+    .select('_id status program programs doctor verifiedAt createdAt')
+    .lean();
 
   const approvedProgramIds = getApprovedProgrammeIds(latestAssessment);
 
-  // Recovery-safe bundle activation: the normal payment flow activates the primary
-  // programme immediately. This ensures additional clinically-approved programmes
-  // are also activated after a valid payment, including webhook-only completions.
+  // Recovery-safe reconciliation for a payment that belongs to the current
+  // clearance cycle. This cannot reuse an older payment for a later assessment.
   if (!blockedAssessment && !pendingAssessment && latestAssessment?.status === 'cleared' && verifiedPayment && approvedProgramIds.length) {
     await activateProgrammeBundle({
       patientId,
@@ -55,33 +59,36 @@ const getClinicalAccess = asyncHandler(async (req, res) => {
     .select('_id program status payment activationPayment startDate expiryDate')
     .lean();
 
+  const currentPaymentId = verifiedPayment ? String(verifiedPayment._id) : '';
   const activeProgramIds = new Set(
     patientPrograms
-      .filter((item) => item.status === 'active')
+      .filter((item) => item.status === 'active' && (
+        !currentPaymentId ||
+        String(item.activationPayment || '') === currentPaymentId ||
+        String(item.payment || '') === currentPaymentId
+      ))
       .map((item) => String(item.program)),
   );
-  const programmeBundleActivated = approvedProgramIds.length
+
+  const programmeBundleActivated = Boolean(verifiedPayment) && (approvedProgramIds.length
     ? approvedProgramIds.every((id) => activeProgramIds.has(String(id)))
-    : patientPrograms.some((item) => item.status === 'active');
+    : patientPrograms.some((item) => item.status === 'active' && (
+      String(item.activationPayment || '') === currentPaymentId || String(item.payment || '') === currentPaymentId
+    )));
 
   let accessState = 'active';
   let assessment = null;
 
   if (blockedAssessment) {
-    accessState = 'blocked';
-    assessment = blockedAssessment;
+    accessState = 'blocked'; assessment = blockedAssessment;
   } else if (pendingAssessment) {
-    accessState = 'pending_review';
-    assessment = pendingAssessment;
+    accessState = 'pending_review'; assessment = pendingAssessment;
   } else if (!latestAssessment || latestAssessment.status !== 'cleared') {
-    accessState = 'assessment_required';
-    assessment = latestAssessment || null;
+    accessState = 'assessment_required'; assessment = latestAssessment || null;
   } else if (!verifiedPayment) {
-    accessState = 'payment_required';
-    assessment = latestAssessment;
+    accessState = 'payment_required'; assessment = latestAssessment;
   } else if (!programmeBundleActivated) {
-    accessState = 'activation_pending';
-    assessment = latestAssessment;
+    accessState = 'activation_pending'; assessment = latestAssessment;
   } else {
     assessment = latestAssessment;
   }
