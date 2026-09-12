@@ -16,9 +16,10 @@ const patientAssessmentSchema = new mongoose.Schema({
     type: String,
     enum: ['red_flag', 'physio_review'],
   },
-  // For pathways that require clinical review (especially post-operative cases),
-  // programme selection is explicit and audited instead of being auto-prescribed.
+  // Legacy primary programme retained for backward compatibility with older
+  // payment/reporting code. New clinical reviews can approve multiple programmes.
   approvedProgram: { type: mongoose.Schema.Types.ObjectId, ref: 'Program' },
+  approvedPrograms: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Program' }],
   answers: [
     {
       question: { type: mongoose.Schema.Types.ObjectId, ref: 'AssessmentQuestion' },
