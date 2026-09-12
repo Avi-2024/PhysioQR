@@ -386,7 +386,7 @@ export default function AdminDoctorDetailPage() {
           <section className="rounded-xl border border-neutral-200 bg-white p-4">
             <div className="flex items-center gap-2 text-sm font-bold text-neutral-950"><ShieldCheck className="h-4 w-4 text-primary-700" />Decision checklist</div>
             <div className="mt-4 space-y-3 text-sm">
-              {[['KYC', humanize(doctor.kycStatus)], ['Bank', doctor.bankVerified ? 'Verified' : 'Not verified'], ['Medical registration', doctor.medicalRegNumber ? 'Provided' : 'Missing'], ['Agent', doctor.agent?.fullName || 'Unassigned'], ['Documents', `${doctor.kycDocuments?.length ?? 0} uploaded`]].map(([label, value]) => <div key={label} className="flex items-center justify-between gap-3"><span className="text-neutral-500">{label}</span><span className="text-right font-semibold text-neutral-900">{value}</span></div>)}
+              {[['KYC', humanize(doctor.kycStatus)], ['Bank', doctor.bankVerified ? 'Verified' : 'Not verified'], ['Medical registration', doctor.medicalRegNumber ? 'Provided' : 'Missing'], ['Agent', doctor.agent?.fullName || 'Unassigned'], ['Documents', `${doctor.kycDocuments?.length ?? 0} uploaded`]].map(([label, value]) => <div key={label} className="flex items-center justify-between gap-3"><span className="text-neutral-500">{label}</span><span className="  font-semibold text-neutral-900">{value}</span></div>)}
             </div>
           </section>
         </aside>

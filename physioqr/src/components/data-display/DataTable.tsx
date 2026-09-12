@@ -53,7 +53,7 @@ export const MobileDataCard = <T extends object>({
         <span className="shrink-0 text-xs font-semibold text-gray-400 uppercase tracking-wide">
           {col.header}
         </span>
-        <span className="min-w-0 text-right text-sm text-gray-800">
+        <span className="min-w-0   text-sm text-gray-800">
           {col.render
             ? col.render(row)
             : String((row as Record<string, unknown>)[col.key] ?? '-')}

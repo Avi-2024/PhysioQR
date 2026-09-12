@@ -362,7 +362,7 @@ export default function AdminDoctorsPage() {
                     <th className="px-4 py-3">KYC</th>
                     <th className="px-4 py-3">Status</th>
                     <th className="px-4 py-3">Patient fee</th>
-                    <th className="px-5 py-3 text-right">Action</th>
+                    <th className="px-5 py-3  ">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100">
@@ -393,7 +393,7 @@ export default function AdminDoctorsPage() {
                           {doctor.approvedPatientFee != null ? inr.format(doctor.approvedPatientFee) : '—'}
                           <div className="mt-0.5 text-xs font-normal text-neutral-500">{labelize(doctor.revenueModel)}</div>
                         </td>
-                        <td className="px-5 py-4 text-right">
+                        <td className="px-5 py-4  ">
                           <button
                             type="button"
                             onClick={(event) => { event.stopPropagation(); navigate(`/admin/doctors/${doctor._id}`); }}
