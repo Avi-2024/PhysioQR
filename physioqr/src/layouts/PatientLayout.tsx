@@ -15,9 +15,9 @@ export function PatientLayout() {
   };
 
   return (
-    <div className="min-h-screen bg-neutral-50 flex flex-col justify-between pb-16 md:pb-0">
+    <div className="min-h-screen bg-neutral-50 flex flex-col justify-between pb-16 md:pb-0 print:bg-white print:pb-0">
       {/* Top Header */}
-      <header className="min-h-16 sm:min-h-20 bg-white border-b border-neutral-200 px-4 sm:px-6 flex items-center justify-between gap-3 sticky top-0 z-20">
+      <header className="min-h-16 sm:min-h-20 bg-white border-b border-neutral-200 px-4 sm:px-6 flex items-center justify-between gap-3 sticky top-0 z-20 print:hidden">
         <div className="flex items-center gap-3 sm:gap-4 min-w-0">
           <Logo width={56} height={56}  />
           <div className="min-w-0">
@@ -31,12 +31,12 @@ export function PatientLayout() {
       </header>
 
       {/* Main Content */}
-      <main id="main-content" className="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6">
+      <main id="main-content" className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 print:max-w-none print:p-0">
         <Outlet />
       </main>
 
       {/* Mobile Bottom Navigation */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-neutral-200 flex items-center h-16 z-30 px-1">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-neutral-200 flex items-center h-16 z-30 px-1 print:hidden">
         {[
           { label: 'Home', path: '/patient/dashboard', icon: Home },
           { label: 'Programme', path: '/patient/programme', icon: PlayCircle },
