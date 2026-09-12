@@ -104,8 +104,14 @@ const finalizeConfirmedRefund = async (refundId) => {
       }
 
       if (isFullRefund) {
-        await PatientProgram.findOneAndUpdate(
-          { payment: payment._id, status: { $nin: ['cancelled', 'completed'] } },
+        await PatientProgram.updateMany(
+          {
+            $or: [
+              { payment: payment._id },
+              { activationPayment: payment._id },
+            ],
+            status: { $nin: ['cancelled', 'completed'] },
+          },
           { $set: { status: 'cancelled' } },
           { session },
         );
