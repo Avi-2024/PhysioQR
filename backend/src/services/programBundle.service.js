@@ -23,24 +23,39 @@ const activateProgrammeBundle = async ({ patientId, paymentId, doctorId = null, 
   const selectedIds = normalizeIds(programIds);
   if (!selectedIds.length) return [];
 
-  let query = Program.find({ _id: { $in: selectedIds }, isActive: true }).select('_id durationDays');
-  if (session) query = query.session(session);
-  const programs = await query;
+  let programQuery = Program.find({ _id: { $in: selectedIds }, isActive: true }).select('_id durationDays');
+  if (session) programQuery = programQuery.session(session);
+  const programs = await programQuery;
   if (programs.length !== selectedIds.length) {
     const error = new Error('One or more approved programmes are inactive or unavailable');
     error.status = 409;
     throw error;
   }
 
-  const startDate = new Date();
-  const gracePeriodDays = 3;
   const primaryId = String(primaryProgramId || selectedIds[0]);
   const results = [];
 
   for (const program of programs) {
-    const durationDays = Number(program.durationDays || 30);
-    const expiryDate = new Date(startDate.getTime() + (durationDays + gracePeriodDays) * 24 * 60 * 60 * 1000);
     const isPrimary = String(program._id) === primaryId;
+    let existingQuery = PatientProgram.findOne({ patient: patientId, program: program._id });
+    if (session) existingQuery = existingQuery.session(session);
+    const existing = await existingQuery;
+
+    if (existing?.status === 'active') {
+      existing.activationPayment = paymentId;
+      if (isPrimary && !existing.payment) existing.payment = paymentId;
+      if (doctorId) existing.doctor = doctorId;
+      else existing.doctor = undefined;
+      await existing.save(session ? { session } : undefined);
+      results.push(existing);
+      continue;
+    }
+
+    const startDate = existing?.startDate || new Date();
+    const gracePeriodDays = Number(existing?.gracePeriodDays ?? 3);
+    const durationDays = Number(program.durationDays || 30);
+    const expiryDate = existing?.expiryDate || new Date(startDate.getTime() + (durationDays + gracePeriodDays) * 24 * 60 * 60 * 1000);
+
     const set = {
       status: 'active',
       startDate,
