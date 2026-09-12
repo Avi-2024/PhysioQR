@@ -22,6 +22,12 @@ const patientSchema = new mongoose.Schema({
   referralSource: String,   // 'qr_code' | 'referral_link' | 'direct'
   referralLocked: { type: Boolean, default: false },
 
+  // Direct-patient commercial terms are patient-level, never programme-level.
+  // Doctor-linked patients continue to use Doctor.approvedPatientFee.
+  directPatientFee: Number,
+  directPatientFeeSetBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  directPatientFeeSetAt: Date,
+
   // Auth
   mobileVerified: { type: Boolean, default: false },
   tokenVersion: { type: Number, default: 0 },
@@ -48,8 +54,6 @@ const getHighestExistingPatientSequence = async () => {
 };
 
 const nextPatientSequence = async () => {
-  // Keep the counter at least as high as existing data. This also lets older
-  // databases migrate safely from the previous countDocuments()+1 strategy.
   const highestExisting = await getHighestExistingPatientSequence();
 
   try {
@@ -59,8 +63,6 @@ const nextPatientSequence = async () => {
       { upsert: true, setDefaultsOnInsert: true },
     );
   } catch (error) {
-    // Two concurrent first registrations can race while creating the counter.
-    // The unique key guarantees one wins; the loser can safely continue.
     if (error?.code !== 11000) throw error;
   }
 
@@ -74,8 +76,6 @@ const nextPatientSequence = async () => {
   return counter.sequence;
 };
 
-// Auto-generate a monotonic patientId like PT00001. IDs are never derived from
-// the current patient count, so deleting a patient cannot make an old ID repeat.
 patientSchema.pre('save', async function (next) {
   if (this.patientId) return next();
 
