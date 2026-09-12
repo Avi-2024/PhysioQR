@@ -1,3 +1,4 @@
+const QRCode = require('qrcode');
 const PatientProgram = require('../models/PatientProgram.model');
 const PatientAssessment = require('../models/PatientAssessment.model');
 const { ProgramDay } = require('../models/Exercise.model');
@@ -52,9 +53,17 @@ const getMyPrescription = asyncHandler(async (req, res) => {
     .map((entry) => entry.exercise?.language)
     .filter(Boolean))];
 
+  const frontendBase = String(process.env.FRONTEND_URL || '').split(',')[0].trim().replace(/\/$/, '');
+  const prescriptionUrl = frontendBase ? `${frontendBase}/patient/programme` : '';
+  const prescriptionQr = prescriptionUrl
+    ? await QRCode.toDataURL(prescriptionUrl, { margin: 1, width: 180 })
+    : '';
+
   res.json({
     prescriptionId: `RX-${String(enrollment._id).slice(-8).toUpperCase()}`,
     prescriptionDate: enrollment.startDate || enrollment.createdAt,
+    prescriptionUrl,
+    prescriptionQr,
     enrollment: {
       id: enrollment._id,
       currentDay,
