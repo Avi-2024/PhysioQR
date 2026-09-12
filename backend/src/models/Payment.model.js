@@ -5,7 +5,10 @@ const orderSchema = new mongoose.Schema({
   patient: { type: mongoose.Schema.Types.ObjectId, ref: 'Patient', required: true },
   doctor: { type: mongoose.Schema.Types.ObjectId, ref: 'Doctor' },
   agent: { type: mongoose.Schema.Types.ObjectId, ref: 'Agent' },
+  // `program` remains the primary/legacy programme. `programs` snapshots the
+  // complete clinically-approved bundle covered by the same patient fee.
   program: { type: mongoose.Schema.Types.ObjectId, ref: 'Program', required: true },
+  programs: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Program' }],
 
   originalAmount: Number,
   discountAmount: { type: Number, default: 0 },
@@ -38,6 +41,7 @@ const paymentSchema = new mongoose.Schema({
   doctor: { type: mongoose.Schema.Types.ObjectId, ref: 'Doctor' },
   agent: { type: mongoose.Schema.Types.ObjectId, ref: 'Agent' },
   program: { type: mongoose.Schema.Types.ObjectId, ref: 'Program' },
+  programs: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Program' }],
 
   gatewayProvider: { type: String, default: 'razorpay' },
   gatewayOrderId: String,
@@ -72,8 +76,6 @@ orderSchema.index({ patient: 1, program: 1, status: 1, createdAt: -1 });
 orderSchema.index({ gatewayOrderId: 1 }, { unique: true, sparse: true });
 orderSchema.index({ patient: 1, idempotencyKey: 1 }, { unique: true, sparse: true });
 paymentSchema.index({ gatewayTransactionId: 1 }, { unique: true, sparse: true });
-// One checkout order can produce only one financially verified payment. A second
-// captured gateway charge is stored as duplicate_captured and never enters this set.
 paymentSchema.index(
   { order: 1 },
   {
