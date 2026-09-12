@@ -6,11 +6,16 @@ const PainCategory = require('../src/models/PainCategory.model');
 const SurgeryType = require('../src/models/SurgeryType.model');
 
 const DEFAULT_PRICE = Number(process.env.SEED_REHAB_PROGRAM_PRICE || 999);
-const DEFAULT_DURATION_DAYS = Number(process.env.SEED_REHAB_PROGRAM_DURATION_DAYS || 30);
 
 const BODY_REGIONS = [
   'Neck', 'Shoulder', 'Elbow', 'Wrist/Hand', 'Upper Back', 'Lower Back',
   'Spine', 'Hip', 'Thigh', 'Knee', 'Lower Leg', 'Ankle/Foot', 'Other',
+];
+
+const PROGRAM_VARIANTS = [
+  { key: '14D', label: '14 Days', durationDays: 14 },
+  { key: '30D', label: '30 Days', durationDays: 30 },
+  { key: '45D', label: '45 Days', durationDays: 45 },
 ];
 
 const regionProgramNames = {
@@ -58,50 +63,42 @@ async function resolveRegion(name) {
   return region;
 }
 
-async function ensureBaseProgram(regionName, region) {
-  const existingCoverage = await Program.findOne({
-    painCategory: region._id,
-    isActive: true,
-    difficultyLevel: { $ne: 'post_operative' },
-  }).sort({ createdAt: 1 });
+async function ensureRegionProgramVariant(regionName, region, variant) {
+  const baseCode = `AUTO-${codePart(regionName)}-REHAB`;
+  const programCode = `${baseCode}-${variant.key}`;
 
-  if (existingCoverage) {
-    let changed = false;
-    if (!Number(existingCoverage.defaultPrice)) {
-      existingCoverage.defaultPrice = DEFAULT_PRICE;
-      changed = true;
-    }
-    if (changed) await existingCoverage.save();
-    return { action: changed ? 'updated' : 'covered', program: existingCoverage };
+  let program = await Program.findOne({ programCode });
+
+  // Migrate the legacy single auto-seeded programme into the canonical 30-day
+  // option rather than leaving a duplicate fourth choice in Admin.
+  if (!program && variant.key === '30D') {
+    program = await Program.findOne({ programCode: baseCode });
+    if (program) program.programCode = programCode;
   }
 
-  const programCode = `AUTO-${codePart(regionName)}-REHAB`;
-  const program = await Program.findOneAndUpdate(
-    { programCode },
-    {
-      $set: {
-        painCategory: region._id,
-        isActive: true,
-      },
-      $setOnInsert: {
-        name: regionProgramNames[regionName] || `${regionName} Rehabilitation`,
-        description: `Rehabilitation programme shell mapped to the ${regionName} clinical pathway. Configure exercises and videos in Admin before production use.`,
-        objective: `Provide structured rehabilitation content for the ${regionName} pathway after clinical clearance.`,
-        difficultyLevel: 'condition_specific',
-        durationDays: DEFAULT_DURATION_DAYS,
-        sessionsPerDay: 1,
-        defaultPrice: DEFAULT_PRICE,
-        eligibleConditions: [regionName],
-      },
-    },
-    { upsert: true, new: true, setDefaultsOnInsert: true },
-  );
+  const name = `${regionProgramNames[regionName] || `${regionName} Rehabilitation`} · ${variant.label}`;
+  const description = `${variant.label} rehabilitation programme shell mapped to the ${regionName} clinical pathway. Configure clinically reviewed exercises and videos in Admin before production use.`;
 
-  if (!Number(program.defaultPrice)) {
-    program.defaultPrice = DEFAULT_PRICE;
-    await program.save();
+  if (!program) {
+    program = new Program({ programCode });
   }
-  return { action: 'created', program };
+
+  program.name = name;
+  program.painCategory = region._id;
+  program.description = description;
+  program.objective = `Provide a ${variant.label.toLowerCase()} rehabilitation programme option for the ${regionName} pathway after clinical clearance.`;
+  program.difficultyLevel = 'condition_specific';
+  program.durationDays = variant.durationDays;
+  program.sessionsPerDay = Number(program.sessionsPerDay || 1);
+  program.defaultPrice = Number(program.defaultPrice || DEFAULT_PRICE);
+  program.eligibleConditions = Array.isArray(program.eligibleConditions) && program.eligibleConditions.length
+    ? program.eligibleConditions
+    : [regionName];
+  program.isActive = true;
+
+  const isNew = program.isNew;
+  await program.save();
+  return { action: isNew ? 'created' : 'updated', program };
 }
 
 async function ensurePostOpProgram(surgery) {
@@ -109,63 +106,57 @@ async function ensurePostOpProgram(surgery) {
   if (!region?._id) return null;
 
   const programCode = `POSTOP-${codePart(surgery.code || surgery.name)}`;
-  const existing = await Program.findOne({ programCode });
-  if (existing) {
-    let changed = false;
-    if (String(existing.painCategory || '') !== String(region._id)) {
-      existing.painCategory = region._id;
-      changed = true;
-    }
-    if (!existing.isActive) {
-      existing.isActive = true;
-      changed = true;
-    }
-    if (!Number(existing.defaultPrice)) {
-      existing.defaultPrice = DEFAULT_PRICE;
-      changed = true;
-    }
-    if (changed) await existing.save();
-    return { action: changed ? 'updated' : 'covered', program: existing };
+  let program = await Program.findOne({ programCode });
+
+  if (!program) {
+    program = new Program({ programCode });
   }
 
-  const program = await Program.create({
-    programCode,
-    name: `${surgery.name} Rehabilitation`,
-    painCategory: region._id,
-    description: `Post-surgery rehabilitation programme shell for ${surgery.name}. A clinician must select/approve this programme before patient payment. Configure exercises and progression before production use.`,
-    objective: `Provide clinician-approved rehabilitation content after ${surgery.name}.`,
-    difficultyLevel: 'post_operative',
-    durationDays: DEFAULT_DURATION_DAYS,
-    sessionsPerDay: 1,
-    defaultPrice: DEFAULT_PRICE,
-    eligibleConditions: [surgery.name],
-    isActive: true,
-  });
-  return { action: 'created', program };
+  const isNew = program.isNew;
+  program.name = `${surgery.name} Rehabilitation`;
+  program.painCategory = region._id;
+  program.description = `Post-surgery rehabilitation programme shell for ${surgery.name}. A clinician must select/approve this programme before patient payment. Configure exercises and progression before production use.`;
+  program.objective = `Provide clinician-approved rehabilitation content after ${surgery.name}.`;
+  program.difficultyLevel = 'post_operative';
+  program.durationDays = Number(program.durationDays || 30);
+  program.sessionsPerDay = Number(program.sessionsPerDay || 1);
+  program.defaultPrice = Number(program.defaultPrice || DEFAULT_PRICE);
+  program.eligibleConditions = Array.isArray(program.eligibleConditions) && program.eligibleConditions.length
+    ? program.eligibleConditions
+    : [surgery.name];
+  program.isActive = true;
+  await program.save();
+
+  return { action: isNew ? 'created' : 'updated', program };
 }
 
 async function run() {
   if (!Number.isFinite(DEFAULT_PRICE) || DEFAULT_PRICE <= 0) {
     throw new Error('SEED_REHAB_PROGRAM_PRICE must be a positive number');
   }
-  if (!Number.isInteger(DEFAULT_DURATION_DAYS) || DEFAULT_DURATION_DAYS < 1) {
-    throw new Error('SEED_REHAB_PROGRAM_DURATION_DAYS must be a positive integer');
-  }
 
   const uri = process.env.MONGODB_URI || process.env.MONGO_URI;
   if (!uri) throw new Error('MONGODB_URI or MONGO_URI is required');
   await mongoose.connect(uri);
 
-  const summary = { created: 0, updated: 0, covered: 0, bodyRegions: 0, surgeryPrograms: 0 };
-  const regions = new Map();
+  const summary = {
+    created: 0,
+    updated: 0,
+    bodyRegions: 0,
+    regionProgrammeOptions: 0,
+    surgeryPrograms: 0,
+  };
 
   for (const regionName of BODY_REGIONS) {
     const region = await resolveRegion(regionName);
-    regions.set(regionName, region);
-    const result = await ensureBaseProgram(regionName, region);
-    summary[result.action] += 1;
     summary.bodyRegions += 1;
-    console.log(`[${result.action}] ${regionName} -> ${result.program.name}`);
+
+    for (const variant of PROGRAM_VARIANTS) {
+      const result = await ensureRegionProgramVariant(regionName, region, variant);
+      summary[result.action] += 1;
+      summary.regionProgrammeOptions += 1;
+      console.log(`[${result.action}] ${regionName} -> ${result.program.name}`);
+    }
   }
 
   const surgeries = await SurgeryType.find({ isActive: true })
@@ -183,7 +174,8 @@ async function run() {
 
   console.log('\nRehabilitation programme seed complete.');
   console.log(summary);
-  console.log(`Default price: ₹${DEFAULT_PRICE}; default duration: ${DEFAULT_DURATION_DAYS} days.`);
+  console.log(`Each body region now has ${PROGRAM_VARIANTS.length} selectable programme options: ${PROGRAM_VARIANTS.map((item) => item.label).join(', ')}.`);
+  console.log(`Default price for newly priced shells: ₹${DEFAULT_PRICE}.`);
   console.log('Programme shells are active and mapped. Add clinically reviewed exercises/videos before production patient use.');
   await mongoose.disconnect();
 }
