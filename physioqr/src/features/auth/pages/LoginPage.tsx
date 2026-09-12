@@ -1,11 +1,13 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   ArrowRight,
+  CheckCircle2,
   HeartPulse,
+  LoaderCircle,
   Lock,
   ShieldCheck,
   Stethoscope,
@@ -43,6 +45,8 @@ export default function LoginPage() {
   const [mode, setMode] = useState<LoginMode>(initialMode);
   const [submitError, setSubmitError] = useState("");
   const [otpSent, setOtpSent] = useState(false);
+  const [otpSending, setOtpSending] = useState(false);
+  const [otpSentMobile, setOtpSentMobile] = useState("");
   const passwordChanged = Boolean(locationState.passwordChanged);
 
   const credentialForm = useForm<CredentialForm>({
@@ -53,11 +57,24 @@ export default function LoginPage() {
     resolver: zodResolver(patientSchema),
     defaultValues: { mobile: "", otp: "" },
   });
+  const patientMobile = patientForm.watch("mobile");
+  const normalizedPatientMobile = patientMobile.trim();
+  const otpAlreadySentForCurrentMobile =
+    otpSent && Boolean(otpSentMobile) && otpSentMobile === normalizedPatientMobile;
+
+  useEffect(() => {
+    if (!otpSent || !otpSentMobile || normalizedPatientMobile === otpSentMobile) return;
+    setOtpSent(false);
+    setOtpSentMobile("");
+    patientForm.setValue("otp", "");
+  }, [normalizedPatientMobile, otpSent, otpSentMobile, patientForm]);
 
   const changeMode = (nextMode: LoginMode) => {
     setMode(nextMode);
     setSubmitError("");
     setOtpSent(false);
+    setOtpSending(false);
+    setOtpSentMobile("");
   };
 
   const credentialLogin = async (data: CredentialForm) => {
@@ -115,15 +132,23 @@ export default function LoginPage() {
 
   const sendPatientOtp = async () => {
     setSubmitError("");
+    if (otpSending || otpAlreadySentForCurrentMobile) return;
     if (!(await patientForm.trigger("mobile"))) return;
+
+    const mobile = patientForm.getValues("mobile").trim();
+    setOtpSending(true);
     try {
       await apiClient.post("/auth/send-otp", {
-        mobile: patientForm.getValues("mobile"),
+        mobile,
         purpose: "login",
       });
+      patientForm.setValue("otp", "");
+      setOtpSentMobile(mobile);
       setOtpSent(true);
     } catch (error) {
       setSubmitError(errorMessage(error));
+    } finally {
+      setOtpSending(false);
     }
   };
 
@@ -255,20 +280,46 @@ export default function LoginPage() {
                   <input
                     {...patientForm.register("mobile")}
                     type="tel"
+                    inputMode="numeric"
+                    autoComplete="tel"
                     placeholder="10-digit mobile number"
                     className={inputClass}
                   />
                   <button
                     type="button"
                     onClick={sendPatientOtp}
-                    className="shrink-0 rounded-lg bg-neutral-100 px-4 text-sm font-semibold text-neutral-700"
+                    disabled={otpSending || otpAlreadySentForCurrentMobile}
+                    aria-live="polite"
+                    className={`inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg border px-4 text-sm font-bold transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                      otpAlreadySentForCurrentMobile
+                        ? "cursor-default border-emerald-200 bg-emerald-50 text-emerald-700 focus:ring-emerald-300"
+                        : "cursor-pointer border-primary-600 bg-primary-600 text-white shadow-sm hover:bg-primary-700 active:scale-[0.98] focus:ring-primary-400 disabled:cursor-wait disabled:opacity-70"
+                    }`}
                   >
-                    {otpSent ? "Resend" : "Send OTP"}
+                    {otpSending ? (
+                      <>
+                        <LoaderCircle className="h-4 w-4 animate-spin" />
+                        Sending...
+                      </>
+                    ) : otpAlreadySentForCurrentMobile ? (
+                      <>
+                        <CheckCircle2 className="h-4 w-4" />
+                        OTP Sent
+                      </>
+                    ) : (
+                      "Send OTP"
+                    )}
                   </button>
                 </div>
                 {patientForm.formState.errors.mobile && (
                   <p className="mt-1 text-xs text-danger-600">
                     {patientForm.formState.errors.mobile.message}
+                  </p>
+                )}
+                {otpAlreadySentForCurrentMobile && (
+                  <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    OTP sent successfully. Enter the OTP below.
                   </p>
                 )}
               </div>
@@ -279,6 +330,8 @@ export default function LoginPage() {
                   </label>
                   <input
                     {...patientForm.register("otp")}
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
                     placeholder="Enter OTP"
                     className={inputClass}
                   />
