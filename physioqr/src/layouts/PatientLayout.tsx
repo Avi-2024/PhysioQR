@@ -21,7 +21,7 @@ export function PatientLayout() {
         <div className="flex items-center gap-3 sm:gap-4 min-w-0">
           <Logo width={56} height={56}  />
           <div className="min-w-0">
-            <h1 className="font-bold text-neutral-900 leading-none text-base sm:text-lg truncate">Patient Portal</h1>
+            
           </div>
         </div>
 
