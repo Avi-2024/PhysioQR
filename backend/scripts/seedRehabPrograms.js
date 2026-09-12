@@ -5,8 +5,6 @@ const Program = require('../src/models/Program.model');
 const PainCategory = require('../src/models/PainCategory.model');
 const SurgeryType = require('../src/models/SurgeryType.model');
 
-const DEFAULT_PRICE = Number(process.env.SEED_REHAB_PROGRAM_PRICE || 999);
-
 const BODY_REGIONS = [
   'Neck', 'Shoulder', 'Elbow', 'Wrist/Hand', 'Upper Back', 'Lower Back',
   'Spine', 'Hip', 'Thigh', 'Knee', 'Lower Leg', 'Ankle/Foot', 'Other',
@@ -68,9 +66,6 @@ async function ensureRegionProgramVariant(regionName, region, variant) {
   const programCode = `${baseCode}-${variant.key}`;
 
   let program = await Program.findOne({ programCode });
-
-  // Migrate the legacy single auto-seeded programme into the canonical 30-day
-  // option rather than leaving a duplicate fourth choice in Admin.
   if (!program && variant.key === '30D') {
     program = await Program.findOne({ programCode: baseCode });
     if (program) program.programCode = programCode;
@@ -79,9 +74,7 @@ async function ensureRegionProgramVariant(regionName, region, variant) {
   const name = `${regionProgramNames[regionName] || `${regionName} Rehabilitation`} · ${variant.label}`;
   const description = `${variant.label} rehabilitation programme shell mapped to the ${regionName} clinical pathway. Configure clinically reviewed exercises and videos in Admin before production use.`;
 
-  if (!program) {
-    program = new Program({ programCode });
-  }
+  if (!program) program = new Program({ programCode });
 
   program.name = name;
   program.painCategory = region._id;
@@ -90,7 +83,8 @@ async function ensureRegionProgramVariant(regionName, region, variant) {
   program.difficultyLevel = 'condition_specific';
   program.durationDays = variant.durationDays;
   program.sessionsPerDay = Number(program.sessionsPerDay || 1);
-  program.defaultPrice = Number(program.defaultPrice || DEFAULT_PRICE);
+  // Programme is clinical content only. Patient fee is controlled by Doctor or Admin.
+  program.defaultPrice = undefined;
   program.eligibleConditions = Array.isArray(program.eligibleConditions) && program.eligibleConditions.length
     ? program.eligibleConditions
     : [regionName];
@@ -107,10 +101,7 @@ async function ensurePostOpProgram(surgery) {
 
   const programCode = `POSTOP-${codePart(surgery.code || surgery.name)}`;
   let program = await Program.findOne({ programCode });
-
-  if (!program) {
-    program = new Program({ programCode });
-  }
+  if (!program) program = new Program({ programCode });
 
   const isNew = program.isNew;
   program.name = `${surgery.name} Rehabilitation`;
@@ -120,7 +111,7 @@ async function ensurePostOpProgram(surgery) {
   program.difficultyLevel = 'post_operative';
   program.durationDays = Number(program.durationDays || 30);
   program.sessionsPerDay = Number(program.sessionsPerDay || 1);
-  program.defaultPrice = Number(program.defaultPrice || DEFAULT_PRICE);
+  program.defaultPrice = undefined;
   program.eligibleConditions = Array.isArray(program.eligibleConditions) && program.eligibleConditions.length
     ? program.eligibleConditions
     : [surgery.name];
@@ -131,10 +122,6 @@ async function ensurePostOpProgram(surgery) {
 }
 
 async function run() {
-  if (!Number.isFinite(DEFAULT_PRICE) || DEFAULT_PRICE <= 0) {
-    throw new Error('SEED_REHAB_PROGRAM_PRICE must be a positive number');
-  }
-
   const uri = process.env.MONGODB_URI || process.env.MONGO_URI;
   if (!uri) throw new Error('MONGODB_URI or MONGO_URI is required');
   await mongoose.connect(uri);
@@ -175,7 +162,7 @@ async function run() {
   console.log('\nRehabilitation programme seed complete.');
   console.log(summary);
   console.log(`Each body region now has ${PROGRAM_VARIANTS.length} selectable programme options: ${PROGRAM_VARIANTS.map((item) => item.label).join(', ')}.`);
-  console.log(`Default price for newly priced shells: ₹${DEFAULT_PRICE}.`);
+  console.log('Programme pricing is intentionally not seeded. Patient fee is controlled only by Doctor or Admin.');
   console.log('Programme shells are active and mapped. Add clinically reviewed exercises/videos before production patient use.');
   await mongoose.disconnect();
 }
