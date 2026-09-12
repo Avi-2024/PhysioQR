@@ -5,7 +5,10 @@ const patientProgramSchema = new mongoose.Schema({
   patient: { type: mongoose.Schema.Types.ObjectId, ref: 'Patient', required: true },
   program: { type: mongoose.Schema.Types.ObjectId, ref: 'Program', required: true },
   doctor: { type: mongoose.Schema.Types.ObjectId, ref: 'Doctor' },
+  // `payment` remains the primary legacy payment link and therefore stays unique.
+  // `activationPayment` can be shared by multiple programmes unlocked by one fee.
   payment: { type: mongoose.Schema.Types.ObjectId, ref: 'Payment' },
+  activationPayment: { type: mongoose.Schema.Types.ObjectId, ref: 'Payment' },
 
   startDate: Date,
   expiryDate: Date,
@@ -32,6 +35,7 @@ const patientProgramSchema = new mongoose.Schema({
 
 patientProgramSchema.index({ patient: 1, program: 1 }, { unique: true });
 patientProgramSchema.index({ payment: 1 }, { unique: true, sparse: true });
+patientProgramSchema.index({ activationPayment: 1, status: 1 });
 patientProgramSchema.index({ doctor: 1, status: 1, createdAt: -1 });
 
 module.exports = mongoose.model('PatientProgram', patientProgramSchema);
