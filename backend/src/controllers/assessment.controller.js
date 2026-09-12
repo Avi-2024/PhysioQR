@@ -112,6 +112,21 @@ const notifyHighRiskAssessment = async (assessment) => {
   });
 };
 
+// Sends the patient an immediate SMS once a clinical/risk review is cleared.
+// The notification service persists provider status and retries failed SMS delivery.
+const notifyPatientAssessmentCleared = async (assessment) => notificationService.createNotification({
+  recipientType: 'patient',
+  patient: assessment.patient,
+  type: 'assessment_review_cleared',
+  channel: 'sms',
+  title: 'Assessment review cleared',
+  message: 'PhysioQR: Your assessment has been reviewed and cleared. Please log in to PhysioQR to continue with the next step of your rehabilitation journey.',
+  metadata: {
+    assessmentId: assessment._id,
+    reviewedAt: assessment.reviewedAt,
+  },
+});
+
 // GET /api/assessments/categories
 const getPainCategories = asyncHandler(async (req, res) => {
   res.json(await PainCategory.find({ isActive: true }).sort({ name: 1 }));
@@ -304,6 +319,7 @@ const reviewAssessment = asyncHandler(async (req, res) => {
     reviewedBy: assessment.reviewedBy,
     reviewedAt: assessment.reviewedAt,
   };
+  const shouldSendClearanceSms = status === 'cleared' && previous.status !== 'cleared';
 
   assessment.status = status;
   assessment.adminReviewNote = note;
@@ -326,7 +342,36 @@ const reviewAssessment = asyncHandler(async (req, res) => {
     reason: note,
   });
 
-  res.json({ message: `Assessment ${status}`, assessment });
+  let smsNotification;
+  if (shouldSendClearanceSms) {
+    smsNotification = await notifyPatientAssessmentCleared(assessment);
+    await writeAuditLog({
+      req,
+      action: 'assessment_clearance_sms_queued',
+      module: 'Notification',
+      recordId: smsNotification._id,
+      newValue: {
+        assessmentId: assessment._id,
+        patientId: assessment.patient,
+        status: smsNotification.status,
+        provider: smsNotification.provider,
+        providerMessageId: smsNotification.providerMessageId,
+        failureReason: smsNotification.failureReason,
+      },
+    });
+  }
+
+  res.json({
+    message: `Assessment ${status}`,
+    assessment,
+    sms: smsNotification ? {
+      notificationId: smsNotification._id,
+      status: smsNotification.status,
+      provider: smsNotification.provider,
+      providerMessageId: smsNotification.providerMessageId,
+      failureReason: smsNotification.failureReason,
+    } : undefined,
+  });
 });
 
 module.exports = {
