@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { protect, authorize } = require('../middlewares/auth.middleware');
-const { requireFields, validateSchema } = require('../middlewares/validate.middleware');
+const { validateSchema } = require('../middlewares/validate.middleware');
 const { getDashboard } = require('../controllers/admin/dashboard.controller');
 const { getAgents, getAgentById, updateAgentTarget } = require('../controllers/admin/agents.controller');
 const { getDoctors, getDoctorById } = require('../controllers/admin/doctors.controller');
@@ -9,6 +9,7 @@ const { getClinics, getClinicById, updateClinic } = require('../controllers/admi
 const { getReferrals, getReferralById } = require('../controllers/admin/referrals.controller');
 const { getClinicVisits, getClinicVisitById } = require('../controllers/admin/clinic-visits.controller');
 const { getPatients, getPatientById, updatePatientStatus, deletePatient } = require('../controllers/admin/patients.controller');
+const { updateDirectPatientFee } = require('../controllers/admin/patient-fee.controller');
 const { getAssessmentQuestions, getAssessmentQuestionById, createAssessmentQuestion, updateAssessmentQuestion, deactivateAssessmentQuestion, reactivateAssessmentQuestion } = require('../controllers/admin/assessment-questions.controller');
 const { getPainCategories, getPainCategoryById, createPainCategory, updatePainCategory, setPainCategoryStatus } = require('../controllers/admin/pain-categories.controller');
 const { getPrograms, getProgramById, createProgram, updateProgram, setProgramStatus } = require('../controllers/admin/programs.controller');
@@ -35,8 +36,7 @@ const programBodySchema = {
   difficultyLevel:{type:'enum',values:['beginner','intermediate','advanced','senior_friendly','post_operative','general_mobility','condition_specific']},
   durationDays:{type:'number',min:1,max:365}, sessionsPerDay:{type:'number',min:1,max:10}, recommendedAgeGroup:{type:'string',max:120},
   eligibleConditions:{type:'array',max:100}, excludedConditions:{type:'array',max:100}, instructions:{type:'string',max:5000},
-  precautions:{type:'string',max:5000}, requiredEquipment:{type:'array',max:100}, defaultPrice:{type:'number',min:0,max:1000000},
-  thumbnail:{type:'string',max:2000}, isActive:{type:'boolean'}
+  precautions:{type:'string',max:5000}, requiredEquipment:{type:'array',max:100}, thumbnail:{type:'string',max:2000}, isActive:{type:'boolean'}
 };
 
 router.use(protect, authorize('admin'));
@@ -50,6 +50,7 @@ router.patch('/clinics/:id', validateSchema({ body: { clinicName:{type:'string',
 router.get('/referrals', getReferrals); router.get('/referrals/:id', getReferralById);
 router.get('/patients', getPatients); router.get('/patients/:id', getPatientById);
 router.patch('/patients/:id/status', validateSchema({ body:{ status:{type:'enum',values:['active','inactive','blocked'],required:true}, reason:{type:'string',max:500,required:true} } }), updatePatientStatus);
+router.patch('/patients/:id/direct-fee', validateSchema({ params:{id:{type:'objectId',required:true}}, body:{fee:{type:'number',min:1,max:1000000,required:true},reason:{type:'string',max:500,required:true}} }), updateDirectPatientFee);
 router.delete('/patients/:id', validateSchema({ body:{ confirmation:{type:'string',max:40,required:true}, reason:{type:'string',max:500,required:true} } }), deletePatient);
 router.get('/assessment-questions', getAssessmentQuestions); router.get('/assessment-questions/:id', getAssessmentQuestionById);
 router.post('/assessment-questions', validateSchema({ body:{ questionText:{type:'string',max:1000,required:true}, questionTextHindi:{type:'string',max:1000}, questionType:{type:'enum',values:['single_choice','multiple_choice','yes_no','pain_scale','number','text','date','image'],required:true}, isRedFlag:{type:'boolean'}, redFlagOperator:{type:'enum',values:['any_answer','equals','not_equals','includes','gte','lte','between']}, redFlagSafetyMessage:{type:'string',max:1000}, displayOrder:{type:'number',min:0,max:100000} } }), createAssessmentQuestion);
@@ -80,7 +81,7 @@ router.get('/notifications/:id', getAdminNotificationById);
 router.get('/support', getSupportTickets);
 router.get('/support/:id', validateSchema({params:{id:{type:'objectId',required:true}}}), getSupportTicketById);
 router.get('/reports', getReports);
-router.get('/risk-reviews', getRiskReviews); router.get('/risk-reviews/:id', getRiskReviewById); router.patch('/risk-reviews/:id', validateSchema({body:{status:{type:'enum',values:['cleared','blocked'],required:true},note:{type:'string',max:2000,required:true}}}), updateRiskReview);
+router.get('/risk-reviews', getRiskReviews); router.get('/risk-reviews/:id', getRiskReviewById); router.patch('/risk-reviews/:id', validateSchema({body:{status:{type:'enum',values:['cleared','blocked'],required:true},note:{type:'string',max:2000,required:true},programId:{type:'objectId'},programIds:{type:'array',max:20},patientFee:{type:'number',min:1,max:1000000}}}), updateRiskReview);
 router.get('/fraud-cases', getFraudCases);
 router.get('/fraud-cases/:id', validateSchema({params:{id:{type:'objectId',required:true}}}), getFraudCaseById);
 router.patch('/fraud-cases/:id/review', validateSchema({body:{status:{type:'enum',values:['reviewing','resolved','dismissed'],required:true},note:{type:'string',max:2000,required:true}}}), reviewFraudCase);
