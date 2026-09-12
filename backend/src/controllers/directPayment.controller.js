@@ -10,64 +10,47 @@ const Coupon = require('../models/Coupon.model');
 const { generateInvoiceNumber } = require('../utils/idGenerator');
 const { writeAuditLog } = require('../utils/auditLogger');
 const { getNextSequence } = require('../services/sequence.service');
+const { activateProgrammeBundle } = require('../services/programBundle.service');
 const fraudService = require('../services/fraud.service');
 const asyncHandler = require('../utils/asyncHandler');
 
 let razorpayClient;
 const VERIFIED_STATUSES = ['successful', 'manually_verified', 'refunded', 'partially_refunded', 'disputed', 'chargeback'];
 
-const paymentError = (message, status = 400) => {
-  const error = new Error(message);
-  error.status = status;
-  return error;
-};
-
+const paymentError = (message, status = 400) => Object.assign(new Error(message), { status });
 const isMockGateway = () => process.env.PAYMENT_GATEWAY_MODE === 'mock' && process.env.NODE_ENV !== 'production';
+const normalizeIds = (values = []) => [...new Set((values || []).map((value) => String(value)).filter(Boolean))];
 
 const getRazorpayClient = () => {
-  if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
-    throw paymentError('Razorpay credentials are not configured', 503);
-  }
-  if (!razorpayClient) {
-    razorpayClient = new Razorpay({
-      key_id: process.env.RAZORPAY_KEY_ID,
-      key_secret: process.env.RAZORPAY_KEY_SECRET,
-    });
-  }
+  if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) throw paymentError('Razorpay credentials are not configured', 503);
+  if (!razorpayClient) razorpayClient = new Razorpay({ key_id: process.env.RAZORPAY_KEY_ID, key_secret: process.env.RAZORPAY_KEY_SECRET });
   return razorpayClient;
 };
 
 const safeCompare = (actual, expected) => {
   if (!actual || !expected) return false;
-  const actualBuffer = Buffer.from(actual);
-  const expectedBuffer = Buffer.from(expected);
-  return actualBuffer.length === expectedBuffer.length
-    && crypto.timingSafeEqual(actualBuffer, expectedBuffer);
+  const a = Buffer.from(actual); const b = Buffer.from(expected);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
 };
 
 const verifyRazorpaySignature = ({ orderId, paymentId, signature }) => {
   if (!process.env.RAZORPAY_KEY_SECRET) throw paymentError('Razorpay credentials are not configured', 503);
-  const expected = crypto
-    .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
-    .update(`${orderId}|${paymentId}`)
-    .digest('hex');
+  const expected = crypto.createHmac('sha256', process.env.RAZORPAY_KEY_SECRET).update(`${orderId}|${paymentId}`).digest('hex');
   if (!safeCompare(signature, expected)) throw paymentError('Payment verification failed - invalid signature');
 };
 
 const verifyWebhookSignature = ({ rawBody, signature }) => {
   if (!process.env.RAZORPAY_WEBHOOK_SECRET) throw paymentError('Razorpay webhook secret is not configured', 503);
-  const expected = crypto
-    .createHmac('sha256', process.env.RAZORPAY_WEBHOOK_SECRET)
-    .update(rawBody)
-    .digest('hex');
+  const expected = crypto.createHmac('sha256', process.env.RAZORPAY_WEBHOOK_SECRET).update(rawBody).digest('hex');
   if (!safeCompare(signature, expected)) throw paymentError('Webhook verification failed - invalid signature');
 };
 
-const resolveDirectPricing = async ({ program, couponCode }) => {
-  const originalAmount = Number(program.defaultPrice || 0);
+const resolveDirectPricing = async ({ patient, programIds, couponCode }) => {
+  const originalAmount = Number(patient.directPatientFee || 0);
+  if (originalAmount <= 0) throw paymentError('Admin has not configured the fee for this direct patient yet.', 409);
+
   let discountAmount = 0;
   let appliedCoupon = null;
-
   if (couponCode) {
     const coupon = await Coupon.findOne({ couponCode: couponCode.toUpperCase(), isActive: true });
     if (coupon && (!coupon.expiryDate || coupon.expiryDate > new Date()) && coupon.usedCount < (coupon.usageLimit || Infinity)) {
@@ -85,10 +68,11 @@ const resolveDirectPricing = async ({ program, couponCode }) => {
     finalAmount,
     appliedCoupon,
     pricingSnapshot: {
-      program: program._id,
+      programs: programIds,
       purchaseMode: 'direct',
       revenueModel: 'platform_direct',
-      defaultPrice: originalAmount,
+      feeAuthority: 'admin',
+      adminPatientFee: originalAmount,
       doctorFeeShare: 0,
       platformShare: finalAmount,
       couponCode: appliedCoupon?.couponCode || null,
@@ -97,84 +81,47 @@ const resolveDirectPricing = async ({ program, couponCode }) => {
 };
 
 const createGatewayOrder = async ({ amount, receipt }) => {
-  if (isMockGateway()) {
-    return {
-      id: `order_mock_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
-      amount: Math.round(amount * 100),
-      currency: 'INR',
-      receipt,
-    };
-  }
-  return getRazorpayClient().orders.create({
-    amount: Math.round(amount * 100),
-    currency: 'INR',
-    receipt,
-  });
+  if (isMockGateway()) return { id: `order_mock_${Date.now()}_${Math.floor(Math.random() * 10000)}`, amount: Math.round(amount * 100), currency: 'INR', receipt };
+  return getRazorpayClient().orders.create({ amount: Math.round(amount * 100), currency: 'INR', receipt });
 };
 
-const assertDirectPurchaseAllowed = async ({ patient, program }) => {
-  if (patient.referringDoctor) {
-    throw paymentError('This patient is linked to a referring doctor. Use the doctor-linked payment flow.', 409);
-  }
+const resolveDirectBundle = async ({ patient, primaryProgramId }) => {
+  if (patient.referringDoctor) throw paymentError('This patient is linked to a referring doctor. Use the doctor-linked payment flow.', 409);
+
   const assessment = await PatientAssessment.findOne({ patient: patient._id }).sort({ createdAt: -1 }).lean();
-  if (!assessment || assessment.status !== 'cleared') {
-    throw paymentError('Assessment must be clinically cleared before payment', 409);
-  }
-  if (assessment.requiresPhysioReview && String(assessment.approvedProgram || '') !== String(program._id)) {
-    throw paymentError('Only the clinically approved rehabilitation programme can be purchased', 409);
-  }
-  if (!assessment.requiresPhysioReview && String(program.painCategory || '') !== String(assessment.painCategory || '')) {
-    throw paymentError('Programme does not match the latest cleared assessment', 409);
+  if (!assessment || assessment.status !== 'cleared') throw paymentError('Assessment must be clinically cleared before payment', 409);
+
+  let programIds = normalizeIds([
+    ...(assessment.approvedPrograms || []),
+    ...(assessment.approvedProgram ? [assessment.approvedProgram] : []),
+  ]);
+  if (!programIds.length) programIds = [String(primaryProgramId)];
+  if (!programIds.includes(String(primaryProgramId))) throw paymentError('Selected programme is not part of the clinically approved programme bundle', 409);
+
+  const programs = await Program.find({ _id: { $in: programIds }, isActive: true });
+  if (programs.length !== programIds.length) throw paymentError('One or more approved programmes are inactive or unavailable', 409);
+  if (programs.some((program) => String(program.painCategory || '') !== String(assessment.painCategory || ''))) {
+    throw paymentError('One or more programmes do not match the latest cleared assessment', 409);
   }
 
-  const existingProgram = await PatientProgram.findOne({
+  const alreadyActive = await PatientProgram.findOne({
     patient: patient._id,
-    program: program._id,
+    program: { $in: programIds },
     status: { $in: ['active', 'paused', 'completed'] },
   });
-  if (existingProgram) throw paymentError('Program is already active for this patient', 409);
+  if (alreadyActive) throw paymentError('One or more programmes in this bundle are already active for this patient', 409);
 
-  const existingPayment = await Payment.findOne({
-    patient: patient._id,
-    program: program._id,
-    verifiedAt: { $ne: null },
-  });
-  if (existingPayment) throw paymentError('Payment already completed for this patient program', 409);
-};
-
-const activateDirectProgram = async ({ order, payment, session }) => {
-  const program = await Program.findById(order.program).session(session);
-  if (!program || !program.isActive) throw paymentError('Program is no longer available for activation', 409);
-
-  const durationDays = Number(program.durationDays || 30);
-  const gracePeriodDays = 3;
-  const startDate = new Date();
-  const expiryDate = new Date(startDate.getTime() + (durationDays + gracePeriodDays) * 24 * 60 * 60 * 1000);
-
-  await PatientProgram.findOneAndUpdate(
-    { patient: order.patient, program: order.program },
-    {
-      $set: {
-        status: 'active',
-        startDate,
-        expiryDate,
-        gracePeriodDays,
-        payment: payment._id,
-      },
-      $unset: { doctor: '' },
-    },
-    { upsert: true, new: true, session, setDefaultsOnInsert: true },
-  );
+  return { assessment, programIds, programs };
 };
 
 const createDuplicateCaptured = async ({ order, primaryPayment, gatewayTransactionId, signature, rawGatewayPayload, session }) => {
   const existing = await Payment.findOne({ gatewayTransactionId }).session(session);
   if (existing) return existing.status === 'duplicate_captured' ? existing : null;
-
   const [duplicate] = await Payment.create([{
     order: order._id,
     patient: order.patient,
     program: order.program,
+    programs: order.programs,
     gatewayProvider: order.gatewayProvider,
     gatewayOrderId: order.gatewayOrderId,
     gatewayTransactionId,
@@ -198,10 +145,7 @@ const createDuplicateCaptured = async ({ order, primaryPayment, gatewayTransacti
 
 const processDirectPayment = async ({ order, gatewayTransactionId, signature, rawGatewayPayload, req }) => {
   const session = await mongoose.startSession();
-  let payment;
-  let newlyProcessed = false;
-  let duplicatePayment = null;
-
+  let payment; let newlyProcessed = false; let duplicatePayment = null;
   try {
     await session.withTransaction(async () => {
       const lockedOrder = await Order.findById(order._id).session(session);
@@ -210,37 +154,21 @@ const processDirectPayment = async ({ order, gatewayTransactionId, signature, ra
 
       const existingTransaction = await Payment.findOne({ gatewayTransactionId }).session(session);
       if (existingTransaction) {
-        if (String(existingTransaction.order) !== String(lockedOrder._id)) {
-          throw paymentError('Gateway transaction is already linked to another payment', 409);
-        }
+        if (String(existingTransaction.order) !== String(lockedOrder._id)) throw paymentError('Gateway transaction is already linked to another payment', 409);
         if (existingTransaction.status === 'duplicate_captured') {
           duplicatePayment = existingTransaction;
           payment = await Payment.findById(existingTransaction.duplicateOf).session(session);
           return;
         }
-        if (existingTransaction.verifiedAt) {
-          payment = existingTransaction;
-          return;
-        }
+        if (existingTransaction.verifiedAt) { payment = existingTransaction; return; }
         throw paymentError('Gateway transaction is already linked to an unresolved payment record', 409);
       }
 
-      const primaryPayment = await Payment.findOne({
-        order: lockedOrder._id,
-        status: { $in: VERIFIED_STATUSES },
-      }).sort({ verifiedAt: 1, createdAt: 1 }).session(session);
-
+      const primaryPayment = await Payment.findOne({ order: lockedOrder._id, status: { $in: VERIFIED_STATUSES } }).sort({ verifiedAt: 1, createdAt: 1 }).session(session);
       if (primaryPayment) {
         payment = primaryPayment;
         if (primaryPayment.gatewayTransactionId !== gatewayTransactionId) {
-          duplicatePayment = await createDuplicateCaptured({
-            order: lockedOrder,
-            primaryPayment,
-            gatewayTransactionId,
-            signature,
-            rawGatewayPayload,
-            session,
-          });
+          duplicatePayment = await createDuplicateCaptured({ order: lockedOrder, primaryPayment, gatewayTransactionId, signature, rawGatewayPayload, session });
         }
         return;
       }
@@ -250,6 +178,7 @@ const processDirectPayment = async ({ order, gatewayTransactionId, signature, ra
         order: lockedOrder._id,
         patient: lockedOrder.patient,
         program: lockedOrder.program,
+        programs: lockedOrder.programs,
         gatewayProvider: lockedOrder.gatewayProvider,
         gatewayOrderId: lockedOrder.gatewayOrderId,
         gatewayTransactionId,
@@ -271,22 +200,18 @@ const processDirectPayment = async ({ order, gatewayTransactionId, signature, ra
       lockedOrder.status = 'successful';
       lockedOrder.paidAt = new Date();
       await lockedOrder.save({ session });
+      await Patient.findByIdAndUpdate(lockedOrder.patient, { $set: { referralLocked: true } }, { session });
 
-      // Locks the commercial attribution as "direct" after the first verified payment.
-      await Patient.findByIdAndUpdate(
-        lockedOrder.patient,
-        { $set: { referralLocked: true } },
-        { session },
-      );
-      await activateDirectProgram({ order: lockedOrder, payment, session });
+      const programIds = normalizeIds(lockedOrder.programs?.length ? lockedOrder.programs : [lockedOrder.program]);
+      await activateProgrammeBundle({
+        patientId: lockedOrder.patient,
+        paymentId: payment._id,
+        programIds,
+        primaryProgramId: lockedOrder.program,
+        session,
+      });
 
-      if (lockedOrder.couponCode) {
-        await Coupon.findOneAndUpdate(
-          { couponCode: lockedOrder.couponCode },
-          { $inc: { usedCount: 1 } },
-          { session },
-        );
-      }
+      if (lockedOrder.couponCode) await Coupon.findOneAndUpdate({ couponCode: lockedOrder.couponCode }, { $inc: { usedCount: 1 } }, { session });
       newlyProcessed = true;
     });
   } finally {
@@ -294,43 +219,22 @@ const processDirectPayment = async ({ order, gatewayTransactionId, signature, ra
   }
 
   if (!payment) throw paymentError('Payment processing did not produce a verified payment', 409);
-
   if (duplicatePayment) {
     await fraudService.createFraudCase({
-      rule: 'duplicate_captured_payment_same_order',
-      severity: 'critical',
-      patient: order.patient,
-      payment: payment._id,
+      rule: 'duplicate_captured_payment_same_order', severity: 'critical', patient: order.patient, payment: payment._id,
       relatedRecord: gatewayTransactionId,
       summary: `A second captured direct payment was detected for order ${order.gatewayOrderId}`,
-      evidence: {
-        order: order._id,
-        primaryPayment: payment._id,
-        duplicatePayment: duplicatePayment._id,
-        duplicateTransactionId: gatewayTransactionId,
-        amount: duplicatePayment.paidAmount,
-        purchaseMode: 'direct',
-      },
+      evidence: { order: order._id, primaryPayment: payment._id, duplicatePayment: duplicatePayment._id, duplicateTransactionId: gatewayTransactionId, amount: duplicatePayment.paidAmount, purchaseMode: 'direct' },
     });
     return { payment, idempotent: false, duplicateCharge: true, duplicatePayment };
   }
 
   if (newlyProcessed) {
     await writeAuditLog({
-      req,
-      action: 'direct_payment_verified',
-      module: 'Payment',
-      recordId: payment._id,
-      newValue: {
-        amount: payment.paidAmount,
-        invoiceNumber: payment.invoiceNumber,
-        gatewayTransactionId,
-        doctorFeeShare: 0,
-        platformShare: payment.platformShare,
-      },
+      req, action: 'direct_payment_verified', module: 'Payment', recordId: payment._id,
+      newValue: { amount: payment.paidAmount, invoiceNumber: payment.invoiceNumber, gatewayTransactionId, programs: payment.programs, doctorFeeShare: 0, platformShare: payment.platformShare },
     });
   }
-
   return { payment, idempotent: !newlyProcessed, duplicateCharge: false };
 };
 
@@ -342,32 +246,19 @@ const createDirectOrder = asyncHandler(async (req, res) => {
 
   if (idempotencyKey) {
     const existing = await Order.findOne({ idempotencyKey, patient: patientId, doctor: null });
-    if (existing) {
-      return res.json({
-        orderId: existing.gatewayOrderId,
-        amount: Math.round(existing.finalAmount * 100),
-        currency: existing.currency,
-        key: process.env.RAZORPAY_KEY_ID,
-        originalAmount: existing.originalAmount,
-        discountAmount: existing.discountAmount,
-        finalAmount: existing.finalAmount,
-        purchaseMode: 'direct',
-        idempotent: true,
-      });
-    }
+    if (existing) return res.json({ orderId: existing.gatewayOrderId, amount: Math.round(existing.finalAmount * 100), currency: existing.currency, key: process.env.RAZORPAY_KEY_ID, originalAmount: existing.originalAmount, discountAmount: existing.discountAmount, finalAmount: existing.finalAmount, purchaseMode: 'direct', idempotent: true });
   }
 
-  const [patient, program] = await Promise.all([
-    Patient.findById(patientId),
-    Program.findById(programId),
-  ]);
+  const patient = await Patient.findById(patientId);
   if (!patient) return res.status(404).json({ message: 'Patient not found' });
   if (!patient.mobileVerified) return res.status(400).json({ message: 'Mobile number must be verified before payment' });
   if (!patient.consentAccepted) return res.status(400).json({ message: 'Patient must accept consent before payment' });
-  if (!program || !program.isActive) return res.status(400).json({ message: 'Invalid or inactive program' });
 
-  await assertDirectPurchaseAllowed({ patient, program });
-  const pricing = await resolveDirectPricing({ program, couponCode });
+  const primaryProgram = await Program.findById(programId);
+  if (!primaryProgram || !primaryProgram.isActive) return res.status(400).json({ message: 'Invalid or inactive program' });
+
+  const bundle = await resolveDirectBundle({ patient, primaryProgramId: programId });
+  const pricing = await resolveDirectPricing({ patient, programIds: bundle.programIds, couponCode });
   if (pricing.finalAmount <= 0) return res.status(400).json({ message: 'Final amount must be greater than zero' });
 
   const receipt = `direct_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
@@ -376,6 +267,7 @@ const createDirectOrder = asyncHandler(async (req, res) => {
     orderId: gatewayOrder.id,
     patient: patientId,
     program: programId,
+    programs: bundle.programIds,
     originalAmount: pricing.originalAmount,
     discountAmount: pricing.discountAmount,
     finalAmount: pricing.finalAmount,
@@ -389,47 +281,22 @@ const createDirectOrder = asyncHandler(async (req, res) => {
     expiresAt: new Date(Date.now() + 30 * 60 * 1000),
   });
 
-  res.json({
-    orderId: gatewayOrder.id,
-    amount: gatewayOrder.amount,
-    currency: gatewayOrder.currency,
-    key: process.env.RAZORPAY_KEY_ID,
-    originalAmount: order.originalAmount,
-    discountAmount: order.discountAmount,
-    finalAmount: order.finalAmount,
-    purchaseMode: 'direct',
-  });
+  res.json({ orderId: gatewayOrder.id, amount: gatewayOrder.amount, currency: gatewayOrder.currency, key: process.env.RAZORPAY_KEY_ID, originalAmount: order.originalAmount, discountAmount: order.discountAmount, finalAmount: order.finalAmount, purchaseMode: 'direct', programmeCount: bundle.programIds.length });
 });
 
 const verifyDirectPayment = asyncHandler(async (req, res) => {
   const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
-  if (!isMockGateway()) {
-    verifyRazorpaySignature({
-      orderId: razorpay_order_id,
-      paymentId: razorpay_payment_id,
-      signature: razorpay_signature,
-    });
-  } else if (!razorpay_payment_id) {
-    return res.status(400).json({ message: 'razorpay_payment_id is required' });
-  }
+  if (!isMockGateway()) verifyRazorpaySignature({ orderId: razorpay_order_id, paymentId: razorpay_payment_id, signature: razorpay_signature });
+  else if (!razorpay_payment_id) return res.status(400).json({ message: 'razorpay_payment_id is required' });
 
   const order = await Order.findOne({ gatewayOrderId: razorpay_order_id });
   if (!order) return res.status(404).json({ message: 'Order not found' });
   if (order.doctor) return res.status(409).json({ message: 'Doctor-linked orders must use the existing payment verification flow' });
-  if (req.user.role !== 'patient' || String(req.user._id) !== String(order.patient)) {
-    return res.status(403).json({ message: 'Cannot verify payment for another patient order' });
-  }
+  if (req.user.role !== 'patient' || String(req.user._id) !== String(order.patient)) return res.status(403).json({ message: 'Cannot verify payment for another patient order' });
 
-  const result = await processDirectPayment({
-    order,
-    gatewayTransactionId: razorpay_payment_id,
-    signature: razorpay_signature,
-    rawGatewayPayload: req.body,
-    req,
-  });
-
+  const result = await processDirectPayment({ order, gatewayTransactionId: razorpay_payment_id, signature: razorpay_signature, rawGatewayPayload: req.body, req });
   res.json({
-    message: result.idempotent ? 'Payment already verified' : 'Payment verified and program activated',
+    message: result.idempotent ? 'Payment already verified' : 'Payment verified and approved programmes activated',
     invoiceNumber: result.payment.invoiceNumber,
     paymentId: result.payment._id,
     duplicateCharge: result.duplicateCharge,
@@ -451,23 +318,8 @@ const directRazorpayWebhook = asyncHandler(async (req, res) => {
   if (!order) return res.status(404).json({ message: 'Order not found' });
   if (order.doctor) return res.status(409).json({ message: 'Not a direct payment order' });
 
-  const result = await processDirectPayment({
-    order,
-    gatewayTransactionId: entity.id,
-    rawGatewayPayload: payload,
-    req,
-  });
-  res.json({
-    received: true,
-    idempotent: result.idempotent,
-    duplicateCharge: result.duplicateCharge,
-    duplicatePaymentId: result.duplicatePayment?._id,
-    purchaseMode: 'direct',
-  });
+  const result = await processDirectPayment({ order, gatewayTransactionId: entity.id, rawGatewayPayload: payload, req });
+  res.json({ received: true, idempotent: result.idempotent, duplicateCharge: result.duplicateCharge, duplicatePaymentId: result.duplicatePayment?._id, purchaseMode: 'direct' });
 });
 
-module.exports = {
-  createDirectOrder,
-  verifyDirectPayment,
-  directRazorpayWebhook,
-};
+module.exports = { createDirectOrder, verifyDirectPayment, directRazorpayWebhook };
