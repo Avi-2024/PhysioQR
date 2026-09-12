@@ -1,18 +1,24 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { CalendarDays, Play, Printer, Stethoscope } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import apiClient from '@/lib/api-client';
 import ErrorState from '@/components/feedback/ErrorState';
 
 type ApiRecord = Record<string, unknown>;
-
+type ActiveProgram = {
+  enrollmentId?: string;
+  currentDay?: number;
+  completionPercentage?: number;
+  program?: { programCode?: string; name?: string; nameHindi?: string; durationDays?: number };
+};
 type Prescription = {
   prescriptionId: string;
   prescriptionDate?: string;
   prescriptionUrl?: string;
   prescriptionQr?: string;
   availableLanguages?: string[];
+  activePrograms?: ActiveProgram[];
   enrollment?: { id?: string; currentDay?: number; completionPercentage?: number };
   patient?: { patientId?: string; fullName?: string; mobile?: string; age?: number; dateOfBirth?: string; gender?: string };
   doctor?: { doctorId?: string; fullName?: string; qualification?: string; specialization?: string; clinicName?: string; clinicAddress?: string; city?: string; state?: string; postalCode?: string; clinicContact?: string };
@@ -22,17 +28,20 @@ type Prescription = {
 
 export default function PatientProgrammePage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedEnrollmentId = searchParams.get('enrollment') || '';
   const [language, setLanguage] = useState('en');
   const [playingId, setPlayingId] = useState('');
   const query = useQuery<Prescription>({
-    queryKey: ['patient-prescription'],
-    queryFn: () => apiClient.get('/patients/me/prescription').then((response) => response.data),
+    queryKey: ['patient-prescription', selectedEnrollmentId],
+    queryFn: () => apiClient.get('/patients/me/prescription', { params: selectedEnrollmentId ? { enrollmentId: selectedEnrollmentId } : {} }).then((response) => response.data),
     retry: false,
   });
 
   const data = query.data;
   const day = data?.day;
   const enrollment = data?.enrollment;
+  const activePrograms = data?.activePrograms || [];
   const languages = data?.availableLanguages?.length ? data.availableLanguages : ['en'];
   const allExercises = useMemo(() => (day?.exercises || []).filter((entry) => entry.exercise), [day?.exercises]);
   const exercises = useMemo(() => {
@@ -51,6 +60,12 @@ export default function PatientProgrammePage() {
   const patientAge = patient.age ?? ageFromDate(patient.dateOfBirth);
   const clinicLocation = [doctor.clinicAddress, doctor.city, doctor.state, doctor.postalCode].filter(Boolean).join(', ');
 
+  const selectProgram = (id?: string) => {
+    if (!id || id === enrollment?.id) return;
+    setPlayingId('');
+    setSearchParams({ enrollment: id });
+  };
+
   const startVideo = (exercise: ApiRecord) => {
     const id = text(exercise._id || exercise.id);
     setPlayingId(id);
@@ -61,6 +76,19 @@ export default function PatientProgrammePage() {
 
   return (
     <div className="mx-auto max-w-5xl bg-white text-neutral-900 print:max-w-none print:shadow-none">
+      {activePrograms.length > 1 && <section className="mb-4 rounded-xl border border-neutral-200 bg-white p-4 print:hidden">
+        <div className="text-xs font-bold uppercase tracking-[0.14em] text-neutral-500">Your approved programmes</div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {activePrograms.map((item) => {
+            const selected = item.enrollmentId === enrollment?.id;
+            return <button key={item.enrollmentId} type="button" onClick={() => selectProgram(item.enrollmentId)} className={`rounded-lg border px-3 py-2 text-left text-sm font-semibold ${selected ? 'border-primary-500 bg-primary-50 text-primary-800' : 'border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50'}`}>
+              <span className="block">{item.program?.name || 'Rehabilitation programme'}</span>
+              <span className="mt-0.5 block text-[11px] font-medium opacity-70">Day {item.currentDay || 1} · {item.program?.durationDays || '—'} days</span>
+            </button>;
+          })}
+        </div>
+      </section>}
+
       <section className="border border-neutral-200 bg-white print:border-0">
         <div className="grid gap-5 border-b border-neutral-200 p-5 md:grid-cols-[1fr_1.2fr_auto] md:items-start">
           <div className="flex items-center gap-3">
@@ -69,9 +97,9 @@ export default function PatientProgrammePage() {
           </div>
 
           <div className="min-w-0 text-sm">
-            <div className="flex items-center gap-2 font-bold text-neutral-950"><Stethoscope className="h-4 w-4 text-primary-600" />{doctor.fullName || 'Physiotherapist'}</div>
+            <div className="flex items-center gap-2 font-bold text-neutral-950"><Stethoscope className="h-4 w-4 text-primary-600" />{doctor.fullName || 'PhysioQR Clinical Team'}</div>
             <p className="mt-1 text-xs text-neutral-500">{[doctor.qualification, doctor.specialization].filter(Boolean).join(' · ') || 'Clinical rehabilitation provider'}</p>
-            <p className="mt-2 text-xs leading-5 text-neutral-600">{doctor.clinicName || 'PhysioQR Partner Clinic'}{clinicLocation ? ` · ${clinicLocation}` : ''}</p>
+            <p className="mt-2 text-xs leading-5 text-neutral-600">{doctor.clinicName || (doctor.fullName ? 'PhysioQR Partner Clinic' : 'PhysioQR Direct')}{clinicLocation ? ` · ${clinicLocation}` : ''}</p>
             {doctor.clinicContact && <p className="mt-1 text-xs text-neutral-500">Clinic: {doctor.clinicContact}</p>}
           </div>
 
@@ -130,7 +158,7 @@ export default function PatientProgrammePage() {
 
           <div className="mt-5 flex flex-col gap-3 border-t border-neutral-200 pt-5 sm:flex-row sm:items-center sm:justify-between print:hidden">
             <p className="text-xs leading-5 text-neutral-500">Complete exercises only as prescribed. Stop and contact your clinician if you develop concerning symptoms.</p>
-            <button type="button" onClick={() => navigate(`/patient/programme/day/${currentDay}`)} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white"><CalendarDays className="h-4 w-4" />Open daily tracking</button>
+            <button type="button" onClick={() => navigate(`/patient/programme/day/${currentDay}?enrollment=${enrollment?.id || ''}`)} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white"><CalendarDays className="h-4 w-4" />Open daily tracking</button>
           </div>
         </div>
       </section>
@@ -138,38 +166,9 @@ export default function PatientProgrammePage() {
   );
 }
 
-function PrescriptionValue({ label, value }: { label: string; value: unknown }) {
-  return <div><dt className="text-xs text-neutral-400">{label}</dt><dd className="mt-0.5 font-bold text-neutral-900">{text(value, '—')}</dd></div>;
-}
-
-function text(value: unknown, fallback = '') {
-  return value === undefined || value === null || value === '' ? fallback : String(value);
-}
-
-function ageFromDate(value?: string) {
-  if (!value) return undefined;
-  const birth = new Date(value);
-  if (Number.isNaN(birth.getTime())) return undefined;
-  const today = new Date();
-  let age = today.getFullYear() - birth.getFullYear();
-  const beforeBirthday = today.getMonth() < birth.getMonth() || (today.getMonth() === birth.getMonth() && today.getDate() < birth.getDate());
-  if (beforeBirthday) age -= 1;
-  return age > 0 ? age : undefined;
-}
-
-function dateText(value?: string) {
-  if (!value) return '—';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '—';
-  return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-}
-
-function extractYoutubeId(url: string) {
-  const match = url.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
-  return match?.[1] || '';
-}
-
-function requestError(error: unknown) {
-  const source = error && typeof error === 'object' ? error as { response?: { data?: { message?: string } }; message?: string } : {};
-  return source.response?.data?.message || source.message || 'Your active rehabilitation prescription is unavailable.';
-}
+function PrescriptionValue({ label, value }: { label: string; value: unknown }) { return <div><dt className="text-xs text-neutral-400">{label}</dt><dd className="mt-0.5 font-bold text-neutral-900">{text(value, '—')}</dd></div>; }
+function text(value: unknown, fallback = '') { return value === undefined || value === null || value === '' ? fallback : String(value); }
+function ageFromDate(value?: string) { if (!value) return undefined; const birth = new Date(value); if (Number.isNaN(birth.getTime())) return undefined; const today = new Date(); let age = today.getFullYear() - birth.getFullYear(); const beforeBirthday = today.getMonth() < birth.getMonth() || (today.getMonth() === birth.getMonth() && today.getDate() < birth.getDate()); if (beforeBirthday) age -= 1; return age > 0 ? age : undefined; }
+function dateText(value?: string) { if (!value) return '—'; const date = new Date(value); if (Number.isNaN(date.getTime())) return '—'; return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }); }
+function extractYoutubeId(url: string) { const match = url.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/); return match?.[1] || ''; }
+function requestError(error: unknown) { const source = error && typeof error === 'object' ? error as { response?: { data?: { message?: string } }; message?: string } : {}; return source.response?.data?.message || source.message || 'Your active rehabilitation prescription is unavailable.'; }
