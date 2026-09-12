@@ -10,6 +10,8 @@ type ApiRecord = Record<string, unknown>;
 type Prescription = {
   prescriptionId: string;
   prescriptionDate?: string;
+  prescriptionUrl?: string;
+  prescriptionQr?: string;
   availableLanguages?: string[];
   enrollment?: { id?: string; currentDay?: number; completionPercentage?: number };
   patient?: { patientId?: string; fullName?: string; mobile?: string; age?: number; dateOfBirth?: string; gender?: string };
@@ -73,13 +75,16 @@ export default function PatientProgrammePage() {
             {doctor.clinicContact && <p className="mt-1 text-xs text-neutral-500">Clinic: {doctor.clinicContact}</p>}
           </div>
 
-          <div className="flex flex-wrap items-end gap-2 md:flex-col md:items-stretch print:hidden">
-            <label className="text-[11px] font-semibold text-neutral-500">Video language
-              <select value={language} onChange={(event) => setLanguage(event.target.value)} className="mt-1 block min-h-9 rounded-lg border border-neutral-300 bg-white px-2.5 text-xs font-semibold text-neutral-700">
-                {languages.map((item) => <option key={item} value={item}>{item === 'hi' ? 'Hindi' : 'English'}</option>)}
-              </select>
-            </label>
-            <button type="button" onClick={() => window.print()} className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg border border-neutral-300 px-3 text-xs font-semibold text-neutral-700"><Printer className="h-4 w-4" />Print</button>
+          <div className="flex flex-wrap items-end gap-3 md:flex-col md:items-center">
+            {data.prescriptionQr && <img src={data.prescriptionQr} alt="Prescription QR code" className="h-20 w-20 rounded border border-neutral-200 bg-white p-1 print:h-16 print:w-16" />}
+            <div className="flex flex-wrap items-end gap-2 print:hidden md:flex-col md:items-stretch">
+              <label className="text-[11px] font-semibold text-neutral-500">Video language
+                <select value={language} onChange={(event) => setLanguage(event.target.value)} className="mt-1 block min-h-9 rounded-lg border border-neutral-300 bg-white px-2.5 text-xs font-semibold text-neutral-700">
+                  {languages.map((item) => <option key={item} value={item}>{item === 'hi' ? 'Hindi' : 'English'}</option>)}
+                </select>
+              </label>
+              <button type="button" onClick={() => window.print()} className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg border border-neutral-300 px-3 text-xs font-semibold text-neutral-700"><Printer className="h-4 w-4" />Print</button>
+            </div>
           </div>
         </div>
 
