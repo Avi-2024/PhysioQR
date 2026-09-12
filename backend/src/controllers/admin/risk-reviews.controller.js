@@ -1,17 +1,19 @@
 const PatientAssessment = require('../../models/PatientAssessment.model');
 const Program = require('../../models/Program.model');
+const { Payment } = require('../../models/Payment.model');
 const { writeAuditLog } = require('../../utils/auditLogger');
 const { paginateModel } = require('../../utils/queryHelpers');
 const asyncHandler = require('../../utils/asyncHandler');
 
 const reviewFilter = { $or: [{ hasRedFlag: true }, { requiresPhysioReview: true }] };
+const FINANCIAL_STATUSES = ['successful', 'manually_verified', 'partially_refunded', 'refunded', 'disputed', 'chargeback'];
 
 const populate = [
   { path: 'patient', select: 'patientId fullName mobile status referringDoctor', populate: { path: 'referringDoctor', select: 'doctorId fullName clinicName' } },
   { path: 'caseType', select: 'code name requiresSurgeryDetails requiresPhysioReview' },
   { path: 'painCategory', select: 'name' },
   { path: 'surgeryType', select: 'code name bodyRegion' },
-  { path: 'approvedProgram', select: 'programCode name durationDays difficultyLevel painCategory isActive' },
+  { path: 'approvedProgram', select: 'programCode name durationDays difficultyLevel painCategory isActive defaultPrice' },
   { path: 'reviewedBy', select: 'email mobile role' },
 ];
 
@@ -51,9 +53,9 @@ const getRiskReviewById = asyncHandler(async (req, res) => {
   if (!assessment) return res.status(404).json({ message: 'Clinical review not found' });
 
   let availablePrograms = [];
-  if (assessment.requiresPhysioReview && assessment.painCategory?._id) {
+  if (assessment.painCategory?._id) {
     availablePrograms = await Program.find({ isActive: true, painCategory: assessment.painCategory._id })
-      .select('programCode name durationDays difficultyLevel description painCategory')
+      .select('programCode name durationDays difficultyLevel description painCategory defaultPrice')
       .sort({ name: 1 })
       .lean();
   }
@@ -68,13 +70,23 @@ const updateRiskReview = asyncHandler(async (req, res) => {
 
   const assessment = await PatientAssessment.findOne({ _id: req.params.id, ...reviewFilter });
   if (!assessment) return res.status(404).json({ message: 'Clinical review not found' });
-  if (assessment.status !== 'pending_review') return res.status(409).json({ message: 'Only pending clinical reviews can receive a decision' });
+
+  const programmeCorrection = assessment.status === 'cleared' && status === 'cleared';
+  if (assessment.status !== 'pending_review' && !programmeCorrection) {
+    return res.status(409).json({ message: 'Only pending reviews can receive a decision. Cleared reviews can only receive a programme assignment correction.' });
+  }
 
   let approvedProgram = null;
-  if (status === 'cleared' && assessment.requiresPhysioReview) {
+  if (status === 'cleared') {
     if (!programId) return res.status(400).json({ message: 'Select the rehabilitation programme approved for this clinical review' });
-    approvedProgram = await Program.findOne({ _id: programId, isActive: true, painCategory: assessment.painCategory }).select('_id name programCode');
+    approvedProgram = await Program.findOne({ _id: programId, isActive: true, painCategory: assessment.painCategory })
+      .select('_id name programCode defaultPrice');
     if (!approvedProgram) return res.status(400).json({ message: 'Select an active programme mapped to this body region' });
+
+    if (programmeCorrection) {
+      const paid = await Payment.exists({ patient: assessment.patient, status: { $in: FINANCIAL_STATUSES } });
+      if (paid) return res.status(409).json({ message: 'Programme assignment is locked after verified payment' });
+    }
   }
 
   const previousValue = {
@@ -84,30 +96,37 @@ const updateRiskReview = asyncHandler(async (req, res) => {
     reviewedBy: assessment.reviewedBy,
     reviewedAt: assessment.reviewedAt,
   };
-  assessment.status = status;
+
+  if (!programmeCorrection) assessment.status = status;
   assessment.adminReviewNote = String(note).trim();
-  assessment.approvedProgram = status === 'cleared' && approvedProgram ? approvedProgram._id : undefined;
+  if (status === 'cleared') assessment.approvedProgram = approvedProgram._id;
+  else assessment.approvedProgram = undefined;
   assessment.reviewedBy = req.user._id;
   assessment.reviewedAt = new Date();
   await assessment.save();
 
   const isRedFlagReview = assessment.reviewType === 'red_flag' || assessment.hasRedFlag;
+  const action = programmeCorrection
+    ? 'assessment_programme_assigned_after_clearance'
+    : status === 'cleared'
+      ? isRedFlagReview ? 'assessment_red_flag_cleared' : 'assessment_physio_review_cleared'
+      : isRedFlagReview ? 'assessment_red_flag_blocked' : 'assessment_physio_review_blocked';
+
   await writeAuditLog({
     req,
-    action: status === 'cleared'
-      ? isRedFlagReview ? 'assessment_red_flag_cleared' : 'assessment_physio_review_cleared'
-      : isRedFlagReview ? 'assessment_red_flag_blocked' : 'assessment_physio_review_blocked',
+    action,
     module: 'PatientAssessment',
     recordId: assessment._id,
     previousValue,
     newValue: {
-      status,
+      status: assessment.status,
       adminReviewNote: assessment.adminReviewNote,
       approvedProgram: assessment.approvedProgram,
       approvedProgramName: approvedProgram?.name,
       reviewedBy: req.user._id,
       reviewedAt: assessment.reviewedAt,
     },
+    reason: note,
   });
 
   const updated = await PatientAssessment.findById(assessment._id).populate(populate).lean();
