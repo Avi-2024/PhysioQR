@@ -19,7 +19,6 @@ const programSchema = new mongoose.Schema({
   instructions: String,
   precautions: String,
   requiredEquipment: [String],
-  defaultPrice: Number,
   thumbnail: String,
   isActive: { type: Boolean, default: true },
 }, { timestamps: true });
