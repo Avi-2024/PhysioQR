@@ -33,6 +33,18 @@ const getOtpProvider = () => {
   return process.env.NODE_ENV === 'production' ? 'twilio' : 'db';
 };
 
+const getTestOtp = () => {
+  const configured = process.env.OTP_TEST_CODE?.trim();
+  if (!configured) return null;
+  if (process.env.NODE_ENV === 'production') {
+    throw httpError('OTP_TEST_CODE cannot be used in production', 503);
+  }
+  if (!/^\d{4,8}$/.test(configured)) {
+    throw httpError('OTP_TEST_CODE must contain 4 to 8 digits', 503);
+  }
+  return configured;
+};
+
 const assertPatientOtpPurpose = (purpose) => {
   if (!PATIENT_OTP_PURPOSES.has(purpose)) {
     throw httpError('OTP is only supported for patient registration and login');
@@ -75,14 +87,14 @@ const sendDbOtp = async ({ mobile, purpose }) => {
     throw httpError('Too many failed attempts. Please wait before retrying.', 429);
   }
 
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const otp = getTestOtp() || Math.floor(100000 + Math.random() * 900000).toString();
   const expiresInMinutes = Number(process.env.OTP_EXPIRY_MINUTES || 10);
   const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000);
 
   await Otp.deleteMany({ mobile: normalizedMobile, purpose, verified: false });
   await Otp.create({ mobile: normalizedMobile, otp, purpose, expiresAt });
 
-  const response = { expiresInMinutes };
+  const response = { expiresInMinutes, delivery: 'local' };
   if (['development', 'test'].includes(process.env.NODE_ENV)) response.otp = otp;
   return response;
 };
@@ -114,7 +126,7 @@ const sendTwilioOtp = async ({ mobile }) => {
     .verifications
     .create({ to, channel });
 
-  return { channel, status: verification.status };
+  return { channel, status: verification.status, delivery: 'twilio' };
 };
 
 const verifyTwilioOtp = async ({ mobile, otp }) => {
@@ -133,12 +145,21 @@ const verifyTwilioOtp = async ({ mobile, otp }) => {
   return { mobile: normalizeMobile(mobile) };
 };
 
+const assertNonProductionLocalProvider = (provider) => {
+  if (provider === 'mock' && process.env.NODE_ENV === 'production') {
+    throw httpError('Mock OTP provider cannot be used in production', 503);
+  }
+};
+
 const sendOtp = async ({ mobile, purpose }) => {
   assertPatientOtpPurpose(purpose);
   const provider = getOtpProvider();
 
   if (provider === 'twilio') return sendTwilioOtp({ mobile, purpose });
-  if (provider === 'db') return sendDbOtp({ mobile, purpose });
+  if (provider === 'db' || provider === 'mock') {
+    assertNonProductionLocalProvider(provider);
+    return sendDbOtp({ mobile, purpose });
+  }
 
   throw httpError(`Unsupported OTP provider: ${provider}`, 503);
 };
@@ -148,7 +169,10 @@ const verifyOtp = async ({ mobile, purpose, otp }) => {
   const provider = getOtpProvider();
 
   if (provider === 'twilio') return verifyTwilioOtp({ mobile, purpose, otp });
-  if (provider === 'db') return verifyDbOtp({ mobile, purpose, otp });
+  if (provider === 'db' || provider === 'mock') {
+    assertNonProductionLocalProvider(provider);
+    return verifyDbOtp({ mobile, purpose, otp });
+  }
 
   throw httpError(`Unsupported OTP provider: ${provider}`, 503);
 };
