@@ -17,7 +17,8 @@
     "reset:all-except-admin": "node scripts/resetAllExceptAdmin.js",
     "test:integration": "node scripts/integrationSmoke.js",
     "worker:notifications": "node scripts/notificationWorker.js",
-    "migrate:rehab-content": "node scripts/migrateProgramContent.js"
+    "migrate:rehab-content": "node scripts/migrateProgramContent.js",
+    "audit:rehab-content": "node scripts/auditRehabContent.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1109.0",
