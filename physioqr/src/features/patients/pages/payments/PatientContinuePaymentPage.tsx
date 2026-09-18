@@ -58,7 +58,9 @@ export default function PatientContinuePaymentPage() {
         idempotencyKey: `patient-${patientId}-${programId}-${Date.now()}`,
       });
       const order = asRecord(orderResponse.data);
-      if (order.key) {
+      const mockOrder = text(order.gatewayProvider) === 'mock' || text(order.orderId).startsWith('order_mock_');
+      if (!mockOrder) {
+        if (!order.key) throw new Error('Razorpay checkout key is not configured.');
         await loadRazorpayScript();
         await openRazorpayCheckout({ order, patient, onVerify: verifyGatewayPayment });
         return;
