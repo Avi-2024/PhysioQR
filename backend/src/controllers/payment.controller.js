@@ -435,7 +435,7 @@ const createOrder = asyncHandler(async (req, res) => {
   if (idempotencyKey) {
     const existing = await Order.findOne({ idempotencyKey, patient: patientId });
     if (existing) {
-      return res.json({ orderId: existing.gatewayOrderId, amount: Math.round(existing.finalAmount * 100), currency: existing.currency, key: process.env.RAZORPAY_KEY_ID, originalAmount: existing.originalAmount, discountAmount: existing.discountAmount, finalAmount: existing.finalAmount, idempotent: true });
+      return res.json({ orderId: existing.gatewayOrderId, amount: Math.round(existing.finalAmount * 100), currency: existing.currency, key: isMockGateway() ? null : process.env.RAZORPAY_KEY_ID, gatewayProvider: isMockGateway() ? 'mock' : 'razorpay', originalAmount: existing.originalAmount, discountAmount: existing.discountAmount, finalAmount: existing.finalAmount, idempotent: true });
     }
   }
 
@@ -481,13 +481,13 @@ const createOrder = asyncHandler(async (req, res) => {
     if (error?.code === 11000 && idempotencyKey) {
       const existing = await Order.findOne({ idempotencyKey, patient: patientId });
       if (existing) {
-        return res.json({ orderId: existing.gatewayOrderId, amount: Math.round(existing.finalAmount * 100), currency: existing.currency, key: process.env.RAZORPAY_KEY_ID, originalAmount: existing.originalAmount, discountAmount: existing.discountAmount, finalAmount: existing.finalAmount, idempotent: true });
+        return res.json({ orderId: existing.gatewayOrderId, amount: Math.round(existing.finalAmount * 100), currency: existing.currency, key: isMockGateway() ? null : process.env.RAZORPAY_KEY_ID, gatewayProvider: isMockGateway() ? 'mock' : 'razorpay', originalAmount: existing.originalAmount, discountAmount: existing.discountAmount, finalAmount: existing.finalAmount, idempotent: true });
       }
     }
     throw error;
   }
 
-  res.json({ orderId: gatewayOrder.id, amount: gatewayOrder.amount, currency: gatewayOrder.currency, key: process.env.RAZORPAY_KEY_ID, originalAmount: order.originalAmount, discountAmount: order.discountAmount, finalAmount: order.finalAmount });
+  res.json({ orderId: gatewayOrder.id, amount: gatewayOrder.amount, currency: gatewayOrder.currency, key: isMockGateway() ? null : process.env.RAZORPAY_KEY_ID, gatewayProvider: isMockGateway() ? 'mock' : 'razorpay', originalAmount: order.originalAmount, discountAmount: order.discountAmount, finalAmount: order.finalAmount });
 });
 
 const verifyPayment = asyncHandler(async (req, res) => {
