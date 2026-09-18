@@ -246,7 +246,7 @@ const createDirectOrder = asyncHandler(async (req, res) => {
 
   if (idempotencyKey) {
     const existing = await Order.findOne({ idempotencyKey, patient: patientId, doctor: null });
-    if (existing) return res.json({ orderId: existing.gatewayOrderId, amount: Math.round(existing.finalAmount * 100), currency: existing.currency, key: process.env.RAZORPAY_KEY_ID, originalAmount: existing.originalAmount, discountAmount: existing.discountAmount, finalAmount: existing.finalAmount, purchaseMode: 'direct', idempotent: true });
+    if (existing) return res.json({ orderId: existing.gatewayOrderId, amount: Math.round(existing.finalAmount * 100), currency: existing.currency, key: isMockGateway() ? null : process.env.RAZORPAY_KEY_ID, gatewayProvider: isMockGateway() ? 'mock' : 'razorpay', originalAmount: existing.originalAmount, discountAmount: existing.discountAmount, finalAmount: existing.finalAmount, purchaseMode: 'direct', idempotent: true });
   }
 
   const patient = await Patient.findById(patientId);
@@ -281,7 +281,7 @@ const createDirectOrder = asyncHandler(async (req, res) => {
     expiresAt: new Date(Date.now() + 30 * 60 * 1000),
   });
 
-  res.json({ orderId: gatewayOrder.id, amount: gatewayOrder.amount, currency: gatewayOrder.currency, key: process.env.RAZORPAY_KEY_ID, originalAmount: order.originalAmount, discountAmount: order.discountAmount, finalAmount: order.finalAmount, purchaseMode: 'direct', programmeCount: bundle.programIds.length });
+  res.json({ orderId: gatewayOrder.id, amount: gatewayOrder.amount, currency: gatewayOrder.currency, key: isMockGateway() ? null : process.env.RAZORPAY_KEY_ID, gatewayProvider: isMockGateway() ? 'mock' : 'razorpay', originalAmount: order.originalAmount, discountAmount: order.discountAmount, finalAmount: order.finalAmount, purchaseMode: 'direct', programmeCount: bundle.programIds.length });
 });
 
 const verifyDirectPayment = asyncHandler(async (req, res) => {
