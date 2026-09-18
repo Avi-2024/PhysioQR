@@ -7,11 +7,21 @@ const { ProgramDay } = require('../src/models/Exercise.model');
 const AUTO_TARGET_REGEX = /^AUTO-.+-REHAB-(14D|30D|45D)$/i;
 const FORCE = String(process.env.PROGRAM_CONTENT_FORCE || '').toLowerCase() === 'true';
 const DRY_RUN = String(process.env.PROGRAM_CONTENT_DRY_RUN || '').toLowerCase() === 'true';
-const EXPLICIT_SOURCE_CODE = String(process.env.PROGRAM_CONTENT_SOURCE_CODE || '').trim();
+
+const looksLikePlaceholder = (value) => {
+  const normalized = String(value || '').trim();
+  return !normalized
+    || /^YOUR[-_]/i.test(normalized)
+    || /^REPLACE[-_]/i.test(normalized)
+    || /^<.*>$/.test(normalized);
+};
+
+const RAW_SOURCE_CODE = String(process.env.PROGRAM_CONTENT_SOURCE_CODE || '').trim();
+const EXPLICIT_SOURCE_CODE = looksLikePlaceholder(RAW_SOURCE_CODE) ? '' : RAW_SOURCE_CODE;
 const EXPLICIT_TARGET_CODES = String(process.env.PROGRAM_CONTENT_TARGET_CODES || '')
   .split(',')
   .map((value) => value.trim())
-  .filter(Boolean);
+  .filter((value) => value && !looksLikePlaceholder(value));
 
 const id = (value) => String(value?._id || value || '');
 const sameId = (a, b) => Boolean(id(a)) && id(a) === id(b);
@@ -255,6 +265,10 @@ async function run() {
     if (!explicitSourceProfile?.exerciseAssignments) {
       throw new Error(`Source programme ${EXPLICIT_SOURCE_CODE} has no configured exercise mappings`);
     }
+  }
+
+  if (RAW_SOURCE_CODE && !EXPLICIT_SOURCE_CODE) {
+    console.warn(`[config] Ignoring placeholder PROGRAM_CONTENT_SOURCE_CODE="${RAW_SOURCE_CODE}" and using automatic same-region source discovery.`);
   }
 
   console.log('Programme content migration');
