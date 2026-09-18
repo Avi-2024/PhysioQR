@@ -34,7 +34,8 @@ async function printCollection(db, name) {
     ] };
   }
 
-  const docs = await collection.find(query).sort({ createdAt: 1, _id: 1 }).limit(200).toArray();
+  const docs = await collection.find(query).sort({ createdAt: -1, _id: -1 }).limit(5).toArray();
+  console.log(`Showing latest ${docs.length} record(s)`);
   for (const doc of docs) {
     console.log(JSON.stringify(doc, null, 2));
   }
@@ -46,7 +47,7 @@ async function scanAllCollectionsForVideoData(db) {
 
   let totalHits = 0;
   for (const { name } of collections) {
-    const sample = await db.collection(name).find({}).limit(500).toArray();
+    const sample = await db.collection(name).find({}).sort({ createdAt: -1, _id: -1 }).limit(5).toArray();
     const matches = [];
 
     for (const doc of sample) {
@@ -56,12 +57,12 @@ async function scanAllCollectionsForVideoData(db) {
 
     if (matches.length) {
       totalHits += matches.length;
-      console.log(`\n[${name}] ${matches.length} document(s) with video-like data`);
+      console.log(`\n[${name}] ${matches.length} of latest ${sample.length} document(s) with video-like data`);
       for (const item of matches) console.log(JSON.stringify(item, null, 2));
     }
   }
 
-  console.log(`\nTotal documents containing video/youtube/thumbnail-like fields: ${totalHits}`);
+  console.log(`\nVideo-like matches found within latest 5 documents per collection: ${totalHits}`);
 }
 
 async function run() {
