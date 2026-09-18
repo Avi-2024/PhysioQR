@@ -11,6 +11,13 @@ type ActiveProgram = {
   currentDay?: number;
   completionPercentage?: number;
   program?: { programCode?: string; name?: string; nameHindi?: string; durationDays?: number };
+  currentDayContent?: {
+    programDayId?: string | null;
+    exerciseCount?: number;
+    videoCount?: number;
+    contentReady?: boolean;
+    videoReady?: boolean;
+  };
 };
 type Prescription = {
   prescriptionId: string;
@@ -81,9 +88,14 @@ export default function PatientProgrammePage() {
         <div className="mt-3 flex flex-wrap gap-2">
           {activePrograms.map((item) => {
             const selected = item.enrollmentId === enrollment?.id;
+            const contentReady = Boolean(item.currentDayContent?.contentReady);
+            const videoCount = Number(item.currentDayContent?.videoCount || 0);
             return <button key={item.enrollmentId} type="button" onClick={() => selectProgram(item.enrollmentId)} className={`rounded-lg border px-3 py-2 text-left text-sm font-semibold ${selected ? 'border-primary-500 bg-primary-50 text-primary-800' : 'border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50'}`}>
               <span className="block">{item.program?.name || 'Rehabilitation programme'}</span>
               <span className="mt-0.5 block text-[11px] font-medium opacity-70">Day {item.currentDay || 1} · {item.program?.durationDays || '—'} days</span>
+              <span className={`mt-1 block text-[10px] font-bold ${contentReady ? 'text-emerald-700' : 'text-amber-700'}`}>
+                {contentReady ? `Content ready · ${videoCount} video${videoCount === 1 ? '' : 's'}` : 'Clinical content not configured'}
+              </span>
             </button>;
           })}
         </div>
@@ -158,7 +170,11 @@ export default function PatientProgrammePage() {
 
           <div className="mt-5 flex flex-col gap-3 border-t border-neutral-200 pt-5 sm:flex-row sm:items-center sm:justify-between print:hidden">
             <p className="text-xs leading-5 text-neutral-500">Complete exercises only as prescribed. Stop and contact your clinician if you develop concerning symptoms.</p>
-            <button type="button" onClick={() => navigate(`/patient/programme/day/${currentDay}?enrollment=${enrollment?.id || ''}`)} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white"><CalendarDays className="h-4 w-4" />Open daily tracking</button>
+            {day?.id && allExercises.length > 0 ? (
+              <button type="button" onClick={() => navigate(`/patient/programme/day/${currentDay}?enrollment=${enrollment?.id || ''}`)} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white"><CalendarDays className="h-4 w-4" />Open daily tracking</button>
+            ) : (
+              <div className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg border border-amber-200 bg-amber-50 px-4 text-sm font-semibold text-amber-800">Day content not configured</div>
+            )}
           </div>
         </div>
       </section>
