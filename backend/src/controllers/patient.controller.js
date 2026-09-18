@@ -6,6 +6,7 @@ const ProgramProgress = require('../models/ProgramProgress.model');
 const PatientAssessment = require('../models/PatientAssessment.model');
 const { Payment } = require('../models/Payment.model');
 const Program = require('../models/Program.model');
+const { ProgramDay } = require('../models/Exercise.model');
 const asyncHandler = require('../utils/asyncHandler');
 
 // POST /api/patients/register
@@ -164,8 +165,74 @@ const getOnboardingQuote = asyncHandler(async (req, res) => {
 });
 
 const getMyProgram = asyncHandler(async (req, res) => {
-  const program = await PatientProgram.findOne({ patient: req.user._id, status: 'active' }).populate('program').populate('doctor', 'fullName clinicName');
-  res.json(program);
+  const activePrograms = await PatientProgram.find({ patient: req.user._id, status: 'active' })
+    .populate('program')
+    .populate('doctor', 'fullName clinicName')
+    .sort({ startDate: -1, createdAt: -1 })
+    .lean();
+
+  if (!activePrograms.length) return res.json(null);
+
+  let preferred = null;
+  let preferredContent = null;
+  let fallbackWithExercises = null;
+  let fallbackExerciseContent = null;
+
+  for (const enrollment of activePrograms) {
+    const currentDay = Math.max(1, Number(enrollment.currentDay || 1));
+    const contentDay = await ProgramDay.findOne({
+      program: enrollment.program?._id || enrollment.program,
+      dayNumber: currentDay,
+      isActive: true,
+      'exercises.0': { $exists: true },
+    })
+      .populate('exercises.exercise', '_id isActive videoUrl youtubeVideoId thumbnail')
+      .lean();
+
+    const activeExercises = (contentDay?.exercises || []).filter(
+      (entry) => entry?.exercise && entry.exercise.isActive !== false,
+    );
+    const videoCount = activeExercises.filter(
+      (entry) => String(entry.exercise.videoUrl || '').trim() || String(entry.exercise.youtubeVideoId || '').trim(),
+    ).length;
+
+    const contentSummary = {
+      dayNumber: currentDay,
+      programDayId: contentDay?._id || null,
+      exerciseCount: activeExercises.length,
+      videoCount,
+      hasExercises: activeExercises.length > 0,
+      hasVideos: videoCount > 0,
+    };
+
+    if (videoCount > 0) {
+      preferred = enrollment;
+      preferredContent = contentSummary;
+      break;
+    }
+    if (!fallbackWithExercises && activeExercises.length > 0) {
+      fallbackWithExercises = enrollment;
+      fallbackExerciseContent = contentSummary;
+    }
+  }
+
+  if (!preferred) {
+    preferred = fallbackWithExercises || activePrograms[0];
+    preferredContent = fallbackExerciseContent || {
+      dayNumber: Math.max(1, Number(preferred.currentDay || 1)),
+      programDayId: null,
+      exerciseCount: 0,
+      videoCount: 0,
+      hasExercises: false,
+      hasVideos: false,
+    };
+  }
+
+  res.json({
+    ...preferred,
+    currentDayContent: preferredContent,
+    activeProgrammeCount: activePrograms.length,
+  });
 });
 const getMyProgress = asyncHandler(async (req, res) => res.json(await ProgramProgress.find({ patient: req.user._id }).sort({ dayNumber: 1 })));
 const getMyPayments = asyncHandler(async (req, res) => res.json(await Payment.find({ patient: req.user._id }).populate('program', 'name')));
