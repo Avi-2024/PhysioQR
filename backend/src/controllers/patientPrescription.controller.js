@@ -40,39 +40,52 @@ const getMyPrescription = asyncHandler(async (req, res) => {
     return res.status(404).json({ message: 'No active rehabilitation prescription found.' });
   }
 
+  const activeProgrammeSummaries = [];
+  for (const item of activeEnrollments) {
+    const itemCurrentDay = Math.max(1, Number(item.currentDay || 1));
+    const contentDay = await ProgramDay.findOne({
+      program: item.program?._id || item.program,
+      dayNumber: itemCurrentDay,
+      isActive: true,
+      'exercises.0': { $exists: true },
+    })
+      .populate('exercises.exercise', '_id isActive videoUrl youtubeVideoId')
+      .lean();
+
+    const activeExercises = (contentDay?.exercises || []).filter(
+      (entry) => entry?.exercise && entry.exercise.isActive !== false,
+    );
+    const videoCount = activeExercises.filter(
+      (entry) => String(entry.exercise.videoUrl || '').trim() || String(entry.exercise.youtubeVideoId || '').trim(),
+    ).length;
+
+    activeProgrammeSummaries.push({
+      enrollmentId: item._id,
+      currentDay: itemCurrentDay,
+      completionPercentage: item.completionPercentage || 0,
+      startDate: item.startDate,
+      expiryDate: item.expiryDate,
+      program: item.program,
+      currentDayContent: {
+        programDayId: contentDay?._id || null,
+        exerciseCount: activeExercises.length,
+        videoCount,
+        contentReady: activeExercises.length > 0,
+        videoReady: videoCount > 0,
+      },
+    });
+  }
+
   const requestedEnrollmentId = String(req.query.enrollmentId || '').trim();
   let selectedSummary = requestedEnrollmentId
     ? activeEnrollments.find((item) => String(item._id) === requestedEnrollmentId)
     : null;
 
-  // Default to the active programme whose current day has playable video content.
-  // If none has video, prefer one with active exercises; otherwise keep the latest.
   if (!requestedEnrollmentId) {
-    let exerciseFallback = null;
-    for (const item of activeEnrollments) {
-      const contentDay = await ProgramDay.findOne({
-        program: item.program?._id || item.program,
-        dayNumber: Math.max(1, Number(item.currentDay || 1)),
-        isActive: true,
-        'exercises.0': { $exists: true },
-      })
-        .populate('exercises.exercise', '_id isActive videoUrl youtubeVideoId')
-        .lean();
-
-      const activeExercises = (contentDay?.exercises || []).filter(
-        (entry) => entry?.exercise && entry.exercise.isActive !== false,
-      );
-      const hasVideo = activeExercises.some(
-        (entry) => String(entry.exercise.videoUrl || '').trim() || String(entry.exercise.youtubeVideoId || '').trim(),
-      );
-
-      if (hasVideo) {
-        selectedSummary = item;
-        break;
-      }
-      if (!exerciseFallback && activeExercises.length) exerciseFallback = item;
-    }
-    selectedSummary ||= exerciseFallback || activeEnrollments[0];
+    const videoReady = activeProgrammeSummaries.find((item) => item.currentDayContent.videoReady);
+    const contentReady = activeProgrammeSummaries.find((item) => item.currentDayContent.contentReady);
+    const preferredId = videoReady?.enrollmentId || contentReady?.enrollmentId || activeEnrollments[0]._id;
+    selectedSummary = activeEnrollments.find((item) => String(item._id) === String(preferredId));
   }
 
   if (!selectedSummary) return res.status(404).json({ message: 'Selected rehabilitation programme is not active for this patient.' });
@@ -114,14 +127,7 @@ const getMyPrescription = asyncHandler(async (req, res) => {
       expiryDate: enrollment.expiryDate,
       unlockMethod: enrollment.unlockMethod,
     },
-    activePrograms: activeEnrollments.map((item) => ({
-      enrollmentId: item._id,
-      currentDay: item.currentDay,
-      completionPercentage: item.completionPercentage || 0,
-      startDate: item.startDate,
-      expiryDate: item.expiryDate,
-      program: item.program,
-    })),
+    activePrograms: activeProgrammeSummaries,
     patient: enrollment.patient,
     doctor: enrollment.doctor,
     program: enrollment.program,
