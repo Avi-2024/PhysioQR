@@ -66,8 +66,11 @@ async function scanAllCollectionsForVideoData(db) {
 }
 
 async function run() {
-  const uri = process.env.MONGODB_URI || process.env.MONGO_URI;
-  if (!uri) throw new Error('MONGODB_URI or MONGO_URI is required');
+  const uri = process.env.MONGO_URI;
+  if (!uri) throw new Error('MONGO_URI is required');
+  if (process.env.MONGODB_URI && process.env.MONGODB_URI !== process.env.MONGO_URI) {
+    console.warn('[config] MONGODB_URI is set but ignored. Scripts use MONGO_URI to match the running backend.');
+  }
 
   await mongoose.connect(uri);
   const db = mongoose.connection.db;
