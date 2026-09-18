@@ -45,23 +45,34 @@ const getMyPrescription = asyncHandler(async (req, res) => {
     ? activeEnrollments.find((item) => String(item._id) === requestedEnrollmentId)
     : null;
 
-  // Dashboard/prescription defaults to the first active programme that actually
-  // has configured content for the patient's current day. This prevents a newly
-  // activated empty programme shell from hiding an older prescribed video plan.
+  // Default to the active programme whose current day has playable video content.
+  // If none has video, prefer one with active exercises; otherwise keep the latest.
   if (!requestedEnrollmentId) {
+    let exerciseFallback = null;
     for (const item of activeEnrollments) {
       const contentDay = await ProgramDay.findOne({
         program: item.program?._id || item.program,
         dayNumber: Math.max(1, Number(item.currentDay || 1)),
         isActive: true,
         'exercises.0': { $exists: true },
-      }).select('_id').lean();
-      if (contentDay) {
+      })
+        .populate('exercises.exercise', '_id isActive videoUrl youtubeVideoId')
+        .lean();
+
+      const activeExercises = (contentDay?.exercises || []).filter(
+        (entry) => entry?.exercise && entry.exercise.isActive !== false,
+      );
+      const hasVideo = activeExercises.some(
+        (entry) => String(entry.exercise.videoUrl || '').trim() || String(entry.exercise.youtubeVideoId || '').trim(),
+      );
+
+      if (hasVideo) {
         selectedSummary = item;
         break;
       }
+      if (!exerciseFallback && activeExercises.length) exerciseFallback = item;
     }
-    selectedSummary ||= activeEnrollments[0];
+    selectedSummary ||= exerciseFallback || activeEnrollments[0];
   }
 
   if (!selectedSummary) return res.status(404).json({ message: 'Selected rehabilitation programme is not active for this patient.' });
