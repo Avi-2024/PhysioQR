@@ -41,9 +41,29 @@ const getMyPrescription = asyncHandler(async (req, res) => {
   }
 
   const requestedEnrollmentId = String(req.query.enrollmentId || '').trim();
-  const selectedSummary = requestedEnrollmentId
+  let selectedSummary = requestedEnrollmentId
     ? activeEnrollments.find((item) => String(item._id) === requestedEnrollmentId)
-    : activeEnrollments[0];
+    : null;
+
+  // Dashboard/prescription defaults to the first active programme that actually
+  // has configured content for the patient's current day. This prevents a newly
+  // activated empty programme shell from hiding an older prescribed video plan.
+  if (!requestedEnrollmentId) {
+    for (const item of activeEnrollments) {
+      const contentDay = await ProgramDay.findOne({
+        program: item.program?._id || item.program,
+        dayNumber: Math.max(1, Number(item.currentDay || 1)),
+        isActive: true,
+        'exercises.0': { $exists: true },
+      }).select('_id').lean();
+      if (contentDay) {
+        selectedSummary = item;
+        break;
+      }
+    }
+    selectedSummary ||= activeEnrollments[0];
+  }
+
   if (!selectedSummary) return res.status(404).json({ message: 'Selected rehabilitation programme is not active for this patient.' });
 
   const enrollment = await PatientProgram.findOne({ _id: selectedSummary._id, patient: patientId, status: 'active' })
