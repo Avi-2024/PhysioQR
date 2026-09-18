@@ -18,7 +18,8 @@
     "test:integration": "node scripts/integrationSmoke.js",
     "worker:notifications": "node scripts/notificationWorker.js",
     "migrate:rehab-content": "node scripts/migrateProgramContent.js",
-    "audit:rehab-content": "node scripts/auditRehabContent.js"
+    "audit:rehab-content": "node scripts/auditRehabContent.js",
+    "inspect:rehab-db": "node scripts/inspectRehabDb.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1109.0",
