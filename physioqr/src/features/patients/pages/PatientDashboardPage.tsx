@@ -1,3 +1,4 @@
+import type { ElementType } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Activity, CalendarDays, Clock3 } from 'lucide-react';
 import apiClient from '@/lib/api-client';
@@ -60,7 +61,7 @@ function DashboardStat({
   value,
   progress,
 }: {
-  icon: React.ElementType;
+  icon: ElementType;
   label: string;
   value: string;
   progress?: number;
