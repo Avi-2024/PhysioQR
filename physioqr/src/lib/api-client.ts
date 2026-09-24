@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { getAccessToken, setAccessToken, clearTokens } from './auth-storage';
 
-const BASE_URL = (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_API_BASE_URL || 'http://localhost:5000/api';
+const BASE_URL = (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_API_BASE_URL ||"https://physio-qr-23qh.vercel.app/api" || 'http://localhost:5000/api';
 
 export const apiClient = axios.create({
   baseURL: BASE_URL,
