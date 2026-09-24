@@ -5,6 +5,7 @@ interface LogoProps {
   height?: number;
   className?: string;
   textClassName?: string;
+  imageScale?: number;
 }
 
 export function Logo({
