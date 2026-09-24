@@ -291,7 +291,7 @@ function FollowUpUpdateForm({ row, saving, error, onSubmit }: { row: ApiRecord; 
         />
       </label>
 
-      {error && <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">{errorMessage(error)}</div>}
+      {Boolean(error) && <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">{errorMessage(error)}</div>}
 
       <div className="flex justify-end border-t border-neutral-100 pt-4">
         <button
