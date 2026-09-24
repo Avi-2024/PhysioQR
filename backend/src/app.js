@@ -7,6 +7,7 @@ const helmet = require('helmet');
 const mongoSanitize = require('express-mongo-sanitize');
 const Sentry = require('@sentry/node');
 const { maintenanceModeGuard } = require('./middlewares/platformSettings.middleware');
+const connectDB = require('./config/db');
 
 require('dotenv').config();
 
@@ -63,6 +64,15 @@ app.use(rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 }));
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (error) {
+    error.status = error.status || 503;
+    next(error);
+  }
+});
 app.use(maintenanceModeGuard);
 
 app.use('/api/auth', require('./routes/auth.routes'));
