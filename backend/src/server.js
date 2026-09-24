@@ -6,11 +6,15 @@ require('dotenv').config();
 
 const PORT = process.env.PORT || 5000;
 
-connectDB().then(() => {
-  app.listen(PORT, () => {
-    console.log(`✅ PhysioQR server running on port ${PORT}`);
-  });
+connectDB()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`✅ PhysioQR server running on port ${PORT}`);
+    });
 
-  // Start daily jobs: program expiry + fee share release (SRS §21.2, §30)
-  startScheduler();
-});
+    // Start daily jobs: program expiry + fee share release (SRS §21.2, §30)
+    startScheduler();
+  })
+  .catch(() => {
+    process.exit(1);
+  });
