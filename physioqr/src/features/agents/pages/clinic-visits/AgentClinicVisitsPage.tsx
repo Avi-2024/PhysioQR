@@ -310,7 +310,7 @@ function VisitForm({ doctors, saving, error, onSubmit }: { doctors: ApiRecord[];
       )}
 
       {formError && <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">{formError}</div>}
-      {error && <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">{errorMessage(error)}</div>}
+      {Boolean(error) && <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">{errorMessage(error)}</div>}
 
       <div className="flex justify-end border-t border-neutral-100 pt-4">
         <button type="submit" disabled={saving} className="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-60">
