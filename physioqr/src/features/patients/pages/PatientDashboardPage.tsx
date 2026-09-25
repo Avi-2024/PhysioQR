@@ -27,6 +27,7 @@ export default function PatientDashboardPage() {
   const program = asRecord(programQuery.data);
   const rehabProgram = asRecord(program.program);
   const doctor = asRecord(program.doctor);
+  const enrollmentId = text(program._id || program.id);
   const currentDay = Math.max(1, Number(program.currentDay || 1));
   const completion = Math.min(Math.max(Number(program.completionPercentage || 0), 0), 100);
   const durationDays = Number(rehabProgram.durationDays || 0);
@@ -51,7 +52,7 @@ export default function PatientDashboardPage() {
             <div className="mt-5 flex flex-wrap items-center gap-3">
               <button
                 type="button"
-                onClick={() => navigate(`/patient/programme/day/${currentDay}`)}
+                onClick={() => navigate(`/patient/programme/day/${currentDay}${enrollmentId ? `?enrollment=${enrollmentId}` : ''}`)}
                 className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-primary-700"
               >
                 <PlayCircle className="h-4.5 w-4.5" />
