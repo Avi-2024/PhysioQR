@@ -10,7 +10,7 @@ const escapeRegex = (value) => cleanString(value).replace(/[.*+?^${}()|[\]\\]/g,
 
 const extractYouTubeVideoId = (videoUrl) => {
   if (!videoUrl) return null;
-  const match = cleanString(videoUrl).match(/(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  const match = cleanString(videoUrl).match(/(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/|live\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
   return match?.[1] || null;
 };
 
@@ -30,7 +30,7 @@ const normalizeExercisePayload = (body = {}) => {
     if (payload.videoUrl) {
       const videoId = extractYouTubeVideoId(payload.videoUrl);
       if (!videoId) {
-        const error = new Error('videoUrl must be a valid YouTube watch, Shorts, or youtu.be URL');
+        const error = new Error('videoUrl must be a valid YouTube watch, Shorts, embed, live, or youtu.be URL');
         error.status = 400;
         throw error;
       }
