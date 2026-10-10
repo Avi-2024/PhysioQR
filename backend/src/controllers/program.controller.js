@@ -98,9 +98,26 @@ const validateDayNumber = async ({ programId, dayNumber, excludeDayId }) => {
   return numericDay;
 };
 
+// For clinician-gated content, a changed exercise-day prescription invalidates
+// its previous clinical sign-off. Published programmes must be unpublished first.
+const ensureDayEditable = async (program) => {
+  if (!program?.clinicalApprovalRequired) return;
+  if (program.isActive) {
+    const error = new Error('Unpublish this clinically approved programme before editing day content');
+    error.status = 409;
+    throw error;
+  }
+};
+const revokeDayContentSignoff = async (program) => {
+  if (!program?.clinicalApprovalRequired || !program.clinicalApproval?.approvedAt) return;
+  program.clinicalApproval = {};
+  await program.save();
+};
+
 const createProgramDay = asyncHandler(async (req, res) => {
-  const dayNumber = await validateDayNumber({ programId: req.params.id, dayNumber: req.body.dayNumber });
   const program = await Program.findById(req.params.id).select('isActive clinicalApprovalRequired clinicalApproval');
+  await ensureDayEditable(program);
+  const dayNumber = await validateDayNumber({ programId: req.params.id, dayNumber: req.body.dayNumber });
   const exercises = await normalizeDayExercises(req.body.exercises, { allowInactive: !program.isActive });
   const day = await ProgramDay.create({
     program: req.params.id,
@@ -109,10 +126,13 @@ const createProgramDay = asyncHandler(async (req, res) => {
     focus: String(req.body.focus || '').trim(),
     exercises,
   });
+  await revokeDayContentSignoff(program);
   res.status(201).json(await day.populate('exercises.exercise'));
 });
 
 const updateProgramDay = asyncHandler(async (req, res) => {
+  const program = await Program.findById(req.params.id).select('isActive clinicalApprovalRequired clinicalApproval');
+  await ensureDayEditable(program);
   const day = await ProgramDay.findOne({ _id: req.params.dayId, program: req.params.id, isActive: true });
   if (!day) return res.status(404).json({ message: 'Program day not found' });
 
@@ -126,11 +146,11 @@ const updateProgramDay = asyncHandler(async (req, res) => {
   if (req.body.title !== undefined) day.title = String(req.body.title || '').trim();
   if (req.body.focus !== undefined) day.focus = String(req.body.focus || '').trim();
   if (req.body.exercises !== undefined) {
-    const program = await Program.findById(req.params.id).select('isActive').lean();
     day.exercises = await normalizeDayExercises(req.body.exercises, { allowInactive: !program.isActive });
   }
 
   await day.save();
+  await revokeDayContentSignoff(program);
   res.json(await day.populate('exercises.exercise'));
 });
 
