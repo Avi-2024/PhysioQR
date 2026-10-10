@@ -37,7 +37,12 @@ export default function AdminExerciseDetailPage() {
 
   const query = useQuery<Response>({ queryKey: ['admin-exercise', exerciseId], enabled: Boolean(exerciseId), queryFn: () => apiClient.get(`/exercises/${exerciseId}`).then((response) => response.data) });
   const categoriesQuery = useQuery<Category[]>({ queryKey: ['assessment-categories'], queryFn: () => apiClient.get('/assessments/categories').then((response) => response.data) });
-  const refreshRelated = () => { queryClient.invalidateQueries({ queryKey: ['admin-exercise', exerciseId] }); queryClient.invalidateQueries({ queryKey: ['admin-exercises'] }); };
+  const refreshRelated = () => {
+    queryClient.invalidateQueries({ queryKey: ['admin-exercise', exerciseId] });
+    queryClient.invalidateQueries({ queryKey: ['admin-exercises'] });
+    queryClient.invalidateQueries({ queryKey: ['admin-program'] });
+    queryClient.invalidateQueries({ queryKey: ['admin-programs'] });
+  };
 
   const updateMutation = useMutation({
     mutationFn: (payload: Record<string, unknown>) => apiClient.put(`/exercises/${exerciseId}`, payload),
