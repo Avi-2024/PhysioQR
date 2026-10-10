@@ -1,13 +1,15 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
-  DEMO_VIDEO_ID, DEMO_VIDEO_URL, youtubeId,
+  DEMO_VIDEO_ID, DEMO_VIDEO_URL, LEGACY_DEMO_VIDEO_ID,
+  missingDemoVideoFilter, pendingDemoVideoFilter, installedDemoVideoFilter, youtubeId,
   isDemoExerciseVideo, patientSafeExercise, patientSafeDay,
 } = require('../src/services/demoExerciseVideo.service');
 const { videoConfigured } = require('../src/services/programmeReleaseGate.service');
 
 test('demo sample is explicitly identified, never clinically ready', () => {
-  assert.equal(DEMO_VIDEO_ID, 'M7lc1UVf-VE');
+  assert.equal(DEMO_VIDEO_ID, 'ml6cT4AZdqI');
+  assert.equal(DEMO_VIDEO_URL, 'https://youtu.be/ml6cT4AZdqI?si=0VwhyxF63Vulcq5Z');
   assert.equal(youtubeId(DEMO_VIDEO_URL), DEMO_VIDEO_ID);
   assert.equal(isDemoExerciseVideo({ youtubeVideoId: DEMO_VIDEO_ID, isDemoVideo: false }), true);
   assert.equal(isDemoExerciseVideo({ videoUrl: DEMO_VIDEO_URL }), true);
@@ -48,8 +50,27 @@ test('non-admin responses redact demo video but preserve exercise instructions a
 });
 
 test('demo markers are recognised from YouTube embedded/watch/short URLs', () => {
-  assert.equal(youtubeId('https://www.youtube.com/embed/M7lc1UVf-VE'), DEMO_VIDEO_ID);
-  assert.equal(youtubeId('https://youtu.be/M7lc1UVf-VE'), DEMO_VIDEO_ID);
-  assert.equal(youtubeId('https://www.youtube.com/shorts/M7lc1UVf-VE'), DEMO_VIDEO_ID);
-  assert.equal(youtubeId('https://example.org/watch?v=M7lc1UVf-VE'), '');
+  assert.equal(youtubeId('https://www.youtube.com/embed/ml6cT4AZdqI'), DEMO_VIDEO_ID);
+  assert.equal(youtubeId('https://youtu.be/ml6cT4AZdqI?si=0VwhyxF63Vulcq5Z'), DEMO_VIDEO_ID);
+  assert.equal(youtubeId('https://www.youtube.com/shorts/ml6cT4AZdqI'), DEMO_VIDEO_ID);
+  assert.equal(youtubeId('https://example.org/watch?v=ml6cT4AZdqI'), '');
+});
+
+test('previous sample is still classified as demo and excluded from publication', () => {
+  const legacy = { youtubeVideoId: LEGACY_DEMO_VIDEO_ID, isDemoVideo: true };
+  assert.equal(isDemoExerciseVideo(legacy), true);
+  assert.equal(videoConfigured(legacy), false);
+  assert.equal(isDemoExerciseVideo({ videoUrl: 'https://www.youtube.com/watch?v=M7lc1UVf-VE' }), true);
+});
+
+test('apply only matches blank fields and exact previous demo records, not real videos', () => {
+  const filter = pendingDemoVideoFilter();
+  assert.equal(filter.$or.length, 2);
+  assert.deepEqual(filter.$or[0], missingDemoVideoFilter());
+  assert.deepEqual(filter.$or[1], {
+    isDemoVideo: true,
+    videoUrl: 'https://www.youtube.com/watch?v=M7lc1UVf-VE',
+    youtubeVideoId: LEGACY_DEMO_VIDEO_ID,
+  });
+  assert.equal(installedDemoVideoFilter().$or.length, 2);
 });
