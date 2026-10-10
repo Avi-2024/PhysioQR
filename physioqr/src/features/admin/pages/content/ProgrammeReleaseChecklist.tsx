@@ -92,11 +92,11 @@ export default function ProgrammeReleaseChecklist({
         <div>
           <div className="flex items-center gap-2">
             <Video className="h-5 w-5 text-primary-700" />
-            <h3 className="text-base font-bold text-neutral-950">Step 1. Complete exercise videos and review</h3>
+            <h3 className="text-base font-bold text-neutral-950">Step 1. Check exercise videos and content</h3>
           </div>
           <p className="mt-1 text-sm leading-6 text-neutral-600">
-            Open each exercise, attach its real reviewed YouTube video, verify instructions/safety, then activate the exercise.
-            Recheck this page after saving. Nothing is approved automatically.
+            Check each exercise's video, instructions and safety notes, then activate it. You do not need to submit a separate review form for each video.
+            The clinician reviews all linked videos during the single programme sign-off in Step 2.
           </p>
           <div className="mt-4 overflow-hidden rounded-xl border border-neutral-200">
             {tasks.length ? tasks.map((task, index) => (
@@ -105,7 +105,7 @@ export default function ProgrammeReleaseChecklist({
                   <p className="text-sm font-bold text-neutral-900">{index + 1}. {task.name}</p>
                   <p className="mt-1 text-xs text-neutral-500">Used on {task.usedOnDays.length} programme day(s)</p>
                   <div className="mt-2 flex flex-wrap gap-1.5">
-                    <Status label={task.candidateReviewPending ? 'Exercise video found — clinician review pending' : task.demoVideo ? 'Generic demo — replace with exercise video' : task.videoReady ? 'Reviewed video ready' : 'Video missing'} ok={task.videoReady} />
+                    <Status label={task.candidateReviewPending ? 'Exercise video linked' : task.demoVideo ? 'Generic demo — replace with exercise video' : task.videoReady ? 'Video linked' : 'Video missing'} ok={task.videoReady} />
                     <Status label={task.active ? 'Active' : 'Inactive'} ok={task.active} />
                     <Status label={task.safetyReady ? 'Safety checked' : 'Safety notes missing'} ok={task.safetyReady} />
                     {!task.categoryReady && <Status label="Wrong body region" ok={false} />}
@@ -136,7 +136,7 @@ export default function ProgrammeReleaseChecklist({
             <h3 className="text-base font-bold text-neutral-950">Step 2. Record real clinical sign-off</h3>
           </div>
           <p className="mt-1 text-sm leading-6 text-neutral-600">
-            A qualified physiotherapist reviews all 30 days, videos, doses and exclusions. Admin then records their name and review note.
+            A qualified physiotherapist reviews the 30-day programme, including its videos, instructions and exclusions. Admin records one programme-level sign-off instead of 15 separate exercise approvals.
           </p>
           {signed && <p className={`mt-2 text-xs font-semibold ${readiness?.approvalOutdated ? 'text-amber-800' : 'text-emerald-800'}`}>
             {readiness?.approvalOutdated ? 'Previous sign-off is outdated. Renew after clinical review.' : 'Recorded reviewer: ' + (clinicalApproval?.clinicianName || '')}
