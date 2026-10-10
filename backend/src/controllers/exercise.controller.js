@@ -3,6 +3,11 @@ const { Exercise, ProgramDay } = require('../models/Exercise.model');
 const PainCategory = require('../models/PainCategory.model');
 const { writeAuditLog } = require('../utils/auditLogger');
 const asyncHandler = require('../utils/asyncHandler');
+const { EXERCISE_PREFIX } = require('../data/generalKnee30DayDraft');
+// Draft-seeded content is delivered only via an authorised patient prescription,
+// never through the generic exercise catalogue or exercise detail API.
+const privateSeedPattern = new RegExp('^' + EXERCISE_PREFIX.replace(/[.*+?^${}()|[\]\\]/g, '\\const asyncHandler = require('../utils/asyncHandler');'));
+
 
 const LANGUAGES = ['en', 'hi'];
 const cleanString = (value) => String(value ?? '').trim();
@@ -68,7 +73,7 @@ const usageForExercises = async (exerciseIds) => {
 
 const getExercises = asyncHandler(async (req, res) => {
   if (req.user?.role !== 'admin') {
-    const filter = { isActive: true };
+    const filter = { isActive: true, seedKey: { $not: privateSeedPattern } };
     if (req.query.category) filter.painCategory = req.query.category;
     if (req.query.language) filter.language = req.query.language;
     return res.json(await Exercise.find(filter).populate('painCategory', 'name').sort({ displayOrder: 1, createdAt: -1 }));
@@ -119,7 +124,9 @@ const createExercise = asyncHandler(async (req, res) => {
 const getExerciseById = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid exercise id' });
   const exercise = await Exercise.findById(req.params.id).populate('painCategory', 'name nameHindi description isActive').lean();
-  if (!exercise) return res.status(404).json({ message: 'Exercise not found' });
+  if (!exercise || (req.user.role !== 'admin' && (
+    exercise.isActive === false || privateSeedPattern.test(String(exercise.seedKey || ''))
+  ))) return res.status(404).json({ message: 'Exercise not found' });
   const programDays = await ProgramDay.find({ 'exercises.exercise': exercise._id, isActive: true })
     .select('program dayNumber title exercises')
     .populate('program', 'name programCode isActive')
