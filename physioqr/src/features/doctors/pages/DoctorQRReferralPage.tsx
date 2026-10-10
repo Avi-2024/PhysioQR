@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  ArrowRight, Check, Copy, Download, ExternalLink, Link2, MapPin,
+  Check, Copy, Download, ExternalLink, Link2, MapPin,
   Phone, Printer, QrCode, Share2, ShieldCheck, TrendingUp, UserRoundCheck,
   Users, Wallet, AlertCircle,
 } from 'lucide-react';
