@@ -4,7 +4,7 @@ const {
   PROGRAM_CODE, EXERCISE_PREFIX, exercises, days, validateDraft,
 } = require('../src/data/generalKnee30DayDraft');
 const { withDayDosage, withDayDosageInProgramme } = require('../src/services/dayExerciseDosage.service');
-const { ensureApprovedRelease } = require('../src/services/programmeReleaseGate.service');
+const { ensureApprovedRelease, videoConfigured } = require('../src/services/programmeReleaseGate.service');
 
 test('draft contains exactly 30 numbered days and 15 reusable exercises', () => {
   assert.equal(PROGRAM_CODE, 'DRAFT-KNEE-GENERAL-30D');
@@ -53,6 +53,15 @@ test('daily dosage overrides are used on the patient exercise object', () => {
   assert.equal(mapped.exercise.restDuration, '45 seconds');
   assert.equal(entry.exercise.sets, 1); // do not mutate reusable library
   assert.equal(withDayDosageInProgramme({ dayNumber:6, exercises:[entry] }).exercises[0].exercise.sets, 2);
+});
+
+test('publication accepts only plausible YouTube video links or video IDs', () => {
+  assert.equal(videoConfigured({ videoUrl: '' }), false);
+  assert.equal(videoConfigured({ videoUrl: 'https://example.com/dummy' }), false);
+  assert.equal(videoConfigured({ videoUrl: 'https://www.youtube.com/watch?v=ABCDEFGHIJK' }), true);
+  assert.equal(videoConfigured({ videoUrl: 'https://youtu.be/ABCDEFGHIJK' }), true);
+  assert.equal(videoConfigured({ youtubeVideoId: 'ABCDEFGHIJK' }), true);
+  assert.equal(videoConfigured({ youtubeVideoId: 'dummy' }), false);
 });
 
 test('unapproved draft programme cannot be released', async () => {
