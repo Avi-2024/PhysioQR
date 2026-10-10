@@ -10,6 +10,7 @@ const {
   setExerciseStatus,
   bulkSetExerciseStatus,
   manageDemoExerciseVideos,
+  assignKneeDraftVideoCandidates,
   deleteExercise,
 } = require('../controllers/exercise.controller');
 
@@ -56,6 +57,12 @@ router.post(
     acknowledgeTestingOnly: { type: 'boolean', required: true },
   } }),
   manageDemoExerciseVideos,
+);
+router.post(
+  '/knee-draft-video-candidates',
+  authorize('admin'),
+  validateSchema({ body: { acknowledgeReviewPending: { type: 'boolean', required: true } } }),
+  assignKneeDraftVideoCandidates,
 );
 router.get('/:id', validateSchema({ params: { id: { type: 'objectId', required: true } } }), getExerciseById);
 router.put('/:id', authorize('admin'), validateSchema({ params: { id: { type: 'objectId', required: true } }, body: exerciseBodySchema }), updateExercise);
