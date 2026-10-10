@@ -153,6 +153,18 @@ const updateExercise = asyncHandler(async (req, res) => {
   const validationError = await validateExercisePayload(payload, { partial: true });
   if (validationError) return res.status(400).json({ message: validationError });
   const previousValue = exercise.toObject();
+  // Editing the title, prescription, or URL cannot silently approve a video
+  // candidate. Only the explicit reviewed-video action releases this flag.
+  if (exercise.videoCandidateReviewPending) {
+    payload.isDemoVideo = true;
+    payload.videoCandidateReviewPending = true;
+    if (payload.videoUrl !== undefined && payload.youtubeVideoId !== exercise.youtubeVideoId) {
+      // A replacement URL also needs a new review; retain pending status.
+      payload.videoCandidateTitle = 'Admin replacement awaiting clinical review';
+      payload.videoCandidateProvider = 'Admin-provided, unreviewed';
+      payload.videoCandidateSourcePage = '';
+    }
+  }
   Object.assign(exercise, payload);
   await exercise.save();
   await writeAuditLog({ req, action: 'exercise_updated', module: 'Exercise', recordId: exercise._id, previousValue, newValue: payload });
@@ -170,6 +182,43 @@ const setExerciseStatus = asyncHandler(async (req, res) => {
   await exercise.save();
   await writeAuditLog({ req, action: nextActive ? 'exercise_reactivated' : 'exercise_deactivated', module: 'Exercise', recordId: exercise._id, previousValue, newValue: { isActive: nextActive }, reason: cleanString(req.body?.reason) || (nextActive ? 'Admin activated exercise from Exercise Library' : 'Admin deactivated exercise from Exercise Library') });
   res.json({ message: `Exercise ${nextActive ? 'reactivated' : 'deactivated'}`, exercise });
+});
+
+// Explicit clinician review for one candidate video. Confirmation is
+// auditable, and a video is never automatically approved by matching its name.
+const recordExerciseVideoReview = asyncHandler(async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid exercise ID' });
+  const exercise = await Exercise.findById(req.params.id);
+  if (!exercise) return res.status(404).json({ message: 'Exercise not found' });
+  if (!exercise.videoCandidateReviewPending) {
+    return res.status(409).json({ message: 'This exercise has no pending mapped-video review' });
+  }
+  const clinicianName = cleanString(req.body?.clinicianName);
+  const reviewNote = cleanString(req.body?.reviewNote);
+  if (clinicianName.length < 3 || clinicianName.length > 160 || reviewNote.length < 10 || reviewNote.length > 2000) {
+    return res.status(400).json({ message: 'Enter the actual reviewing clinician name and a meaningful review note' });
+  }
+  if (!exercise.youtubeVideoId || !/^[A-Za-z0-9_-]{11}$/.test(exercise.youtubeVideoId)) {
+    return res.status(409).json({ message: 'First save a valid, working YouTube exercise demonstration' });
+  }
+  const { LEGACY_DEMO_VIDEO_ID, DEMO_VIDEO_ID } = require('../services/demoExerciseVideo.service');
+  if ([LEGACY_DEMO_VIDEO_ID, DEMO_VIDEO_ID].includes(exercise.youtubeVideoId)) {
+    return res.status(409).json({ message: 'Generic sample-player URLs cannot be approved as exercise demonstrations' });
+  }
+  const previousValue = { isDemoVideo: exercise.isDemoVideo, videoCandidateReviewPending: exercise.videoCandidateReviewPending };
+  exercise.videoCandidateReviewPending = false;
+  exercise.isDemoVideo = false;
+  exercise.videoReview = {
+    clinicianName, reviewNote, reviewedAt: new Date(), recordedBy: req.user._id,
+  };
+  await exercise.save();
+  await writeAuditLog({
+    req, action: 'exercise_video_clinical_review_recorded', module: 'Exercise',
+    recordId: exercise._id, previousValue,
+    newValue: { isDemoVideo: false, videoCandidateReviewPending: false, videoReview: exercise.videoReview },
+    reason: reviewNote,
+  });
+  res.json({ message: 'Video review recorded. Programme publication still requires separate 30-day clinical sign-off.', exercise });
 });
 
 // Admin-only batch lifecycle action. IDs are explicit, validated and limited.
@@ -287,4 +336,4 @@ const deleteExercise = asyncHandler(async (req, res) => {
   res.json({ message: 'Exercise deactivated' });
 });
 
-module.exports = { getExercises, createExercise, getExerciseById, updateExercise, setExerciseStatus, bulkSetExerciseStatus, manageDemoExerciseVideos, assignKneeDraftVideoCandidates, deleteExercise };
+module.exports = { getExercises, createExercise, getExerciseById, updateExercise, setExerciseStatus, bulkSetExerciseStatus, manageDemoExerciseVideos, assignKneeDraftVideoCandidates, recordExerciseVideoReview, deleteExercise };
