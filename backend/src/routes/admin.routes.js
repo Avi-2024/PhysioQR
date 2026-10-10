@@ -12,7 +12,7 @@ const { getPatients, getPatientById, updatePatientStatus, deletePatient } = requ
 const { updateDirectPatientFee } = require('../controllers/admin/patient-fee.controller');
 const { getAssessmentQuestions, getAssessmentQuestionById, createAssessmentQuestion, updateAssessmentQuestion, deactivateAssessmentQuestion, reactivateAssessmentQuestion } = require('../controllers/admin/assessment-questions.controller');
 const { getPainCategories, getPainCategoryById, createPainCategory, updatePainCategory, setPainCategoryStatus } = require('../controllers/admin/pain-categories.controller');
-const { getPrograms, getProgramById, createProgram, updateProgram, setProgramStatus } = require('../controllers/admin/programs.controller');
+const { getPrograms, getProgramById, createProgram, updateProgram, setProgramStatus, recordProgrammeClinicalApproval } = require('../controllers/admin/programs.controller');
 const { getRiskReviews, getRiskReviewById, updateRiskReview } = require('../controllers/admin/risk-reviews.controller');
 const { getOrders, getOrderById } = require('../controllers/admin/orders.controller');
 const { getPayments, getPaymentById } = require('../controllers/admin/payments.controller');
@@ -65,6 +65,7 @@ router.get('/programs', getPrograms); router.get('/programs/:id', getProgramById
 router.post('/programs', validateSchema({body:{...programBodySchema,name:{type:'string',max:180,required:true},painCategory:{type:'objectId',required:true},durationDays:{type:'number',min:1,max:365,required:true}}}), createProgram);
 router.patch('/programs/:id', validateSchema({params:{id:{type:'objectId',required:true}},body:programBodySchema}), updateProgram);
 router.post('/programs/:id/:action(deactivate|reactivate)', validateSchema({params:{id:{type:'objectId',required:true}},body:{reason:{type:'string',max:500,required:true}}}), setProgramStatus);
+router.post('/programs/:id/clinical-approval', validateSchema({params:{id:{type:'objectId',required:true}},body:{clinicianName:{type:'string',min:3,max:160,required:true},reviewNote:{type:'string',min:10,max:2000,required:true}}}), recordProgrammeClinicalApproval);
 router.get('/revenue-models', getRevenueModels);
 router.patch('/revenue-models/:doctorId', validateSchema({ body: { revenueModel:{type:'enum',values:['split','platform_fee']}, approvedPatientFee:{type:'number',min:0,max:1000000}, feeSharePercentage:{type:'number',min:0,max:100}, feeShareType:{type:'enum',values:['percentage','fixed','slab']}, fixedFeeShareAmount:{type:'number',min:0,max:1000000}, feeShareCalculationBasis:{type:'enum',values:['gross','after_discount','net_after_charges']}, feeShareHoldingDays:{type:'number',min:0,max:365}, minWithdrawal:{type:'number',min:0,max:10000000}, maxWithdrawal:{type:'number',min:0,max:10000000}, payoutCycle:{type:'string',max:80}, reason:{type:'string',max:500} } }), updateRevenueModel);
 router.get('/orders', getOrders); router.get('/orders/:id', getOrderById);
