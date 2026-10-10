@@ -223,14 +223,14 @@ export default function AdminExercisesPage() {
       <div className="space-y-4 pt-4">
         {demoAction === 'apply' ? <>
           <p className="text-sm leading-6 text-neutral-700">
-            All exercises with empty YouTube video fields will receive the same sample URL.
-            Existing real videos will not be overwritten. This action works on the database connected to the running backend.
+            Exercises with empty YouTube video fields, plus exercises using the previous PhysioQR demo video, will receive your requested sample URL.
+            Existing real exercise-specific video links will not be overwritten. This action uses the database connected to the running backend.
           </p>
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
             <strong>Testing only — not an exercise video.</strong> The YouTube sample is for checking playback.
             It will stay excluded from clinical readiness and patient video content; knee programme publication will remain locked.
           </div>
-          <p className="text-xs text-neutral-600">Sample: https://www.youtube.com/watch?v=M7lc1UVf-VE</p>
+          <p className="text-xs text-neutral-600">Sample: https://youtu.be/ml6cT4AZdqI?si=0VwhyxF63Vulcq5Z</p>
         </> : <>
           <p className="text-sm leading-6 text-neutral-700">
             Remove only the exact demo links previously added by PhysioQR. Any real videos you added will remain untouched.
