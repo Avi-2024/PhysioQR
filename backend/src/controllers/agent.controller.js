@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const Agent = require('../models/Agent.model');
 const User = require('../models/User.model');
 const Doctor = require('../models/Doctor.model');
@@ -89,48 +90,73 @@ const createFollowUpNotification = async (visit) => {
   });
 };
 
+
+const AGENT_STATUSES = ['active', 'inactive', 'suspended', 'terminated'];
+const AGENT_PROFILE_FIELDS = ['fullName', 'mobile', 'email', 'whatsapp', 'address', 'city', 'state', 'assignedRegion', 'reportingPerson', 'joiningDate', 'monthlyOnboardingTarget'];
+const AGENT_TEXT_LIMITS = { fullName: 150, mobile: 15, email: 160, whatsapp: 15, address: 500, city: 100, state: 100, assignedRegion: 160, reportingPerson: 160 };
+const validateAgentPayload = (body, { creating = false } = {}) => {
+  const values = {};
+  for (const field of AGENT_PROFILE_FIELDS) {
+    if (!Object.prototype.hasOwnProperty.call(body, field)) continue;
+    const value = body[field];
+    if (field === 'monthlyOnboardingTarget') {
+      if (value === null || value === '') { values[field] = undefined; continue; }
+      if (!Number.isInteger(value) || value < 0 || value > 10000) return { error: 'Monthly target must be an integer from 0 to 10000' };
+      values[field] = value;
+    } else if (field === 'joiningDate') {
+      if (value === '' || value === null) { values[field] = undefined; continue; }
+      if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value) || Number.isNaN(Date.parse(value))) return { error: 'Joining date must be a valid YYYY-MM-DD date' };
+      values[field] = new Date(value);
+    } else {
+      if (typeof value !== 'string' || value.trim().length > AGENT_TEXT_LIMITS[field]) return { error: `Invalid ${field}` };
+      values[field] = value.trim();
+    }
+  }
+  if ((creating || Object.prototype.hasOwnProperty.call(values, 'fullName')) && (!values.fullName || values.fullName.length < 2)) return { error: 'Full name must have at least 2 characters' };
+  if ((creating || Object.prototype.hasOwnProperty.call(values, 'mobile')) && !/^\+?\d{10,15}$/.test(values.mobile || '')) return { error: 'Mobile must contain 10–15 digits' };
+  if (values.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email)) return { error: 'Invalid email address' };
+  if (values.whatsapp && !/^\+?\d{10,15}$/.test(values.whatsapp)) return { error: 'Invalid WhatsApp number' };
+  if (values.email !== undefined) values.email = values.email.toLowerCase();
+  if (body.status !== undefined && !AGENT_STATUSES.includes(body.status)) return { error: 'Invalid agent status' };
+  return { values };
+};
+const loginConflict = async ({ mobile, email, excludeId }) => {
+  const match = [{ mobile }, ...(email ? [{ email }] : [])].filter(x => Object.values(x)[0]);
+  return match.length ? User.findOne({ ...(excludeId ? { _id: { $ne: excludeId } } : {}), $or: match }).select('_id').lean() : null;
+};
+
 // POST /api/agents - Admin creates an agent.
 const createAgent = asyncHandler(async (req, res) => {
-  const { email, mobile, password, user, ...agentPayload } = req.body;
+  const { values, error } = validateAgentPayload(req.body, { creating: true });
+  if (error) return res.status(400).json({ message: error });
+  if (req.body.status && req.body.status !== 'active') return res.status(400).json({ message: 'Create agents as active; manage status from their profile' });
+  if (await loginConflict(values)) return res.status(409).json({ message: 'An account with this email or mobile already exists' });
 
-  let loginUser = user ? await User.findById(user) : null;
-  const generatedPassword = password || `Agent@${Math.floor(100000 + Math.random() * 900000)}`;
-
-  if (!loginUser) {
-    const existing = await User.findOne({
-      $or: [
-        ...(email ? [{ email: email.trim().toLowerCase() }] : []),
-        ...(mobile ? [{ mobile: mobile.trim() }] : []),
-      ],
-    });
-    if (existing) return res.status(409).json({ message: 'A user with this email or mobile already exists' });
-
+  const temporaryPassword = `Agent@${crypto.randomInt(100000, 1000000)}${crypto.randomBytes(3).toString('hex')}`;
+  let loginUser;
+  try {
     loginUser = await User.create({
-      role: 'agent',
-      email: email?.trim().toLowerCase(),
-      mobile: mobile?.trim(),
-      password: generatedPassword,
-      status: 'active',
+      role: 'agent', email: values.email || undefined, mobile: values.mobile,
+      password: temporaryPassword, status: 'active', mustChangePassword: true,
     });
+    const agent = await Agent.create({ ...values, user: loginUser._id, status: 'active' });
+    loginUser.profileRef = agent._id;
+    loginUser.profileModel = 'Agent';
+    await loginUser.save();
+    await writeAuditLog({ req, action: 'agent_created', module: 'Agent', recordId: agent._id, newValue: { fullName: agent.fullName, user: loginUser._id } });
+    return res.status(201).json({
+      agent, user: { id: loginUser._id, email: loginUser.email, mobile: loginUser.mobile, role: loginUser.role },
+      temporaryPassword,
+    });
+  } catch (err) {
+    // Do not leave a login account stranded when the agent profile could not be created.
+    if (loginUser) {
+      const linkedAgent = await Agent.findOne({ user: loginUser._id }).select('_id').lean();
+      if (!linkedAgent) await User.deleteOne({ _id: loginUser._id });
+    }
+    if (err?.code === 11000) return res.status(409).json({ message: 'Agent ID or account contact already exists; retry' });
+    throw err;
   }
-
-  const agent = await Agent.create({
-    ...agentPayload,
-    user: loginUser._id,
-    email: email || loginUser.email,
-    mobile: mobile || loginUser.mobile,
-  });
-
-  loginUser.profileRef = agent._id;
-  loginUser.profileModel = 'Agent';
-  await loginUser.save();
-
-  await writeAuditLog({ req, action: 'agent_created', module: 'Agent', recordId: agent._id, newValue: { fullName: agent.fullName, user: loginUser._id } });
-  res.status(201).json({
-    agent,
-    user: { id: loginUser._id, email: loginUser.email, mobile: loginUser.mobile, role: loginUser.role },
-    temporaryPassword: password ? undefined : generatedPassword,
-  });
 });
 
 // GET /api/agents - Admin gets all agents.
@@ -148,15 +174,46 @@ const getAgentById = asyncHandler(async (req, res) => {
 
 // PUT /api/agents/:id
 const updateAgent = asyncHandler(async (req, res) => {
-  const agent = await Agent.findByIdAndUpdate(req.params.id, req.body, { new: true });
+  const agent = await Agent.findById(req.params.id);
   if (!agent) return res.status(404).json({ message: 'Agent not found' });
-  if (agent.user && (req.body.status || req.body.email || req.body.mobile)) {
-    await User.findByIdAndUpdate(agent.user, {
-      ...(req.body.status ? { status: req.body.status === 'suspended' ? 'suspended' : req.body.status === 'inactive' ? 'inactive' : 'active' } : {}),
-      ...(req.body.email ? { email: req.body.email.trim().toLowerCase() } : {}),
-      ...(req.body.mobile ? { mobile: req.body.mobile.trim() } : {}),
-    });
+  if (agent.status === 'terminated') return res.status(409).json({ message: 'Terminated agents cannot be edited or reactivated' });
+
+  const { values, error } = validateAgentPayload(req.body);
+  if (error) return res.status(400).json({ message: error });
+  const statusChanged = req.body.status !== undefined && req.body.status !== agent.status;
+  const reason = typeof req.body.reason === 'string' ? req.body.reason.trim() : '';
+  if (statusChanged && (reason.length < 5 || reason.length > 500)) return res.status(400).json({ message: 'A reason (5–500 characters) is required for status changes' });
+  if (req.body.status === 'terminated') return res.status(400).json({ message: 'Use the terminate action to terminate an agent' });
+
+  const user = await User.findById(agent.user);
+  if (!user || user.role !== 'agent') return res.status(409).json({ message: 'Linked agent login account is missing or invalid' });
+  if (await loginConflict({ mobile: values.mobile ?? agent.mobile, email: values.email ?? agent.email, excludeId: user._id })) {
+    return res.status(409).json({ message: 'Email or mobile is already used by another account' });
   }
+
+  const before = { fullName: agent.fullName, mobile: agent.mobile, email: agent.email, status: agent.status, assignedRegion: agent.assignedRegion };
+  const contactChanged = (values.mobile !== undefined && values.mobile !== user.mobile) || (values.email !== undefined && values.email !== (user.email || ''));
+  Object.entries(values).forEach(([field, value]) => { agent[field] = value; });
+  if (statusChanged) agent.status = req.body.status;
+
+  // Keep the login identity/status in sync, and revoke existing sessions on contact or status changes.
+  if (values.mobile !== undefined) user.mobile = values.mobile;
+  if (values.email !== undefined) user.email = values.email || undefined;
+  if (statusChanged) user.status = agent.status;
+  if (contactChanged || statusChanged) user.tokenVersion = (user.tokenVersion || 0) + 1;
+  try {
+    if (contactChanged || statusChanged) await user.save();
+    await agent.save();
+  } catch (err) {
+    if (err?.code === 11000) return res.status(409).json({ message: 'Email or mobile is already used by another account' });
+    throw err;
+  }
+  await writeAuditLog({
+    req, action: statusChanged ? 'agent_status_changed' : 'agent_updated', module: 'Agent',
+    recordId: agent._id, previousValue: before,
+    newValue: { fullName: agent.fullName, mobile: agent.mobile, email: agent.email, status: agent.status, assignedRegion: agent.assignedRegion },
+    reason: reason || undefined,
+  });
   res.json(agent);
 });
 
@@ -164,28 +221,22 @@ const updateAgent = asyncHandler(async (req, res) => {
 const deleteAgent = asyncHandler(async (req, res) => {
   const agent = await Agent.findById(req.params.id);
   if (!agent) return res.status(404).json({ message: 'Agent not found' });
+  if (agent.status === 'terminated') return res.json({ message: 'Agent already terminated', agent });
+  const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
+  if (reason.length < 5 || reason.length > 500 || req.body?.confirmation !== agent.agentId) {
+    return res.status(400).json({ message: 'Enter the Agent ID and a reason (5–500 characters) to confirm termination' });
+  }
 
   const previousValue = { status: agent.status };
   agent.status = 'terminated';
+  await User.updateOne({ _id: agent.user, role: 'agent' }, { $set: { status: 'terminated' }, $inc: { tokenVersion: 1 } });
   await agent.save();
-
-  if (agent.user) {
-    await User.findByIdAndUpdate(agent.user, {
-      status: 'terminated',
-      $inc: { tokenVersion: 1 },
-    });
-  }
-
+  // Preserve agent, doctors, visits, referrals, payments, and audit history.
   await writeAuditLog({
-    req,
-    action: 'agent_terminated',
-    module: 'Agent',
-    recordId: agent._id,
-    previousValue,
-    newValue: { status: agent.status },
+    req, action: 'agent_terminated', module: 'Agent', recordId: agent._id, previousValue,
+    newValue: { status: agent.status }, reason,
   });
-
-  res.json({ message: 'Agent terminated', agent });
+  res.json({ message: 'Agent terminated; historical records retained', agent });
 });
 
 // GET /api/agents/me/dashboard - Agent dashboard stats.
