@@ -6,7 +6,7 @@ const asyncHandler = require('../utils/asyncHandler');
 const { EXERCISE_PREFIX } = require('../data/generalKnee30DayDraft');
 // Draft-seeded content is delivered only via an authorised patient prescription,
 // never through the generic exercise catalogue or exercise detail API.
-const privateSeedPattern = new RegExp('^' + EXERCISE_PREFIX.replace(/[.*+?^${}()|[\]\\]/g, '\\const asyncHandler = require('../utils/asyncHandler');'));
+const privateSeedPattern = new RegExp('^' + EXERCISE_PREFIX); // Prefix is fixed alphanumeric/underscore text.
 
 
 const LANGUAGES = ['en', 'hi'];
