@@ -76,3 +76,35 @@ process in the intended environment first. Do not run destructive reset scripts.
 
 NOTE: The assessment seeder respects globally inactive records. It does not
 reactivate Admin-disabled regions or surgeries during future seeding runs.
+
+## No long-description questions in patient assessment
+
+Phase 1 collects structured answers only (choices, yes/no, pain scale, numbers and dates).
+Free-writing (`text`) and unsupported image-answer (`image`) questions are hidden
+server-side from new patient assessments. The same filter is applied to question
+retrieval and submission. The patient UI has an additional safety filter.
+
+The seeded questions asking for "biggest difficulty", "one main recovery goal" and
+a description of doctor restrictions are retired. Existing historical questions
+and answers are **not deleted**.
+
+After deploying, optionally synchronize the Admin question statuses in the
+connected MongoDB (run **once** in the intended backend environment):
+
+```sh
+npm run retire:description-questions
+```
+
+This only sets `isActive=false` on currently active `text` / `image` questions.
+It does not delete any records. The patient-facing filter works even before
+this cleanup command is run.
+
+Regression tests:
+
+```sh
+npm run test:assessment-questions
+```
+
+For new questions, Admin chooses a structured answer type. Old retired question
+records remain reviewable for historical context and can only be republished
+after being converted into structured questions.
