@@ -118,7 +118,7 @@ export default function AssessmentPublicationManager({ bodyRegions, surgeryTypes
                           aria-pressed={visible}
                         >
                           {visible ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-                          {visible ? 'Shown — click to hide' : 'Hidden — click to show'}
+                          {!region.isActive && visible ? 'Saved as shown (inactive)' : visible ? 'Shown — click to hide' : 'Hidden — click to show'}
                         </button>
                       </td>;
                     })}
@@ -156,7 +156,7 @@ export default function AssessmentPublicationManager({ bodyRegions, surgeryTypes
                     aria-label={`${surgery.assessmentPublished ? 'Hide' : 'Show'} surgery ${surgery.name}`}
                   >
                     {surgery.assessmentPublished ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-                    {surgery.assessmentPublished ? 'Shown — hide' : 'Hidden — show'}
+                    {surgery.assessmentPublished ? (enabled ? 'Shown — hide' : 'Enabled (region hidden)') : 'Hidden — show'}
                   </button>
                 </div>
               );
