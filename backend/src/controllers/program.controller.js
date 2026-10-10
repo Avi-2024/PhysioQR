@@ -1,6 +1,7 @@
 const Program = require('../models/Program.model');
 const { Exercise, ProgramDay } = require('../models/Exercise.model');
 const asyncHandler = require('../utils/asyncHandler');
+const { ensureApprovedRelease } = require('../services/programmeReleaseGate.service');
 
 const getPrograms = asyncHandler(async (req, res) => {
   const filter = req.user?.role === 'admin' ? {} : { isActive: true };
@@ -13,12 +14,20 @@ const createProgram = asyncHandler(async (req, res) => {
 });
 
 const updateProgram = asyncHandler(async (req, res) => {
-  const program = await Program.findByIdAndUpdate(req.params.id, req.body, { new: true });
-  if (!program) return res.status(404).json({ message: 'Program not found' });
+  const existing = await Program.findById(req.params.id);
+  if (!existing) return res.status(404).json({ message: 'Program not found' });
+  if (req.body.isActive === true && !existing.isActive) await ensureApprovedRelease(existing);
+  // Release gate is immutable through the legacy generic update API.
+  const { clinicalApprovalRequired, clinicalApproval, ...safeBody } = req.body;
+  const program = await Program.findByIdAndUpdate(req.params.id, safeBody, { new: true });
   res.json(program);
 });
 
 const getProgramDays = asyncHandler(async (req, res) => {
+  const program = await Program.findById(req.params.id).select('isActive').lean();
+  if (!program || (req.user.role !== 'admin' && !program.isActive)) {
+    return res.status(404).json({ message: 'Programme days not found' });
+  }
   res.json(
     await ProgramDay.find({ program: req.params.id, isActive: true })
       .populate('exercises.exercise')
@@ -26,19 +35,31 @@ const getProgramDays = asyncHandler(async (req, res) => {
   );
 });
 
-const normalizeDayExercises = async (entries = []) => {
+const normalizeDayExercises = async (entries = [], { allowInactive = false } = {}) => {
   if (!Array.isArray(entries)) return [];
   const normalized = entries
     .map((entry, index) => ({
       exercise: entry?.exercise,
       displayOrder: Number.isFinite(Number(entry?.displayOrder)) ? Number(entry.displayOrder) : index + 1,
+      ...(entry?.sets !== undefined ? { sets: Number(entry.sets) } : {}),
+      ...(entry?.repetitions !== undefined ? { repetitions: Number(entry.repetitions) } : {}),
+      ...(entry?.holdDuration !== undefined ? { holdDuration: String(entry.holdDuration).trim() } : {}),
+      ...(entry?.restDuration !== undefined ? { restDuration: String(entry.restDuration).trim() } : {}),
     }))
     .filter((entry) => entry.exercise);
 
   const ids = [...new Set(normalized.map((entry) => String(entry.exercise)))];
   if (!ids.length) return [];
 
-  const valid = await Exercise.find({ _id: { $in: ids }, isActive: true }).select('_id').lean();
+  if (normalized.some((entry) =>
+    (entry.sets !== undefined && (!Number.isInteger(entry.sets) || entry.sets < 1 || entry.sets > 20))
+    || (entry.repetitions !== undefined && (!Number.isInteger(entry.repetitions) || entry.repetitions < 1 || entry.repetitions > 100))
+    || (entry.holdDuration?.length > 100) || (entry.restDuration?.length > 100))) {
+    const error = new Error('Invalid per-day exercise prescription');
+    error.status = 400;
+    throw error;
+  }
+  const valid = await Exercise.find({ _id: { $in: ids }, ...(allowInactive ? {} : { isActive: true }) }).select('_id').lean();
   const validIds = new Set(valid.map((exercise) => String(exercise._id)));
   if (validIds.size !== ids.length) {
     const error = new Error('One or more selected exercises are missing or inactive');
@@ -77,11 +98,13 @@ const validateDayNumber = async ({ programId, dayNumber, excludeDayId }) => {
 
 const createProgramDay = asyncHandler(async (req, res) => {
   const dayNumber = await validateDayNumber({ programId: req.params.id, dayNumber: req.body.dayNumber });
-  const exercises = await normalizeDayExercises(req.body.exercises);
+  const program = await Program.findById(req.params.id).select('isActive clinicalApprovalRequired clinicalApproval');
+  const exercises = await normalizeDayExercises(req.body.exercises, { allowInactive: !program.isActive });
   const day = await ProgramDay.create({
     program: req.params.id,
     dayNumber,
     title: String(req.body.title || '').trim(),
+    focus: String(req.body.focus || '').trim(),
     exercises,
   });
   res.status(201).json(await day.populate('exercises.exercise'));
@@ -99,7 +122,11 @@ const updateProgramDay = asyncHandler(async (req, res) => {
     });
   }
   if (req.body.title !== undefined) day.title = String(req.body.title || '').trim();
-  if (req.body.exercises !== undefined) day.exercises = await normalizeDayExercises(req.body.exercises);
+  if (req.body.focus !== undefined) day.focus = String(req.body.focus || '').trim();
+  if (req.body.exercises !== undefined) {
+    const program = await Program.findById(req.params.id).select('isActive').lean();
+    day.exercises = await normalizeDayExercises(req.body.exercises, { allowInactive: !program.isActive });
+  }
 
   await day.save();
   res.json(await day.populate('exercises.exercise'));
