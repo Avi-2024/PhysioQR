@@ -7,20 +7,10 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
 const { Exercise } = require('../src/models/Exercise.model');
-const { DEMO_VIDEO_ID, DEMO_VIDEO_URL } = require('../src/services/demoExerciseVideo.service');
+const { DEMO_VIDEO_ID, DEMO_VIDEO_URL, missingDemoVideoFilter, installedDemoVideoFilter } = require('../src/services/demoExerciseVideo.service');
 
-const blankField = (name) => ({ $or: [
-  { [name]: { $exists: false } }, { [name]: null }, { [name]: '' },
-] });
-const missingVideoFilter = { $and: [
-  blankField('videoUrl'),
-  blankField('youtubeVideoId'),
-] };
-const demoOnlyFilter = {
-  isDemoVideo: true,
-  videoUrl: DEMO_VIDEO_URL,
-  youtubeVideoId: DEMO_VIDEO_ID,
-};
+const missingVideoFilter = missingDemoVideoFilter();
+const demoOnlyFilter = installedDemoVideoFilter();
 
 async function run() {
   if (process.env.NODE_ENV === 'production') {
