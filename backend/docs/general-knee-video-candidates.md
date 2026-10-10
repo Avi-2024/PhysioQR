@@ -64,13 +64,19 @@ This does not affect post-operative Knee/Shoulder or other programmes.
   That means **pending clinical review**, not an irrelevant generic demo.
 - Candidates can be opened in Admin Exercise Detail for review. They are
   hidden from patient video APIs and never count as a ready clinical video.
-- After a qualified physiotherapist actually reviews a video, an Admin opens
-  its Exercise Detail → **Record physiotherapist video review**, and enters
-  the clinician's name and review note. This action is audit-logged.
-- Editing a pending candidate does NOT silently clear its pending flag.
-  Changing a previously reviewed video requires another clinician review.
-- The Knee programme also requires all 30 days, exercises, video access,
-  a separate clinical programme sign-off, and deliberate publication.
+- **No separate video-by-video sign-off form.** A qualified physiotherapist
+  reviews the complete 30-day programme (including each linked demonstration,
+  exercise technique, instructions and safety) once. Admin → Programmes →
+  Knee 30-Day → **Record clinical sign-off** records the real reviewing
+  physiotherapist's name and review note. Only that explicit full-programme
+  action marks its 15 mapped video candidates as reviewed and audit-logs the
+  sign-off. It does NOT automatically publish the programme.
+- Editing candidate metadata does not silently approve a video. Changing a
+  previously reviewed video invalidates its review; the whole programme must
+  be re-reviewed before publication.
+- The Knee programme still requires all 30 days, valid exercise content,
+  active exercises, a single qualified clinical sign-off, and separate
+  deliberate Admin publication.
 - External videos may block embedding or change after being linked. The
   clinical team must check rights, video accessibility, technique and
   instructions before approving. Prefer owned/licensed exercise video content
