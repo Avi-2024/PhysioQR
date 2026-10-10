@@ -2,7 +2,7 @@ import { useDeferredValue, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Activity, ChevronLeft, ChevronRight, Dumbbell, ExternalLink, PlayCircle, Plus, RefreshCw } from 'lucide-react';
+import { Activity, ChevronLeft, ChevronRight, Dumbbell, ExternalLink, PlayCircle, Plus, RefreshCw, CheckSquare, ShieldAlert } from 'lucide-react';
 import apiClient from '@/lib/api-client';
 import ErrorState from '@/components/feedback/ErrorState';
 import { Modal } from '@/components/ui/Modal';
@@ -45,6 +45,11 @@ export default function AdminExercisesPage() {
   const [page, setPage] = useState(1);
   const [showCreate, setShowCreate] = useState(false);
   const [formError, setFormError] = useState('');
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkAction, setBulkAction] = useState<'activate' | 'deactivate' | null>(null);
+  const [bulkReason, setBulkReason] = useState('');
+  const [bulkError, setBulkError] = useState('');
+  const [bulkNotice, setBulkNotice] = useState('');
 
   const query = useQuery<Response>({
     queryKey: ['admin-exercises', page, deferredSearch, status, categoryId, language, video],
@@ -73,12 +78,54 @@ export default function AdminExercisesPage() {
     onError: (error: any) => setFormError(error?.response?.data?.message || 'Exercise could not be created.'),
   });
 
+  const visibleItems = query.data?.items || [];
+  const visibleIds = visibleItems.map((item) => item._id);
+  const selectedVisible = visibleItems.filter((item) => selectedIds.includes(item._id));
+  const visibleAllSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.includes(id));
+  const hasSelection = selectedVisible.length > 0;
+  const selectAllVisible = (checked: boolean) => {
+    setSelectedIds(checked ? visibleIds : []);
+    setBulkNotice('');
+  };
+  const toggleSelected = (id: string, checked: boolean) => {
+    setSelectedIds((current) => checked
+      ? [...new Set([...current, id])]
+      : current.filter((item) => item !== id));
+    setBulkNotice('');
+  };
+  const clearSelection = () => { setSelectedIds([]); setBulkNotice(''); };
+  const selectTarget = (action: 'activate' | 'deactivate') => {
+    if (!selectedVisible.some((item) => item.isActive !== (action === 'activate'))) return;
+    setBulkAction(action);
+    setBulkReason('');
+    setBulkError('');
+  };
+  const bulkMutation = useMutation({
+    mutationFn: async ({ ids, action, reason }: { ids: string[]; action: 'activate' | 'deactivate'; reason: string }) =>
+      apiClient.post('/exercises/bulk-status', { exerciseIds: ids, action, ...(reason ? { reason } : {}) }),
+    onSuccess: async (response) => {
+      setBulkNotice(response.data?.message || 'Selected exercise statuses updated.');
+      setSelectedIds([]);
+      setBulkAction(null);
+      setBulkReason('');
+      setBulkError('');
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['admin-exercises'] }),
+        queryClient.invalidateQueries({ queryKey: ['admin-program'] }),
+        queryClient.invalidateQueries({ queryKey: ['admin-programs'] }),
+      ]);
+    },
+    onError: (error: any) => setBulkError(error?.response?.data?.message || 'Bulk action failed. Nothing has been confirmed; refresh and retry.'),
+  });
+
   const cards = useMemo(() => [
     { label: 'Total exercises', value: query.data?.summary.total ?? '—', icon: Dumbbell },
     { label: 'Active', value: query.data?.summary.active ?? '—', icon: Activity },
     { label: 'Inactive', value: query.data?.summary.inactive ?? '—', icon: Dumbbell },
     { label: 'With video', value: query.data?.summary.withVideo ?? '—', icon: PlayCircle },
   ], [query.data?.summary]);
+
+  const resetFiltersSelection = () => { setSelectedIds([]); setBulkNotice(''); };
 
   const handleCreate = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -110,14 +157,67 @@ export default function AdminExercisesPage() {
     {!query.isError && <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{cards.map((card) => <div key={card.label} className="rounded-xl border border-neutral-200 bg-white p-4"><div className="flex items-center justify-between"><div><p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{card.label}</p><p className="mt-2 text-2xl font-bold text-neutral-950">{query.isLoading ? '—' : card.value}</p></div><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-neutral-50 text-neutral-600"><card.icon className="h-5 w-5" /></div></div></div>)}</section>}
 
     <section className="overflow-hidden rounded-xl border border-neutral-200 bg-white">
-      <div className="border-b border-neutral-200 px-4 py-4 sm:px-5"><div className="flex flex-col gap-3 xl:flex-row xl:items-center"><div className="min-w-0 flex-1"><SearchInput value={search} onChange={(value) => { setSearch(value); setPage(1); }} placeholder="Search exercise name, description or frequency" /></div><select value={categoryId} onChange={(e) => { setCategoryId(e.target.value); setPage(1); }} className="min-h-11 rounded-lg border border-neutral-300 px-3 text-sm"><option value="">All categories</option>{categoriesQuery.data?.map((category) => <option key={category._id} value={category._id}>{category.name}</option>)}</select><select value={language} onChange={(e) => { setLanguage(e.target.value); setPage(1); }} className="min-h-11 rounded-lg border border-neutral-300 px-3 text-sm"><option value="">All languages</option><option value="en">English</option><option value="hi">Hindi</option></select><select value={video} onChange={(e) => { setVideo(e.target.value); setPage(1); }} className="min-h-11 rounded-lg border border-neutral-300 px-3 text-sm"><option value="">Video: all</option><option value="with">With video</option><option value="without">Without video</option></select><select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className="min-h-11 rounded-lg border border-neutral-300 px-3 text-sm"><option value="active">Active</option><option value="inactive">Inactive</option><option value="">All statuses</option></select></div>{!query.isLoading && !query.isError && <p className="mt-3 text-xs text-neutral-500">{query.data?.meta.total ?? 0} exercise{query.data?.meta.total === 1 ? '' : 's'} found.</p>}</div>
+      <div className="border-b border-neutral-200 px-4 py-4 sm:px-5"><div className="flex flex-col gap-3 xl:flex-row xl:items-center"><div className="min-w-0 flex-1"><SearchInput value={search} onChange={(value) => { setSearch(value); setPage(1); resetFiltersSelection(); }} placeholder="Search exercise name, description or frequency" /></div><select value={categoryId} onChange={(e) => { setCategoryId(e.target.value); setPage(1); resetFiltersSelection(); }} className="min-h-11 rounded-lg border border-neutral-300 px-3 text-sm"><option value="">All categories</option>{categoriesQuery.data?.map((category) => <option key={category._id} value={category._id}>{category.name}</option>)}</select><select value={language} onChange={(e) => { setLanguage(e.target.value); setPage(1); resetFiltersSelection(); }} className="min-h-11 rounded-lg border border-neutral-300 px-3 text-sm"><option value="">All languages</option><option value="en">English</option><option value="hi">Hindi</option></select><select value={video} onChange={(e) => { setVideo(e.target.value); setPage(1); resetFiltersSelection(); }} className="min-h-11 rounded-lg border border-neutral-300 px-3 text-sm"><option value="">Video: all</option><option value="with">With video</option><option value="without">Without video</option></select><select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); resetFiltersSelection(); }} className="min-h-11 rounded-lg border border-neutral-300 px-3 text-sm"><option value="active">Active</option><option value="inactive">Inactive</option><option value="">All statuses</option></select></div>{!query.isLoading && !query.isError && <p className="mt-3 text-xs text-neutral-500">{query.data?.meta.total ?? 0} exercise{query.data?.meta.total === 1 ? '' : 's'} found.</p>}</div>
+
+      {!query.isLoading && !query.isError && Boolean(query.data?.items.length) && <div className="border-b border-neutral-200 bg-neutral-50/70 px-4 py-3 sm:px-5">
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-neutral-700">
+            <input type="checkbox" checked={visibleAllSelected} onChange={(event) => selectAllVisible(event.target.checked)}
+              aria-label="Select all exercises on this page"
+              className="h-4 w-4 rounded border-neutral-300 accent-emerald-700"/>
+            Select all on this page
+          </label>
+          <span className="text-sm text-neutral-500">{selectedVisible.length} selected</span>
+          {hasSelection && <button type="button" onClick={clearSelection} className="text-xs font-semibold text-neutral-600 underline">Clear selection</button>}
+          <div className="flex flex-wrap gap-2 sm:ml-auto">
+            <button type="button" disabled={!selectedVisible.some((item) => !item.isActive)} onClick={() => selectTarget('activate')}
+              className="inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-emerald-700 px-3 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">
+              <CheckSquare className="h-4 w-4" /> Activate selected
+            </button>
+            <button type="button" disabled={!selectedVisible.some((item) => item.isActive)} onClick={() => selectTarget('deactivate')}
+              className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-neutral-300 bg-white px-3 text-xs font-bold text-neutral-800 disabled:cursor-not-allowed disabled:opacity-40">
+              Deactivate selected
+            </button>
+          </div>
+        </div>
+        {bulkNotice && <p role="status" className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{bulkNotice} Refresh the Knee Programme to recheck content.</p>}
+        <p className="mt-2 text-xs leading-5 text-neutral-500">Bulk actions apply to selected exercises on this page only. Activation does not add videos, approve content or publish a rehabilitation programme.</p>
+      </div>}
 
       {query.isError ? <div className="p-5"><ErrorState title="Exercises could not load" message="Check the exercise API and admin session, then retry." onRetry={() => query.refetch()} /></div> : query.isLoading ? <div className="space-y-3 p-5">{Array.from({ length: 7 }).map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}</div> : !query.data?.items.length ? <div className="px-5 py-14 text-center"><Dumbbell className="mx-auto h-9 w-9 text-neutral-300" /><h2 className="mt-3 text-sm font-semibold text-neutral-900">No exercises found</h2><p className="mt-1 text-sm text-neutral-500">Create an exercise or adjust the filters.</p></div> : <>
-        <div className="hidden overflow-x-auto md:block"><table className="w-full min-w-[1050px] text-left text-sm"><thead className="border-b border-neutral-200 bg-neutral-50/80"><tr className="text-xs font-semibold uppercase tracking-wide text-neutral-500"><th className="px-5 py-3">Exercise</th><th className="px-4 py-3">Category</th><th className="px-4 py-3">Prescription</th><th className="px-4 py-3">Usage</th><th className="px-4 py-3">Video</th><th className="px-4 py-3">Status</th><th className="px-5 py-3  ">Action</th></tr></thead><tbody className="divide-y divide-neutral-100">{query.data.items.map((item) => <tr key={item._id} onClick={() => navigate(`/admin/exercises/${item._id}`)} className="cursor-pointer hover:bg-neutral-50"><td className="px-5 py-4"><div className="font-semibold text-neutral-950">{item.name}</div><div className="mt-1 text-xs text-neutral-500">{item.language === 'hi' ? 'Hindi' : 'English'}{item.frequency ? ` · ${item.frequency}` : ''}</div></td><td className="px-4 py-4 text-neutral-700">{item.painCategory?.name || 'General'}</td><td className="px-4 py-4 text-neutral-600">{item.sets ?? '—'} sets · {item.repetitions ?? '—'} reps</td><td className="px-4 py-4 text-neutral-600"><div>{item.usage?.programs ?? 0} programs</div><div className="text-xs text-neutral-400">{item.usage?.programDays ?? 0} program days</div></td><td className="px-4 py-4">{item.videoUrl ? <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary-700"><PlayCircle className="h-4 w-4" />Linked</span> : <span className="text-xs text-neutral-400">Not linked</span>}</td><td className="px-4 py-4"><span className={cn('rounded-full px-2.5 py-1 text-xs font-semibold', item.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-neutral-100 text-neutral-600')}>{item.isActive ? 'Active' : 'Inactive'}</span></td><td className="px-5 py-4  "><button type="button" onClick={(e) => { e.stopPropagation(); navigate(`/admin/exercises/${item._id}`); }} className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-200 px-3 py-2 text-xs font-semibold text-neutral-700">Manage <ExternalLink className="h-3.5 w-3.5" /></button></td></tr>)}</tbody></table></div>
-        <div className="divide-y divide-neutral-100 md:hidden">{query.data.items.map((item) => <button key={item._id} type="button" onClick={() => navigate(`/admin/exercises/${item._id}`)} className="block w-full px-4 py-4 text-left"><div className="flex items-start justify-between gap-3"><div><div className="font-semibold text-neutral-950">{item.name}</div><div className="mt-1 text-xs text-neutral-500">{item.painCategory?.name || 'General'} · {item.usage?.programs ?? 0} programs</div></div><span className={cn('rounded-full px-2 py-1 text-xs font-semibold', item.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-neutral-100 text-neutral-600')}>{item.isActive ? 'Active' : 'Inactive'}</span></div></button>)}</div>
-        <div className="flex items-center justify-between border-t border-neutral-200 px-4 py-3 sm:px-5"><p className="text-xs text-neutral-500">Page {query.data.meta.page} of {Math.max(query.data.meta.totalPages, 1)}</p><div className="flex gap-2"><button disabled={query.data.meta.page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-neutral-200 disabled:opacity-40"><ChevronLeft className="h-4 w-4" /></button><button disabled={query.data.meta.page >= query.data.meta.totalPages} onClick={() => setPage((value) => value + 1)} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-neutral-200 disabled:opacity-40"><ChevronRight className="h-4 w-4" /></button></div></div>
+        <div className="hidden overflow-x-auto md:block"><table className="w-full min-w-[1050px] text-left text-sm"><thead className="border-b border-neutral-200 bg-neutral-50/80"><tr className="text-xs font-semibold uppercase tracking-wide text-neutral-500"><th className="w-10 py-3 pl-4" scope="col">Select</th><th className="px-5 py-3">Exercise</th><th className="px-4 py-3">Category</th><th className="px-4 py-3">Prescription</th><th className="px-4 py-3">Usage</th><th className="px-4 py-3">Video</th><th className="px-4 py-3">Status</th><th className="px-5 py-3  ">Action</th></tr></thead><tbody className="divide-y divide-neutral-100">{query.data.items.map((item) => <tr key={item._id} onClick={() => navigate(`/admin/exercises/${item._id}`)} className="cursor-pointer hover:bg-neutral-50"><td className="py-4 pl-4" onClick={(event) => event.stopPropagation()}><input type="checkbox" checked={selectedIds.includes(item._id)} onChange={(event) => toggleSelected(item._id, event.target.checked)} aria-label={`Select ${item.name}`} className="h-4 w-4 rounded border-neutral-300 accent-emerald-700"/></td><td className="px-5 py-4"><div className="font-semibold text-neutral-950">{item.name}</div><div className="mt-1 text-xs text-neutral-500">{item.language === 'hi' ? 'Hindi' : 'English'}{item.frequency ? ` · ${item.frequency}` : ''}</div></td><td className="px-4 py-4 text-neutral-700">{item.painCategory?.name || 'General'}</td><td className="px-4 py-4 text-neutral-600">{item.sets ?? '—'} sets · {item.repetitions ?? '—'} reps</td><td className="px-4 py-4 text-neutral-600"><div>{item.usage?.programs ?? 0} programs</div><div className="text-xs text-neutral-400">{item.usage?.programDays ?? 0} program days</div></td><td className="px-4 py-4">{item.videoUrl ? <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary-700"><PlayCircle className="h-4 w-4" />Linked</span> : <span className="text-xs text-neutral-400">Not linked</span>}</td><td className="px-4 py-4"><span className={cn('rounded-full px-2.5 py-1 text-xs font-semibold', item.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-neutral-100 text-neutral-600')}>{item.isActive ? 'Active' : 'Inactive'}</span></td><td className="px-5 py-4  "><button type="button" onClick={(e) => { e.stopPropagation(); navigate(`/admin/exercises/${item._id}`); }} className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-200 px-3 py-2 text-xs font-semibold text-neutral-700">Manage <ExternalLink className="h-3.5 w-3.5" /></button></td></tr>)}</tbody></table></div>
+        <div className="divide-y divide-neutral-100 md:hidden">{query.data.items.map((item) => <div key={item._id} className="flex items-center gap-3 px-4 py-4"><input type="checkbox" checked={selectedIds.includes(item._id)} onChange={(event) => toggleSelected(item._id, event.target.checked)} aria-label={`Select ${item.name}`} className="h-4 w-4 shrink-0 rounded border-neutral-300 accent-emerald-700"/><button type="button" onClick={() => navigate(`/admin/exercises/${item._id}`)} className="min-w-0 flex-1 text-left"><div className="flex items-start justify-between gap-3"><div><div className="font-semibold text-neutral-950">{item.name}</div><div className="mt-1 text-xs text-neutral-500">{item.painCategory?.name || 'General'} · {item.usage?.programs ?? 0} programs</div></div><span className={cn('shrink-0 rounded-full px-2 py-1 text-xs font-semibold', item.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-neutral-100 text-neutral-600')}>{item.isActive ? 'Active' : 'Inactive'}</span></div></button></div>)}</div>
+        <div className="flex items-center justify-between border-t border-neutral-200 px-4 py-3 sm:px-5"><p className="text-xs text-neutral-500">Page {query.data.meta.page} of {Math.max(query.data.meta.totalPages, 1)}</p><div className="flex gap-2"><button disabled={query.data.meta.page <= 1} onClick={() => (clearSelection(), setPage((value) => Math.max(1, value - 1)))} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-neutral-200 disabled:opacity-40"><ChevronLeft className="h-4 w-4" /></button><button disabled={query.data.meta.page >= query.data.meta.totalPages} onClick={() => (clearSelection(), setPage((value) => value + 1))} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-neutral-200 disabled:opacity-40"><ChevronRight className="h-4 w-4" /></button></div></div>
       </>}
     </section>
+
+    <Modal isOpen={bulkAction !== null} onClose={() => { if (!bulkMutation.isPending) { setBulkAction(null); setBulkError(''); } }} title={bulkAction === 'activate' ? 'Bulk activate exercises?' : 'Bulk deactivate exercises?'} size="md">
+      <form onSubmit={(event) => { event.preventDefault(); if (bulkAction && selectedVisible.length) bulkMutation.mutate({ ids: selectedVisible.map((item) => item._id), action: bulkAction, reason: bulkReason.trim() }); }} className="space-y-4 pt-4">
+        <p className="text-sm leading-6 text-neutral-700">
+          {selectedVisible.filter((item) => item.isActive !== (bulkAction === 'activate')).length} exercise(s) will change status.
+          {selectedVisible.length > 0 && selectedVisible.some((item) => item.isActive === (bulkAction === 'activate')) && ' Exercises already in the requested status will be skipped.'}
+          All status changes will be audit-logged.
+        </p>
+        {bulkAction === 'activate' && selectedVisible.some((item) => !item.videoUrl) && <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
+          <ShieldAlert className="h-5 w-5 shrink-0"/>
+          <p>{selectedVisible.filter((item) => !item.videoUrl).length} selected exercise(s) have no video. Activating them does not make the Knee Programme publishable. Attach and review real videos before clinical sign-off.</p>
+        </div>}
+        <label className="block text-sm font-semibold text-neutral-800">Shared reason (optional)
+          <textarea value={bulkReason} onChange={(event) => setBulkReason(event.target.value)} maxLength={500} rows={2}
+            placeholder="e.g. Administrative status update — can leave blank"
+            className={`${inputClass} py-3`}/>
+          <span className="mt-1 block text-xs font-normal text-neutral-500">One reason applies to every selected exercise. If blank, the backend records a standard action reason.</span>
+        </label>
+        {bulkError && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{bulkError}</p>}
+        <div className="flex justify-end gap-2">
+          <button type="button" disabled={bulkMutation.isPending} onClick={() => { setBulkAction(null); setBulkError(''); }} className="min-h-10 rounded-lg border border-neutral-300 px-4 text-sm font-semibold text-neutral-700">Cancel</button>
+          <button type="submit" disabled={bulkMutation.isPending || !selectedVisible.some((item) => item.isActive !== (bulkAction === 'activate'))}
+            className="min-h-10 rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white disabled:opacity-40">
+            {bulkMutation.isPending ? 'Updating…' : 'Confirm bulk action'}
+          </button>
+        </div>
+      </form>
+    </Modal>
 
     <Modal isOpen={showCreate} onClose={() => { setShowCreate(false); setFormError(''); }} title="Create rehabilitation exercise" size="lg"><form onSubmit={handleCreate} className="space-y-5 pt-5">{formError && <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{formError}</div>}<div className="grid gap-4 sm:grid-cols-2"><Field label="Exercise name *"><input name="name" required className={inputClass} /></Field><Field label="Hindi name"><input name="nameHindi" className={inputClass} /></Field><Field label="Pain category"><select name="painCategory" className={inputClass}><option value="">General / cross-category</option>{categoriesQuery.data?.map((category) => <option key={category._id} value={category._id}>{category.name}</option>)}</select></Field><Field label="Language"><select name="language" className={inputClass}><option value="en">English</option><option value="hi">Hindi</option></select></Field><Field label="Sets"><input name="sets" type="number" min="0" className={inputClass} /></Field><Field label="Repetitions"><input name="repetitions" type="number" min="0" className={inputClass} /></Field><Field label="Frequency"><input name="frequency" className={inputClass} placeholder="e.g. twice daily" /></Field><Field label="Hold duration"><input name="holdDuration" className={inputClass} placeholder="e.g. 10 seconds" /></Field><Field label="Rest duration"><input name="restDuration" className={inputClass} /></Field><Field label="YouTube URL"><input name="videoUrl" type="url" className={inputClass} /></Field><Field label="Required equipment"><input name="requiredEquipment" className={inputClass} placeholder="Band, chair" /></Field><label className="sm:col-span-2"><span className="text-xs font-semibold text-neutral-600">Description</span><textarea name="description" rows={3} className={`${inputClass} py-3`} /></label><label className="sm:col-span-2"><span className="text-xs font-semibold text-neutral-600">Safety instructions</span><textarea name="safetyInstructions" rows={3} className={`${inputClass} py-3`} /></label></div><div className="flex justify-end gap-2 border-t border-neutral-200 pt-4"><button type="button" onClick={() => setShowCreate(false)} className="min-h-10 rounded-lg border border-neutral-300 px-4 text-sm font-semibold text-neutral-700">Cancel</button><button disabled={createMutation.isPending} className="min-h-10 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white disabled:opacity-60">{createMutation.isPending ? 'Creating...' : 'Create exercise'}</button></div></form></Modal>
   </div>;
