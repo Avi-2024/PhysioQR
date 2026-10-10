@@ -11,6 +11,12 @@ const exerciseSchema = new mongoose.Schema({
   youtubeVideoId: String,
   // TESTING ONLY. A demo URL must never satisfy clinical programme readiness.
   isDemoVideo: { type: Boolean, default: false },
+  // Exercise-specific external video candidate, NOT yet reviewed by our
+  // physiotherapist. The clinical release gate treats it as unapproved.
+  videoCandidateReviewPending: { type: Boolean, default: false },
+  videoCandidateTitle: String,
+  videoCandidateProvider: String,
+  videoCandidateSourcePage: String,
   thumbnail: String,
   repetitions: Number,
   sets: Number,
