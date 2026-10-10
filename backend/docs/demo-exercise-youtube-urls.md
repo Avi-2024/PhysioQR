@@ -1,82 +1,56 @@
-# Demo YouTube videos for exercise-player TESTING ONLY
+# Exercise YouTube playback test URL — development only
 
-**Never publish a clinical rehabilitation programme using these sample videos.**
-The demo URL is YouTube's IFrame API sample:
-`https://www.youtube.com/watch?v=M7lc1UVf-VE`
-(see Google Developers' IFrame Player API documentation).
-It demonstrates embedded playback, not physiotherapy technique.
+**Requested sample URL:** https://youtu.be/ml6cT4AZdqI?si=0VwhyxF63Vulcq5Z
 
-## Easiest: use the Admin Panel (no separate DB script)
+This user-supplied URL is used for **playback testing**, not as a verified
+exercise-specific physiotherapy tutorial. It is intentionally marked
+`isDemoVideo=true`, excluded from patient video responses and NOT considered
+valid clinical content in the programme publication gate.
 
-1. Pull the latest GitHub `main`, then restart backend and frontend.
-2. Sign in as Admin, open **Exercises**.
-3. Click **Add Demo YouTube URLs**, review the test-only warning and confirm.
-4. The API operates on the same MongoDB connection as your running
-   `/api/exercises` listing, including exercises on later pages.
-5. The success message says how many records changed; refresh or filter by
-   **Video: With video** and check the **Demo · testing only** count.
-6. Use **Remove demo links** to reverse the exact test-only URLs.
+## Correct way to insert URLs
 
-If `NODE_ENV=production`, the API returns HTTP 403 intentionally.
-This feature must not be used on a live patient production environment.
+Pull the latest `main`. In the backend folder, with the **development**
+`MONGO_URI` and `NODE_ENV=development`:
 
-**Important:** A GitHub commit never populates the database by itself.
-The old CLI defaults to preview only unless `--apply` is provided.
-If 0 records change, ensure the Exercises page and the script use the same
-MongoDB database and that exercises' `videoUrl` / `youtubeVideoId` are both empty.
-The UI action uses the API database directly to avoid that mismatch.
-
-## Safe workflow
-
-In `backend`, with `MONGO_URI` configured for your **development** database:
-
-```sh
+```powershell
 npm run demo:exercise-videos
-```
-
-This is a read-only preview: it prints how many exercise records have no
-video metadata and would get a demo link.
-
-To apply once in development:
-
-```sh
-npm run demo:exercise-videos -- --apply
-```
-
-This fills **all existing exercises with neither `videoUrl` nor
-`youtubeVideoId`**, whether active or inactive; no existing real video is
-overwritten. Saved records get `isDemoVideo=true` and the demo YouTube ID.
-Running the command again is idempotent. It changes no active/inactive status,
-patient data, programme approval, or programme publication. The script REFUSES
-to run if `NODE_ENV=production`.
-
-To remove only these exact demo links later:
-
-```sh
-npm run demo:exercise-videos -- --remove
-```
-
-This only cleans records still marked with the sample URL and ID. A real
-video installed through Admin → Exercise Edit is not removed.
-
-## User interface and safety
-
-- Admin Exercise Library and Exercise Detail display **Demo — Testing Only**.
-- The programme readiness checklist says **Demo video — replace with real exercise video**.
-- The release gate refuses to count sample links as a valid clinical video
-  even if the exercise is active and its ID looks like a normal YouTube video.
-- Patient exercise listing/detail, programme days, prescription and daily
-  progress content do **not** return demo YouTube URLs to non-Admin users.
-- When Admin replaces a sample URL with a proper YouTube exercise video,
-  `isDemoVideo` automatically resets to false. Qualified clinician review,
-  actual video suitability and manual clinical sign-off are still required.
-
-Remember: a URL's YouTube format does not itself establish that the video
-is medically relevant, safe, authorised or even publicly accessible.
-
-Test:
-
-```sh
+npm run demo:exercise-videos:apply
 npm run test:demo-exercise-videos
-npm run test:knee-general-30d-draft
 ```
+
+The first command is **read-only preview**. The second actually inserts the
+sample into exercises that have no URL/ID and upgrades the previous PhysioQR
+sample `M7lc1UVf-VE` (if it was installed and flagged as demo). Real
+exercise-specific video links are NEVER overwritten. Running it again is safe
+and won't change records that already contain the requested sample.
+
+**Why the older command did not work:** On some npm/PowerShell combinations,
+`npm run demo:exercise-videos -- --apply` did not forward `--apply` to Node,
+so the script reported `PREVIEW ONLY`. The new
+`demo:exercise-videos:apply` script contains the argument explicitly.
+
+**Alternative one-click Admin action:** Admin → Exercises → **Add Demo
+YouTube URLs** → Confirm. It uses the *same database as the running backend*
+and updates blank/previous-demo exercises. In a non-production environment
+only.
+
+## Remove sample URLs
+
+```powershell
+npm run demo:exercise-videos:remove
+```
+
+This removes only **exactly matching, flagged** PhysioQR demo URLs (both
+the requested and original sample). Exercise-specific real URLs remain saved.
+
+## Safety and release
+
+- No exercise is activated by this operation.
+- No clinical sign-off or programme publication occurs.
+- Real videos and patient records are unchanged.
+- Both the original and requested demo IDs are recognized as testing links.
+- Admin sees a testing-only warning; patients will not be shown these links.
+- The Knee 30-Day Programme remains clinically locked until unique, relevant,
+  clinician-reviewed exercise videos and actual physiotherapist approval exist.
+- Production mode (`NODE_ENV=production`) explicitly rejects the demo operation.
+- A matching YouTube ID does not prove a video's exercise relevance or safety.
