@@ -1,8 +1,10 @@
 // Release gate for programmes explicitly requiring clinical approval.
 // Legacy programmes do not enter this process automatically.
 const { ProgramDay } = require('../models/Exercise.model');
+const { isDemoExerciseVideo } = require('./demoExerciseVideo.service');
 
 const videoConfigured = (exercise) => {
+  if (isDemoExerciseVideo(exercise)) return false; // Demo videos never meet clinical readiness.
   const videoId = String(exercise?.youtubeVideoId || '').trim();
   if (/^[A-Za-z0-9_-]{11}$/.test(videoId)) return true;
   try {
@@ -33,7 +35,7 @@ const inspectProgrammeRelease = async (program, { checkApprovalFreshness = false
 
   const days = await ProgramDay.find({ program: program._id, isActive: true })
     .populate('exercises.exercise',
-      '_id name isActive videoUrl youtubeVideoId safetyInstructions sets repetitions painCategory updatedAt')
+      '_id name isActive videoUrl youtubeVideoId isDemoVideo safetyInstructions sets repetitions painCategory updatedAt')
     .lean();
 
   if (checkApprovalFreshness && program.clinicalApproval?.approvedAt) {
@@ -60,6 +62,7 @@ const inspectProgrammeRelease = async (program, { checkApprovalFreshness = false
       if (!exercise) { issues.push('Day ' + n + ': missing exercise reference'); continue; }
       const id = String(exercise._id);
       const active = exercise.isActive === true;
+      const demoVideo = isDemoExerciseVideo(exercise);
       const videoReady = videoConfigured(exercise);
       const safetyReady = Boolean(String(exercise.safetyInstructions || '').trim());
       const categoryReady = String(exercise.painCategory?._id || exercise.painCategory || '') === String(program.painCategory?._id || program.painCategory);
@@ -68,17 +71,18 @@ const inspectProgrammeRelease = async (program, { checkApprovalFreshness = false
       const doseReady = Number.isInteger(Number(sets)) && Number(sets) >= 1
         && Number.isInteger(Number(reps)) && Number(reps) >= 1;
       if (!active) issues.push('Day ' + n + ': exercise "' + exercise.name + '" is inactive');
-      if (!videoReady) issues.push('Day ' + n + ': exercise "' + exercise.name + '" has no video');
+      if (!videoReady) issues.push('Day ' + n + ': exercise "' + exercise.name + '" ' + (demoVideo ? 'has TEST-ONLY video; replace with a clinically reviewed exercise video' : 'has no video'));
       if (!safetyReady) issues.push('Day ' + n + ': exercise "' + exercise.name + '" needs safety instructions');
       if (!categoryReady) issues.push('Day ' + n + ': exercise "' + exercise.name + '" is mapped to another body region');
       if (!doseReady) issues.push('Day ' + n + ': exercise "' + exercise.name + '" needs valid sets/reps');
       if (!checklist.has(id)) checklist.set(id, {
-        id, name: exercise.name, active, videoReady, safetyReady,
+        id, name: exercise.name, active, videoReady, demoVideo, safetyReady,
         categoryReady, doseReady: true, usedOnDays: [],
       });
       const row = checklist.get(id);
       row.active = row.active && active;
       row.videoReady = row.videoReady && videoReady;
+      row.demoVideo = row.demoVideo || demoVideo;
       row.safetyReady = row.safetyReady && safetyReady;
       row.categoryReady = row.categoryReady && categoryReady;
       row.doseReady = row.doseReady && doseReady;
