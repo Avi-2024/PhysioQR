@@ -4,6 +4,7 @@ const PainCategory = require('../models/PainCategory.model');
 const { writeAuditLog } = require('../utils/auditLogger');
 const asyncHandler = require('../utils/asyncHandler');
 const { EXERCISE_PREFIX } = require('../data/generalKnee30DayDraft');
+const { DEMO_VIDEO_ID, youtubeId, patientSafeExercise } = require('../services/demoExerciseVideo.service');
 // Draft-seeded content is delivered only via an authorised patient prescription,
 // never through the generic exercise catalogue or exercise detail API.
 const privateSeedPattern = new RegExp('^' + EXERCISE_PREFIX); // Prefix is fixed alphanumeric/underscore text.
@@ -40,7 +41,11 @@ const normalizeExercisePayload = (body = {}) => {
         throw error;
       }
       payload.youtubeVideoId = videoId;
-    } else payload.youtubeVideoId = '';
+      payload.isDemoVideo = (videoId === DEMO_VIDEO_ID);
+    } else {
+      payload.youtubeVideoId = '';
+      payload.isDemoVideo = false;
+    }
   }
   return payload;
 };
@@ -76,7 +81,8 @@ const getExercises = asyncHandler(async (req, res) => {
     const filter = { isActive: true, seedKey: { $not: privateSeedPattern } };
     if (req.query.category) filter.painCategory = req.query.category;
     if (req.query.language) filter.language = req.query.language;
-    return res.json(await Exercise.find(filter).populate('painCategory', 'name').sort({ displayOrder: 1, createdAt: -1 }));
+    const items = await Exercise.find(filter).populate('painCategory', 'name').sort({ displayOrder: 1, createdAt: -1 }).lean();
+    return res.json(items.map(patientSafeExercise));
   }
 
   const page = Math.max(1, Number(req.query.page) || 1);
@@ -133,7 +139,8 @@ const getExerciseById = asyncHandler(async (req, res) => {
     .sort({ dayNumber: 1 })
     .lean();
   const programIds = new Set(programDays.map((day) => String(day.program?._id || '')).filter(Boolean));
-  res.json({ exercise, usage: { programDays: programDays.length, programs: programIds.size }, programDays });
+  res.json({ exercise: req.user.role === 'admin' ? exercise : patientSafeExercise(exercise),
+    usage: { programDays: programDays.length, programs: programIds.size }, programDays });
 });
 
 const updateExercise = asyncHandler(async (req, res) => {
