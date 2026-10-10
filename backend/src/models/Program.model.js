@@ -20,6 +20,15 @@ const programSchema = new mongoose.Schema({
   precautions: String,
   requiredEquipment: [String],
   thumbnail: String,
+  // Only selected clinician-reviewed draft programmes require the release gate.
+  // Legacy programmes keep their current lifecycle until separately migrated.
+  clinicalApprovalRequired: { type: Boolean, default: false },
+  clinicalApproval: {
+    clinicianName: String,
+    reviewNote: String,
+    approvedAt: Date,
+    recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  },
   isActive: { type: Boolean, default: true },
 }, { timestamps: true });
 
