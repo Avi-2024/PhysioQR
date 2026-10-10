@@ -155,11 +155,14 @@ const updateExercise = asyncHandler(async (req, res) => {
   const previousValue = exercise.toObject();
   // Editing the title, prescription, or URL cannot silently approve a video
   // candidate. Only the explicit reviewed-video action releases this flag.
-  if (exercise.videoCandidateReviewPending) {
+  const changedVideo = payload.videoUrl !== undefined && payload.youtubeVideoId !== exercise.youtubeVideoId;
+  if (exercise.videoCandidateReviewPending || (changedVideo && exercise.videoReview?.reviewedAt)) {
     payload.isDemoVideo = true;
     payload.videoCandidateReviewPending = true;
-    if (payload.videoUrl !== undefined && payload.youtubeVideoId !== exercise.youtubeVideoId) {
-      // A replacement URL also needs a new review; retain pending status.
+    if (changedVideo) {
+      // A replacement URL also needs a NEW clinical review, even if an older
+      // candidate had previously been approved.
+      payload.videoReview = {};
       payload.videoCandidateTitle = 'Admin replacement awaiting clinical review';
       payload.videoCandidateProvider = 'Admin-provided, unreviewed';
       payload.videoCandidateSourcePage = '';
