@@ -17,6 +17,8 @@ export type ReleaseReadiness = {
   required: boolean;
   clinicalApproved: boolean;
   readyForSignOff: boolean;
+  readyForPublish?: boolean;
+  approvalOutdated?: boolean;
   issueCount: number;
   issues: string[];
   exercises?: ReleaseExercise[];
@@ -55,7 +57,7 @@ export default function ProgrammeReleaseChecklist({
   const configuredDays = readiness?.configuredDays || 0;
   const contentReady = Boolean(readiness?.readyForSignOff);
   const signed = Boolean(clinicalApproval?.approvedAt);
-  const canPublish = !isActive && contentReady && signed;
+  const canPublish = !isActive && Boolean(readiness?.readyForPublish) && signed;
   const percent = tasks.length ? Math.round((readyCount / tasks.length) * 100) : 0;
 
   return (
@@ -134,7 +136,9 @@ export default function ProgrammeReleaseChecklist({
           <p className="mt-1 text-sm leading-6 text-neutral-600">
             A qualified physiotherapist reviews all 30 days, videos, doses and exclusions. Admin then records their name and review note.
           </p>
-          {signed && <p className="mt-2 text-xs font-semibold text-emerald-800">Recorded reviewer: {clinicalApproval?.clinicianName}</p>}
+          {signed && <p className={`mt-2 text-xs font-semibold ${readiness?.approvalOutdated ? 'text-amber-800' : 'text-emerald-800'}`}>
+            {readiness?.approvalOutdated ? 'Previous sign-off is outdated. Renew after clinical review.' : 'Recorded reviewer: ' + (clinicalApproval?.clinicianName || '')}
+          </p>}
           <button type="button" onClick={onSignoff} disabled={isActive || !contentReady}
             className="mt-3 min-h-10 rounded-lg bg-primary-700 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">
             {signed ? 'Record renewed sign-off' : 'Record clinical sign-off'}
@@ -151,7 +155,7 @@ export default function ProgrammeReleaseChecklist({
             className="mt-3 min-h-10 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">
             {isActive ? 'Already published' : 'Publish after approval'}
           </button>
-          {!signed && <p className="mt-2 text-xs text-amber-800">Waiting for clinical sign-off.</p>}
+          {(!signed || readiness?.approvalOutdated) && <p className="mt-2 text-xs text-amber-800">{readiness?.approvalOutdated ? 'The previous sign-off is outdated. Record renewed clinical sign-off first.' : 'Waiting for clinical sign-off.'}</p>}
         </div>
       </div>
     </section>
