@@ -9,6 +9,8 @@ const exerciseSchema = new mongoose.Schema({
   description: String,
   videoUrl: String,       // YouTube unlisted URL
   youtubeVideoId: String,
+  // TESTING ONLY. A demo URL must never satisfy clinical programme readiness.
+  isDemoVideo: { type: Boolean, default: false },
   thumbnail: String,
   repetitions: Number,
   sets: Number,
