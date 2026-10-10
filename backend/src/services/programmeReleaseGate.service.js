@@ -5,16 +5,26 @@ const { ProgramDay } = require('../models/Exercise.model');
 const videoConfigured = (exercise) =>
   Boolean(String(exercise?.videoUrl || '').trim() || String(exercise?.youtubeVideoId || '').trim());
 
-const getProgrammeReleaseReadiness = async (program) => {
+const getProgrammeReleaseReadiness = async (program, { checkApprovalFreshness = false } = {}) => {
   const issues = [];
   if (!program) return ['Programme not found'];
   if (!program.clinicalApprovalRequired) return issues;
 
   const days = await ProgramDay.find({ program: program._id, isActive: true })
     .populate('exercises.exercise',
-      '_id name isActive videoUrl youtubeVideoId safetyInstructions sets repetitions painCategory')
+      '_id name isActive videoUrl youtubeVideoId safetyInstructions sets repetitions painCategory updatedAt')
     .lean();
 
+  if (checkApprovalFreshness && program.clinicalApproval?.approvedAt) {
+    const approvedAt = new Date(program.clinicalApproval.approvedAt).getTime();
+    const changedAfterApproval = days.some((day) =>
+      new Date(day.updatedAt || 0).getTime() > approvedAt
+      || (day.exercises || []).some((entry) =>
+        entry.exercise && new Date(entry.exercise.updatedAt || 0).getTime() > approvedAt));
+    if (changedAfterApproval) {
+      issues.push('Day configuration or exercise library content changed after clinical sign-off. Record a new clinician review.');
+    }
+  }
   const daysByNumber = new Map();
   for (const day of days) {
     if (daysByNumber.has(day.dayNumber)) issues.push(`Day ${day.dayNumber}: duplicate active day`);
@@ -49,7 +59,7 @@ const ensureApprovedRelease = async (program) => {
     error.status = 409;
     throw error;
   }
-  const issues = await getProgrammeReleaseReadiness(program);
+  const issues = await getProgrammeReleaseReadiness(program, { checkApprovalFreshness: true });
   if (issues.length) {
     const error = new Error('Draft programme is not ready: ' + issues.slice(0, 4).join('; ') + (issues.length > 4 ? ` (+${issues.length-4} more)` : ''));
     error.status = 409;
