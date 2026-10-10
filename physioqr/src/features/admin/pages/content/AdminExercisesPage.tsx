@@ -51,6 +51,8 @@ export default function AdminExercisesPage() {
   const [bulkReason, setBulkReason] = useState('');
   const [bulkError, setBulkError] = useState('');
   const [bulkNotice, setBulkNotice] = useState('');
+  const [demoAction, setDemoAction] = useState<'apply' | 'remove' | null>(null);
+  const [demoError, setDemoError] = useState('');
 
   const query = useQuery<Response>({
     queryKey: ['admin-exercises', page, deferredSearch, status, categoryId, language, video],
@@ -78,6 +80,28 @@ export default function AdminExercisesPage() {
     },
     onError: (error: any) => setFormError(error?.response?.data?.message || 'Exercise could not be created.'),
   });
+
+  const demoMutation = useMutation({
+    mutationFn: (action: 'apply' | 'remove') =>
+      apiClient.post('/exercises/demo-videos', { action, acknowledgeTestingOnly: true }),
+    onSuccess: async (response) => {
+      setDemoAction(null);
+      setDemoError('');
+      setBulkNotice(response.data?.message || 'Demo-video changes saved.');
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['admin-exercises'] }),
+        queryClient.invalidateQueries({ queryKey: ['admin-exercise'] }),
+        queryClient.invalidateQueries({ queryKey: ['admin-program'] }),
+        queryClient.invalidateQueries({ queryKey: ['admin-programs'] }),
+      ]);
+    },
+    onError: (error: any) => setDemoError(error?.response?.data?.message ||
+      'Demo videos could not be updated. Check backend mode and API connection.'),
+  });
+  const openDemoAction = (action: 'apply' | 'remove') => {
+    setDemoError('');
+    setDemoAction(action);
+  };
 
   const visibleItems = query.data?.items || [];
   const visibleIds = visibleItems.map((item) => item._id);
@@ -153,7 +177,7 @@ export default function AdminExercisesPage() {
   return <div className="min-w-0 space-y-6">
     <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
       <div><p className="text-xs font-bold uppercase tracking-[0.16em] text-primary-700">Clinical content</p><h1 className="mt-2 text-2xl font-bold tracking-tight text-neutral-950 sm:text-3xl">Exercises</h1><p className="mt-1 max-w-3xl text-sm leading-6 text-neutral-500">Manage reusable rehabilitation exercises used inside program days. Keep instructions, safety guidance and video metadata clinically clear.</p></div>
-      <div className="flex flex-wrap gap-2"><button type="button" onClick={() => query.refetch()} disabled={query.isFetching} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 text-sm font-semibold text-neutral-700"><RefreshCw className={cn('h-4 w-4', query.isFetching && 'animate-spin')} />Refresh</button><button type="button" onClick={() => setShowCreate(true)} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white"><Plus className="h-4 w-4" />New exercise</button></div>
+      <div className="flex flex-wrap gap-2"><button type="button" onClick={() => query.refetch()} disabled={query.isFetching} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 text-sm font-semibold text-neutral-700"><RefreshCw className={cn('h-4 w-4', query.isFetching && 'animate-spin')} />Refresh</button><button type="button" onClick={() => openDemoAction('apply')} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 text-sm font-semibold text-amber-900 hover:bg-amber-100"><PlayCircle className="h-4 w-4" />Add Demo YouTube URLs</button>{(query.data?.summary.demoVideos || 0) > 0 && <button type="button" onClick={() => openDemoAction('remove')} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-neutral-300 bg-white px-3 text-sm font-semibold text-neutral-700">Remove demo links</button>}<button type="button" onClick={() => setShowCreate(true)} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white"><Plus className="h-4 w-4" />New exercise</button></div>
     </header>
 
     {!query.isError && <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">{cards.map((card) => <div key={card.label} className="rounded-xl border border-neutral-200 bg-white p-4"><div className="flex items-center justify-between"><div><p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{card.label}</p><p className="mt-2 text-2xl font-bold text-neutral-950">{query.isLoading ? '—' : card.value}</p></div><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-neutral-50 text-neutral-600"><card.icon className="h-5 w-5" /></div></div></div>)}</section>}
@@ -193,6 +217,37 @@ export default function AdminExercisesPage() {
         <div className="flex items-center justify-between border-t border-neutral-200 px-4 py-3 sm:px-5"><p className="text-xs text-neutral-500">Page {query.data.meta.page} of {Math.max(query.data.meta.totalPages, 1)}</p><div className="flex gap-2"><button disabled={query.data.meta.page <= 1} onClick={() => { clearSelection(); setPage((value) => Math.max(1, value - 1)); }} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-neutral-200 disabled:opacity-40"><ChevronLeft className="h-4 w-4" /></button><button disabled={query.data.meta.page >= query.data.meta.totalPages} onClick={() => { clearSelection(); setPage((value) => value + 1); }} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-neutral-200 disabled:opacity-40"><ChevronRight className="h-4 w-4" /></button></div></div>
       </>}
     </section>
+
+    <Modal isOpen={demoAction !== null} onClose={() => { if (!demoMutation.isPending) { setDemoAction(null); setDemoError(''); } }}
+      title={demoAction === 'apply' ? 'Add demo YouTube URLs to exercises?' : 'Remove testing-only demo videos?'} size="md">
+      <div className="space-y-4 pt-4">
+        {demoAction === 'apply' ? <>
+          <p className="text-sm leading-6 text-neutral-700">
+            All exercises with empty YouTube video fields will receive the same sample URL.
+            Existing real videos will not be overwritten. This action works on the database connected to the running backend.
+          </p>
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
+            <strong>Testing only — not an exercise video.</strong> The YouTube sample is for checking playback.
+            It will stay excluded from clinical readiness and patient video content; knee programme publication will remain locked.
+          </div>
+          <p className="text-xs text-neutral-600">Sample: https://www.youtube.com/watch?v=M7lc1UVf-VE</p>
+        </> : <>
+          <p className="text-sm leading-6 text-neutral-700">
+            Remove only the exact demo links previously added by PhysioQR. Any real videos you added will remain untouched.
+          </p>
+        </>}
+        {demoError && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{demoError}</p>}
+        <div className="flex justify-end gap-2">
+          <button type="button" disabled={demoMutation.isPending} onClick={() => { setDemoAction(null); setDemoError(''); }}
+            className="min-h-10 rounded-lg border border-neutral-300 px-4 text-sm font-semibold text-neutral-700">Cancel</button>
+          <button type="button" disabled={demoMutation.isPending || !demoAction}
+            onClick={() => { if (demoAction) demoMutation.mutate(demoAction); }}
+            className="min-h-10 rounded-lg bg-primary-700 px-4 text-sm font-semibold text-white disabled:opacity-40">
+            {demoMutation.isPending ? 'Updating videos…' : demoAction === 'apply' ? 'Confirm: Add demo URLs' : 'Confirm: Remove demo URLs'}
+          </button>
+        </div>
+      </div>
+    </Modal>
 
     <Modal isOpen={bulkAction !== null} onClose={() => { if (!bulkMutation.isPending) { setBulkAction(null); setBulkError(''); } }} title={bulkAction === 'activate' ? 'Bulk activate exercises?' : 'Bulk deactivate exercises?'} size="md">
       <form onSubmit={(event) => { event.preventDefault(); if (bulkAction && selectedVisible.length) bulkMutation.mutate({ ids: selectedVisible.map((item) => item._id), action: bulkAction, reason: bulkReason.trim() }); }} className="space-y-4 pt-4">
