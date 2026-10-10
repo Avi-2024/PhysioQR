@@ -102,19 +102,20 @@ const getExercises = asyncHandler(async (req, res) => {
   if (req.query.video === 'with') filter.videoUrl = { $nin: [null, ''] };
   if (req.query.video === 'without') filter.$and = [{ $or: [{ videoUrl: null }, { videoUrl: '' }, { videoUrl: { $exists: false } }] }];
 
-  const [items, total, totalAll, active, inactive, withVideo] = await Promise.all([
+  const [items, total, totalAll, active, inactive, withVideo, demoVideos] = await Promise.all([
     Exercise.find(filter).populate('painCategory', 'name nameHindi isActive').sort({ isActive: -1, displayOrder: 1, createdAt: -1 }).skip(skip).limit(limit).lean(),
     Exercise.countDocuments(filter),
     Exercise.countDocuments(),
     Exercise.countDocuments({ isActive: true }),
     Exercise.countDocuments({ isActive: false }),
     Exercise.countDocuments({ videoUrl: { $nin: [null, ''] } }),
+    Exercise.countDocuments({ isDemoVideo: true }),
   ]);
   const usage = await usageForExercises(items.map((item) => item._id));
   res.json({
     items: items.map((item) => ({ ...item, usage: usage.get(String(item._id)) || { programDays: 0, programs: 0 } })),
     meta: { page, limit, total, totalPages: Math.max(1, Math.ceil(total / limit)) },
-    summary: { total: totalAll, active, inactive, withVideo },
+    summary: { total: totalAll, active, inactive, withVideo, demoVideos },
   });
 });
 
