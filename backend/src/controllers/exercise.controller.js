@@ -187,43 +187,6 @@ const setExerciseStatus = asyncHandler(async (req, res) => {
   res.json({ message: `Exercise ${nextActive ? 'reactivated' : 'deactivated'}`, exercise });
 });
 
-// Explicit clinician review for one candidate video. Confirmation is
-// auditable, and a video is never automatically approved by matching its name.
-const recordExerciseVideoReview = asyncHandler(async (req, res) => {
-  if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid exercise ID' });
-  const exercise = await Exercise.findById(req.params.id);
-  if (!exercise) return res.status(404).json({ message: 'Exercise not found' });
-  if (!exercise.videoCandidateReviewPending) {
-    return res.status(409).json({ message: 'This exercise has no pending mapped-video review' });
-  }
-  const clinicianName = cleanString(req.body?.clinicianName);
-  const reviewNote = cleanString(req.body?.reviewNote);
-  if (clinicianName.length < 3 || clinicianName.length > 160 || reviewNote.length < 10 || reviewNote.length > 2000) {
-    return res.status(400).json({ message: 'Enter the actual reviewing clinician name and a meaningful review note' });
-  }
-  if (!exercise.youtubeVideoId || !/^[A-Za-z0-9_-]{11}$/.test(exercise.youtubeVideoId)) {
-    return res.status(409).json({ message: 'First save a valid, working YouTube exercise demonstration' });
-  }
-  const { LEGACY_DEMO_VIDEO_ID, DEMO_VIDEO_ID } = require('../services/demoExerciseVideo.service');
-  if ([LEGACY_DEMO_VIDEO_ID, DEMO_VIDEO_ID].includes(exercise.youtubeVideoId)) {
-    return res.status(409).json({ message: 'Generic sample-player URLs cannot be approved as exercise demonstrations' });
-  }
-  const previousValue = { isDemoVideo: exercise.isDemoVideo, videoCandidateReviewPending: exercise.videoCandidateReviewPending };
-  exercise.videoCandidateReviewPending = false;
-  exercise.isDemoVideo = false;
-  exercise.videoReview = {
-    clinicianName, reviewNote, reviewedAt: new Date(), recordedBy: req.user._id,
-  };
-  await exercise.save();
-  await writeAuditLog({
-    req, action: 'exercise_video_clinical_review_recorded', module: 'Exercise',
-    recordId: exercise._id, previousValue,
-    newValue: { isDemoVideo: false, videoCandidateReviewPending: false, videoReview: exercise.videoReview },
-    reason: reviewNote,
-  });
-  res.json({ message: 'Video review recorded. Programme publication still requires separate 30-day clinical sign-off.', exercise });
-});
-
 // Admin-only batch lifecycle action. IDs are explicit, validated and limited.
 // A shared optional note avoids typing the same reason for each exercise.
 // Each changed record still has its own attributed audit log.
@@ -339,4 +302,4 @@ const deleteExercise = asyncHandler(async (req, res) => {
   res.json({ message: 'Exercise deactivated' });
 });
 
-module.exports = { getExercises, createExercise, getExerciseById, updateExercise, setExerciseStatus, bulkSetExerciseStatus, manageDemoExerciseVideos, assignKneeDraftVideoCandidates, recordExerciseVideoReview, deleteExercise };
+module.exports = { getExercises, createExercise, getExerciseById, updateExercise, setExerciseStatus, bulkSetExerciseStatus, manageDemoExerciseVideos, assignKneeDraftVideoCandidates, deleteExercise };
