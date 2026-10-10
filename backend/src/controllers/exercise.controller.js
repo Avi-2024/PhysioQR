@@ -4,7 +4,7 @@ const PainCategory = require('../models/PainCategory.model');
 const { writeAuditLog } = require('../utils/auditLogger');
 const asyncHandler = require('../utils/asyncHandler');
 const { EXERCISE_PREFIX } = require('../data/generalKnee30DayDraft');
-const { DEMO_VIDEO_ID, youtubeId, patientSafeExercise } = require('../services/demoExerciseVideo.service');
+const { DEMO_VIDEO_ID, DEMO_VIDEO_URL, patientSafeExercise, missingDemoVideoFilter, installedDemoVideoFilter } = require('../services/demoExerciseVideo.service');
 // Draft-seeded content is delivered only via an authorised patient prescription,
 // never through the generic exercise catalogue or exercise detail API.
 const privateSeedPattern = new RegExp('^' + EXERCISE_PREFIX); // Prefix is fixed alphanumeric/underscore text.
@@ -220,10 +220,54 @@ const bulkSetExerciseStatus = asyncHandler(async (req, res) => {
   });
 });
 
+// Explicit Admin action for local testing only. Unlike the CLI, this uses
+// the SAME database as the running API, avoiding accidental .env mismatches.
+// NEVER marks a video reviewed or publishes a programme.
+const manageDemoExerciseVideos = asyncHandler(async (req, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(403).json({
+      message: 'Demo YouTube videos are disabled in production.',
+    });
+  }
+  if (req.body?.acknowledgeTestingOnly !== true) {
+    return res.status(400).json({ message: 'Confirm these are testing-only videos, not clinical exercise instructions.' });
+  }
+  const action = req.body?.action;
+  if (!['apply', 'remove'].includes(action)) {
+    return res.status(400).json({ message: 'Action must be apply or remove' });
+  }
+  const filter = action === 'apply' ? missingDemoVideoFilter() : installedDemoVideoFilter();
+  const change = action === 'apply'
+    ? { videoUrl: DEMO_VIDEO_URL, youtubeVideoId: DEMO_VIDEO_ID, isDemoVideo: true }
+    : { videoUrl: '', youtubeVideoId: '', isDemoVideo: false };
+
+  const matchingBefore = await Exercise.countDocuments(filter);
+  const result = matchingBefore
+    ? await Exercise.updateMany(filter, { $set: change })
+    : { matchedCount: 0, modifiedCount: 0 };
+  const modified = Number(result.modifiedCount || 0);
+  await writeAuditLog({
+    req,
+    action: action === 'apply' ? 'exercise_demo_videos_bulk_added' : 'exercise_demo_videos_bulk_removed',
+    module: 'Exercise',
+    reason: 'Admin confirmed development-only demo playback URLs',
+    metadata: { action, matchingBefore, modified, testOnly: true, realVideosOverwritten: 0 },
+  });
+
+  res.json({
+    message: action === 'apply'
+      ? `Demo YouTube URL added to ${modified} exercises. Real videos preserved. Clinical approval remains locked.`
+      : `Demo YouTube URLs removed from ${modified} exercises. Real videos preserved.`,
+    action, matched: Number(result.matchedCount || 0), changed: modified,
+    realVideosOverwritten: 0, programmePublished: false,
+    testingOnly: true,
+  });
+});
+
 const deleteExercise = asyncHandler(async (req, res) => {
   const exercise = await Exercise.findByIdAndUpdate(req.params.id, { isActive: false }, { new: true });
   if (!exercise) return res.status(404).json({ message: 'Exercise not found' });
   res.json({ message: 'Exercise deactivated' });
 });
 
-module.exports = { getExercises, createExercise, getExerciseById, updateExercise, setExerciseStatus, bulkSetExerciseStatus, deleteExercise };
+module.exports = { getExercises, createExercise, getExerciseById, updateExercise, setExerciseStatus, bulkSetExerciseStatus, manageDemoExerciseVideos, deleteExercise };
