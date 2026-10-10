@@ -15,7 +15,7 @@
     "seed:rehab-programs": "node scripts/seedRehabPrograms.js",
     "seed:knee-general-30d-draft": "node scripts/seedGeneralKnee30DayDraft.js",
     "validate:knee-general-30d-draft": "node scripts/seedGeneralKnee30DayDraft.js --validate",
-    "test:knee-general-30d-draft": "node --test tests/generalKnee30DayDraft.test.js",
+    "test:knee-general-30d-draft": "node --test tests/generalKnee30DayDraft.test.js tests/programmeReleaseChecklist.test.js",
     "seed:clinical-content": "npm run seed:assessment-pathways && npm run seed:assessment-questions && npm run seed:rehab-programs",
     "reset:all-except-admin": "node scripts/resetAllExceptAdmin.js",
     "test:integration": "node scripts/integrationSmoke.js",
