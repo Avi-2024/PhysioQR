@@ -28,7 +28,7 @@ type Exercise = {
 type Response = {
   items: Exercise[];
   meta: { page: number; limit: number; total: number; totalPages: number };
-  summary: { total: number; active: number; inactive: number; withVideo: number };
+  summary: { total: number; active: number; inactive: number; withVideo: number; demoVideos?: number };
 };
 
 const PAGE_SIZE = 20;
@@ -123,7 +123,8 @@ export default function AdminExercisesPage() {
     { label: 'Total exercises', value: query.data?.summary.total ?? '—', icon: Dumbbell },
     { label: 'Active', value: query.data?.summary.active ?? '—', icon: Activity },
     { label: 'Inactive', value: query.data?.summary.inactive ?? '—', icon: Dumbbell },
-    { label: 'With video', value: query.data?.summary.withVideo ?? '—', icon: PlayCircle },
+    { label: 'With video (incl. demo)', value: query.data?.summary.withVideo ?? '—', icon: PlayCircle },
+    { label: 'Demo · testing only', value: query.data?.summary.demoVideos ?? '—', icon: PlayCircle },
   ], [query.data?.summary]);
 
   const resetFiltersSelection = () => { setSelectedIds([]); setBulkNotice(''); };
@@ -155,7 +156,7 @@ export default function AdminExercisesPage() {
       <div className="flex flex-wrap gap-2"><button type="button" onClick={() => query.refetch()} disabled={query.isFetching} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 text-sm font-semibold text-neutral-700"><RefreshCw className={cn('h-4 w-4', query.isFetching && 'animate-spin')} />Refresh</button><button type="button" onClick={() => setShowCreate(true)} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white"><Plus className="h-4 w-4" />New exercise</button></div>
     </header>
 
-    {!query.isError && <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{cards.map((card) => <div key={card.label} className="rounded-xl border border-neutral-200 bg-white p-4"><div className="flex items-center justify-between"><div><p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{card.label}</p><p className="mt-2 text-2xl font-bold text-neutral-950">{query.isLoading ? '—' : card.value}</p></div><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-neutral-50 text-neutral-600"><card.icon className="h-5 w-5" /></div></div></div>)}</section>}
+    {!query.isError && <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">{cards.map((card) => <div key={card.label} className="rounded-xl border border-neutral-200 bg-white p-4"><div className="flex items-center justify-between"><div><p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{card.label}</p><p className="mt-2 text-2xl font-bold text-neutral-950">{query.isLoading ? '—' : card.value}</p></div><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-neutral-50 text-neutral-600"><card.icon className="h-5 w-5" /></div></div></div>)}</section>}
 
     {bulkNotice && <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">{bulkNotice} Refresh your programme to recheck its readiness. You may need to change the Status filter to see updated exercises.</p>}
 
