@@ -59,13 +59,23 @@ It refuses to modify an already active programme or overwrite existing Admin
 changes. It is safe to re-run after interruption, but must not be used to
 replace clinical edits.
 
-Admin steps:
+Admin steps (the Programme screen now shows a 3-step guided checklist):
 1. Open **Admin → Programmes** and search `DRAFT-KNEE-GENERAL-30D`.
 2. Open its detail screen and inspect **all 30 day cards** and prescriptions.
+   The readiness checklist groups repeated per-day warnings by **unique exercise**.
+   The initial draft has 15 distinct exercises, reused across 112 day-exercise
+   assignments. In the initial state these generate 224 assignment-level
+   warnings: 112 inactive exercise assignments + 112 missing-video assignments.
+   Click **Edit exercise** on any checklist row to open its exercise record.
+   After saving, click **Back to programme checklist** to return.
+
 3. Open **Admin → Exercise Library** to review exercise technique, safety,
    progression and equipment, attach real clinician-approved YouTube videos,
    then activate each reviewed exercise as appropriate.
-4. In the Programme detail, verify the release readiness list is clear.
+4. Use **Recheck readiness** in the Programme checklist after adding the
+   real videos and marking clinically reviewed exercises active. All 15 unique
+   exercise rows must be ready, all 30 days present and all additional
+   configuration issues resolved.
 5. Only after an actual physiotherapist has reviewed the complete content,
    click **Record clinical sign-off** and enter clinician name + review note.
    This records the Admin account and sign-off in the audit log.
@@ -83,6 +93,8 @@ assigned to this specific programme by the normal clinical/purchase workflow.
 
 - This seed **does not generate or source any videos**.
 - No video link is a placeholder; blank means not recorded.
+- This workflow does not insert videos or claim clinical approval on behalf of
+  a clinician. The UI records genuine human sign-off, not auto-sign-off.
 - The programme is separate from existing active `AUTO-KNEE` shells. An
   existing active shell can still be chosen by old automatic matching;
   review existing active programmes and their readiness independently.
