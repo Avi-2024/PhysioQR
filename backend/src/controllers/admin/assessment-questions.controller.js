@@ -5,6 +5,7 @@ const SurgeryType = require('../../models/SurgeryType.model');
 const { writeAuditLog } = require('../../utils/auditLogger');
 const { buildSearchFilter, buildSort, paginateModel } = require('../../utils/queryHelpers');
 const asyncHandler = require('../../utils/asyncHandler');
+const { HIDDEN_PATIENT_QUESTION_TYPES } = require('../../services/patientAssessmentQuestions.service');
 
 const QUESTION_TYPES = ['single_choice', 'multiple_choice', 'yes_no', 'pain_scale', 'number', 'text', 'date', 'image'];
 const CHOICE_TYPES = ['single_choice', 'multiple_choice'];
@@ -209,6 +210,9 @@ const getAssessmentQuestionById = asyncHandler(async (req, res) => {
 
 const createAssessmentQuestion = asyncHandler(async (req, res) => {
   const payload = normalizePayload(req.body);
+  if (HIDDEN_PATIENT_QUESTION_TYPES.includes(payload.questionType)) {
+    return res.status(400).json({ message: 'Free-text and image-answer questions are retired from the patient assessment. Please choose a structured answer type.' });
+  }
   await applyCreateDefaults(payload);
   const error = await validatePayload(payload);
   if (error) return res.status(400).json({ message: error });
@@ -222,6 +226,10 @@ const updateAssessmentQuestion = asyncHandler(async (req, res) => {
   if (!question) return res.status(404).json({ message: 'Assessment question not found' });
   const payload = normalizePayload(req.body);
   const effectiveForValidation = { ...payload, questionType: payload.questionType || question.questionType, isRedFlag: payload.isRedFlag ?? question.isRedFlag };
+  if (HIDDEN_PATIENT_QUESTION_TYPES.includes(effectiveForValidation.questionType)) {
+    // Existing records may be edited for audit/history but never republished.
+    payload.isActive = false;
+  }
   const error = await validatePayload(effectiveForValidation, { partial: true, existing: question });
   if (error) return res.status(400).json({ message: error });
   if (payload.showIfQuestion && String(payload.showIfQuestion) === String(question._id)) return res.status(400).json({ message: 'A question cannot depend on itself' });
@@ -252,6 +260,9 @@ const deactivateAssessmentQuestion = asyncHandler(async (req, res) => {
 const reactivateAssessmentQuestion = asyncHandler(async (req, res) => {
   const question = await AssessmentQuestion.findById(req.params.id);
   if (!question) return res.status(404).json({ message: 'Assessment question not found' });
+  if (HIDDEN_PATIENT_QUESTION_TYPES.includes(question.questionType)) {
+    return res.status(409).json({ message: 'Free-text and image-answer questions cannot be reactivated for patients. Convert this to a structured question type first.' });
+  }
   if (question.isActive) return res.status(409).json({ message: 'Assessment question is already active' });
   const previousValue = { isActive: question.isActive };
   question.isActive = true;
