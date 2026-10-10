@@ -25,6 +25,23 @@ const isDemoExerciseVideo = (exercise) => Boolean(exercise && (
   youtubeId(exercise.videoUrl) === DEMO_VIDEO_ID
 ));
 
+// Same strict selectors for the CLI and Admin's development-only action.
+// Both fields must be empty, so an existing real link or ID is never replaced.
+const blankVideoField = (field) => ({ $or: [
+  { [field]: { $exists: false } },
+  { [field]: null },
+  { [field]: '' },
+] });
+const missingDemoVideoFilter = () => ({ $and: [
+  blankVideoField('videoUrl'),
+  blankVideoField('youtubeVideoId'),
+] });
+const installedDemoVideoFilter = () => ({
+  isDemoVideo: true,
+  videoUrl: DEMO_VIDEO_URL,
+  youtubeVideoId: DEMO_VIDEO_ID,
+});
+
 // Strip test-only video links from every non-Admin programme content response.
 // The exercise instructions remain available, but misleading sample videos do not.
 const patientSafeExercise = (exercise) => {
@@ -48,5 +65,6 @@ const patientSafeDay = (day) => {
 
 module.exports = {
   DEMO_VIDEO_ID, DEMO_VIDEO_URL, youtubeId,
+  missingDemoVideoFilter, installedDemoVideoFilter,
   isDemoExerciseVideo, patientSafeExercise, patientSafeDay,
 };
