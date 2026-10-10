@@ -8,6 +8,7 @@ import ErrorState from '@/components/feedback/ErrorState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Modal } from '@/components/ui/Modal';
 import { cn } from '@/lib/cn';
+import ProgrammeReleaseChecklist, { type ReleaseReadiness } from './ProgrammeReleaseChecklist';
 
 type Category = { _id: string; name: string; nameHindi?: string; description?: string; isActive?: boolean };
 type Exercise = { _id: string; name: string; isActive?: boolean; videoUrl?: string; painCategory?: Category | null };
@@ -21,7 +22,7 @@ type Program = {
   clinicalApprovalRequired?: boolean;
   clinicalApproval?: { clinicianName?: string; reviewNote?: string; approvedAt?: string };
 };
-type DetailResponse = { program: Program; days: Day[]; releaseReadiness?: { required: boolean; clinicalApproved: boolean; readyForSignOff: boolean; issueCount: number; issues: string[] }; metrics: { configuredDays: number; totalExercises: number; enrollments: number; activeEnrollments: number; completedEnrollments: number; pendingPaymentEnrollments: number } };
+type DetailResponse = { program: Program; days: Day[]; releaseReadiness?: ReleaseReadiness; metrics: { configuredDays: number; totalExercises: number; enrollments: number; activeEnrollments: number; completedEnrollments: number; pendingPaymentEnrollments: number } };
 type ExerciseResponse = { items: Exercise[]; meta: { total: number } };
 type CategoryOption = { _id: string; name: string };
 type DayEditorState = { day?: Day; selectedIds: string[]; doses: Record<string, DailyDose> };
@@ -153,38 +154,19 @@ export default function AdminProgramDetailPage() {
   return <div className="min-w-0 space-y-6">
     <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
       <div className="min-w-0"><button type="button" onClick={() => navigate('/admin/programs')} className="mb-3 inline-flex items-center gap-2 text-sm font-semibold text-neutral-500 hover:text-neutral-900"><ArrowLeft className="h-4 w-4" />Programs</button><div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-bold tracking-tight text-neutral-950 sm:text-3xl">{program.name}</h1><span className={cn('rounded-full px-2.5 py-1 text-xs font-semibold', program.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-neutral-100 text-neutral-600')}>{program.isActive ? 'Active' : 'Inactive'}</span></div><p className="mt-2 text-sm text-neutral-500">{program.programCode || 'No program code'} · {program.painCategory?.name || 'No pain category'} · {labelize(program.difficultyLevel)}</p></div>
-      <div className="flex flex-wrap gap-2"><button type="button" onClick={() => query.refetch()} disabled={query.isFetching} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 text-sm font-semibold text-neutral-700"><RefreshCw className={cn('h-4 w-4', query.isFetching && 'animate-spin')} />Refresh</button><button type="button" onClick={() => setShowEdit(true)} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 text-sm font-semibold text-neutral-700"><Edit3 className="h-4 w-4" />Edit program</button><button type="button" onClick={() => setShowStatus(true)} className={cn('min-h-11 rounded-lg px-4 text-sm font-semibold text-white', program.isActive ? 'bg-neutral-800' : 'bg-primary-600')}>{program.isActive ? 'Deactivate' : program.clinicalApprovalRequired ? 'Publish after approval' : 'Reactivate'}</button></div>
+      <div className="flex flex-wrap gap-2"><button type="button" onClick={() => query.refetch()} disabled={query.isFetching} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 text-sm font-semibold text-neutral-700"><RefreshCw className={cn('h-4 w-4', query.isFetching && 'animate-spin')} />Refresh</button><button type="button" onClick={() => setShowEdit(true)} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 text-sm font-semibold text-neutral-700"><Edit3 className="h-4 w-4" />Edit program</button>{(!program.clinicalApprovalRequired || program.isActive) && <button type="button" onClick={() => { setFormError(''); setShowStatus(true); }} className={cn('min-h-11 rounded-lg px-4 text-sm font-semibold text-white', program.isActive ? 'bg-neutral-800' : 'bg-primary-600')}>{program.isActive ? 'Deactivate' : 'Reactivate'}</button>}</div>
     </header>
 
-    {program.clinicalApprovalRequired && <section className="rounded-xl border border-amber-200 bg-amber-50 p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-wider text-amber-800">Clinical Draft — patient publication locked</p>
-          <h2 className="mt-1 text-lg font-bold text-neutral-950">30-Day Content & Clinical Sign-off</h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-amber-950">
-            Videos and exercise instructions must be checked for every day. A real clinician must review and sign off the plan.
-            The programme remains inactive until Admin separately publishes it.
-          </p>
-          <p className="mt-2 text-sm font-semibold text-amber-900">
-            {query.data?.releaseReadiness?.issueCount || 0} content readiness issue(s) ·
-            {program.clinicalApproval?.approvedAt ? ` Signed off by ${program.clinicalApproval.clinicianName}` : ' Clinical review not signed off'}
-          </p>
-        </div>
-        <button type="button" disabled={program.isActive || !query.data?.releaseReadiness?.readyForSignOff}
-          onClick={() => { setFormError(''); setShowClinicalSignoff(true); }}
-          className="min-h-11 rounded-lg bg-neutral-900 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">
-          Record clinical sign-off
-        </button>
-      </div>
-      {(query.data?.releaseReadiness?.issues || []).length > 0 && <div className="mt-4 rounded-lg border border-amber-200 bg-white p-3">
-        <p className="text-xs font-bold text-amber-900">Complete these items before review:</p>
-        <ul className="mt-2 max-h-44 list-disc space-y-1 overflow-auto pl-5 text-xs leading-5 text-neutral-700">
-          {query.data?.releaseReadiness?.issues.map((issue) => <li key={issue}>{issue}</li>)}
-        </ul>
-        {(query.data?.releaseReadiness?.issueCount || 0) > (query.data?.releaseReadiness?.issues.length || 0) &&
-          <p className="mt-2 text-xs text-neutral-500">More issues exist. Add approved videos and activate reviewed exercises, then refresh.</p>}
-      </div>}
-    </section>}
+    {program.clinicalApprovalRequired && <ProgrammeReleaseChecklist
+      programId={programId}
+      isActive={program.isActive}
+      clinicalApproval={program.clinicalApproval}
+      readiness={query.data?.releaseReadiness}
+      isRefreshing={query.isFetching}
+      onRefresh={() => { query.refetch(); }}
+      onSignoff={() => { setFormError(''); setShowClinicalSignoff(true); }}
+      onPublish={() => { setFormError(''); setShowStatus(true); }}
+    />}
 
     <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{cards.map((card) => <div key={card.label} className="rounded-xl border border-neutral-200 bg-white p-4"><div className="flex items-center justify-between"><div><p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{card.label}</p><p className="mt-2 text-2xl font-bold text-neutral-950">{card.value}</p></div><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-neutral-50 text-neutral-600"><card.icon className="h-5 w-5" /></div></div></div>)}</section>
 
