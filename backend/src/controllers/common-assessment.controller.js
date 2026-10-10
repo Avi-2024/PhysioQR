@@ -7,6 +7,7 @@ const PatientAssessment = require('../models/PatientAssessment.model');
 const notificationService = require('../services/notification.service');
 const { writeAuditLog } = require('../utils/auditLogger');
 const asyncHandler = require('../utils/asyncHandler');
+const { isRegionVisibleForCase, isSurgeryVisible } = require('../services/assessmentVisibility.service');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const ALLOWED_SIDES = ['right', 'left', 'both', 'not_applicable'];
@@ -110,9 +111,12 @@ const loadPathwayContext = async ({ caseTypeId, bodyRegionId, surgeryTypeId, sur
   if (caseTypeId && !caseType) return { error: 'Selected case type is invalid or inactive' };
 
   const bodyRegion = bodyRegionId
-    ? await PainCategory.findOne({ _id: bodyRegionId, isActive: true }).select('_id name').lean()
+    ? await PainCategory.findOne({ _id: mongoose.isValidObjectId(bodyRegionId) ? bodyRegionId : null, isActive: true }).select('_id name isActive assessmentVisibility').lean()
     : null;
   if (bodyRegionId && !bodyRegion) return { error: 'Selected body region is invalid or inactive' };
+  if (bodyRegion && caseType && !isRegionVisibleForCase(bodyRegion, caseType)) {
+    return { error: 'This body region is not yet available for the selected assessment pathway' };
+  }
 
   let surgeryType = null;
   let parsedSurgeryDate;
@@ -120,7 +124,7 @@ const loadPathwayContext = async ({ caseTypeId, bodyRegionId, surgeryTypeId, sur
     if (!bodyRegion) return { error: 'Select the operated body region' };
     if (!surgeryTypeId) return { error: 'Select the surgery type' };
     surgeryType = await SurgeryType.findOne({ _id: surgeryTypeId, bodyRegion: bodyRegion._id, isActive: true }).lean();
-    if (!surgeryType) return { error: 'Selected surgery type is invalid for this body region' };
+    if (!surgeryType || !isSurgeryVisible(surgeryType)) return { error: 'Selected surgery type is not available for new assessments' };
     if (!surgeryDate) return { error: 'Surgery date is required' };
     parsedSurgeryDate = new Date(surgeryDate);
     if (Number.isNaN(parsedSurgeryDate.getTime())) return { error: 'Enter a valid surgery date' };
@@ -161,6 +165,29 @@ const getCommonQuestions = asyncHandler(async (req, res) => {
       requiresSurgeryDetails: Boolean(surgeryTypeId),
     }).sort({ displayOrder: 1, createdAt: 1 }).select('_id').lean();
     resolvedCaseTypeId = inferredCaseType?._id;
+  }
+
+  // The questions endpoint is public. It must apply the same publication
+  // rules as assessment submission, not just rely on frontend filtering.
+  if (bodyRegionId) {
+    const selectedCase = resolvedCaseTypeId && mongoose.isValidObjectId(resolvedCaseTypeId)
+      ? await CaseType.findOne({ _id: resolvedCaseTypeId, isActive: true }).lean()
+      : null;
+    const selectedRegion = mongoose.isValidObjectId(bodyRegionId)
+      ? await PainCategory.findOne({ _id: bodyRegionId, isActive: true })
+        .select('_id name isActive assessmentVisibility').lean()
+      : null;
+    if (!isRegionVisibleForCase(selectedRegion, selectedCase)) {
+      return res.status(400).json({ message: 'Selected body region is not available for this assessment pathway' });
+    }
+    if (selectedCase.requiresSurgeryDetails) {
+      const surgery = surgeryTypeId && mongoose.isValidObjectId(surgeryTypeId)
+        ? await SurgeryType.findOne({ _id: surgeryTypeId, bodyRegion: selectedRegion._id, isActive: true }).lean()
+        : null;
+      if (!isSurgeryVisible(surgery)) {
+        return res.status(400).json({ message: 'Selected surgery is not available for new assessments' });
+      }
+    }
   }
 
   const questions = await AssessmentQuestion.find(questionScopeFilter({
