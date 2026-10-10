@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Activity, Dumbbell, Edit3, PlayCircle, RefreshCw, ShieldCheck } from 'lucide-react';
 import apiClient from '@/lib/api-client';
 import ErrorState from '@/components/feedback/ErrorState';
@@ -24,6 +24,9 @@ const csv = (values?: string[]) => values?.join(', ') || '';
 export default function AdminExerciseDetailPage() {
   const { exerciseId = '' } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const programmeId = searchParams.get('programme') || '';
+  const returnToProgramme = /^[a-f0-9]{24}$/i.test(programmeId) ? `/admin/programs/${programmeId}` : '';
   const queryClient = useQueryClient();
   const [showEdit, setShowEdit] = useState(false);
   const [showStatus, setShowStatus] = useState(false);
@@ -74,7 +77,7 @@ export default function AdminExerciseDetailPage() {
   };
 
   return <div className="min-w-0 space-y-6">
-    <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div><button type="button" onClick={() => navigate('/admin/exercises')} className="mb-3 inline-flex items-center gap-2 text-sm font-semibold text-neutral-500"><ArrowLeft className="h-4 w-4" />Exercises</button><div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-bold tracking-tight text-neutral-950 sm:text-3xl">{exercise.name}</h1><span className={cn('rounded-full px-2.5 py-1 text-xs font-semibold', exercise.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-neutral-100 text-neutral-600')}>{exercise.isActive ? 'Active' : 'Inactive'}</span></div><p className="mt-2 text-sm text-neutral-500">{exercise.painCategory?.name || 'General / cross-category'} · {exercise.language === 'hi' ? 'Hindi' : 'English'}</p></div><div className="flex flex-wrap gap-2"><button onClick={() => query.refetch()} disabled={query.isFetching} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 text-sm font-semibold text-neutral-700"><RefreshCw className={cn('h-4 w-4', query.isFetching && 'animate-spin')} />Refresh</button><button onClick={() => setShowEdit(true)} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 text-sm font-semibold text-neutral-700"><Edit3 className="h-4 w-4" />Edit</button><button onClick={() => setShowStatus(true)} className={cn('min-h-11 rounded-lg px-4 text-sm font-semibold text-white', exercise.isActive ? 'bg-neutral-800' : 'bg-primary-600')}>{exercise.isActive ? 'Deactivate' : 'Reactivate'}</button></div></header>
+    <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div><button type="button" onClick={() => navigate(returnToProgramme || '/admin/exercises')} className="mb-3 inline-flex items-center gap-2 text-sm font-semibold text-neutral-500"><ArrowLeft className="h-4 w-4" />{returnToProgramme ? 'Back to programme checklist' : 'Exercises'}</button><div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-bold tracking-tight text-neutral-950 sm:text-3xl">{exercise.name}</h1><span className={cn('rounded-full px-2.5 py-1 text-xs font-semibold', exercise.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-neutral-100 text-neutral-600')}>{exercise.isActive ? 'Active' : 'Inactive'}</span></div><p className="mt-2 text-sm text-neutral-500">{exercise.painCategory?.name || 'General / cross-category'} · {exercise.language === 'hi' ? 'Hindi' : 'English'}</p></div><div className="flex flex-wrap gap-2"><button onClick={() => query.refetch()} disabled={query.isFetching} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 text-sm font-semibold text-neutral-700"><RefreshCw className={cn('h-4 w-4', query.isFetching && 'animate-spin')} />Refresh</button><button onClick={() => setShowEdit(true)} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 text-sm font-semibold text-neutral-700"><Edit3 className="h-4 w-4" />Edit</button><button onClick={() => setShowStatus(true)} className={cn('min-h-11 rounded-lg px-4 text-sm font-semibold text-white', exercise.isActive ? 'bg-neutral-800' : 'bg-primary-600')}>{exercise.isActive ? 'Deactivate' : 'Reactivate'}</button></div></header>
 
     <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{cards.map((card) => <div key={card.label} className="rounded-xl border border-neutral-200 bg-white p-4"><div className="flex items-center justify-between"><div><p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{card.label}</p><p className="mt-2 text-2xl font-bold text-neutral-950">{card.value}</p></div><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-neutral-50 text-neutral-600"><card.icon className="h-5 w-5" /></div></div></div>)}</section>
 
