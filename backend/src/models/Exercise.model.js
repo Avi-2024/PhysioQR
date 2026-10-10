@@ -3,6 +3,8 @@ const mongoose = require('mongoose');
 // A single exercise (video + instructions)
 const exerciseSchema = new mongoose.Schema({
   name: { type: String, required: true },
+  // Stable seed identity. Existing clinical exercises have no seed key.
+  seedKey: { type: String, unique: true, sparse: true },
   nameHindi: String,
   description: String,
   videoUrl: String,       // YouTube unlisted URL
@@ -27,10 +29,16 @@ const programDaySchema = new mongoose.Schema({
   program: { type: mongoose.Schema.Types.ObjectId, ref: 'Program', required: true },
   dayNumber: { type: Number, required: true },
   title: String,
+  focus: String,
   exercises: [
     {
       exercise: { type: mongoose.Schema.Types.ObjectId, ref: 'Exercise' },
       displayOrder: Number,
+      // Daily dosage overrides keep progression attached to the programme day.
+      sets: Number,
+      repetitions: Number,
+      holdDuration: String,
+      restDuration: String,
     },
   ],
   isActive: { type: Boolean, default: true },
