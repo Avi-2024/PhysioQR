@@ -138,6 +138,9 @@ export default function ProgrammeDayPage() {
             <p className="mt-2 text-sm leading-6 text-neutral-600">
               {text(program.name, 'Rehabilitation programme')} · {exercises.length} exercise{exercises.length === 1 ? '' : 's'} assigned
             </p>
+            {Boolean(programDay.focus) && <p className="mt-2 max-w-2xl rounded-lg border border-emerald-100 bg-white/70 px-3 py-2 text-xs leading-5 text-neutral-700">
+              <strong>Today's focus:</strong> {text(programDay.focus)}
+            </p>}
 
             <div className="mt-5 max-w-xl">
               <div className="mb-2 flex items-center justify-between text-xs font-semibold">
