@@ -4,7 +4,7 @@ const PainCategory = require('../models/PainCategory.model');
 const { writeAuditLog } = require('../utils/auditLogger');
 const asyncHandler = require('../utils/asyncHandler');
 const { EXERCISE_PREFIX } = require('../data/generalKnee30DayDraft');
-const { DEMO_VIDEO_ID, DEMO_VIDEO_URL, patientSafeExercise, missingDemoVideoFilter, installedDemoVideoFilter } = require('../services/demoExerciseVideo.service');
+const { DEMO_VIDEO_ID, DEMO_VIDEO_URL, isDemoExerciseVideo, patientSafeExercise, missingDemoVideoFilter, installedDemoVideoFilter, pendingDemoVideoFilter } = require('../services/demoExerciseVideo.service');
 // Draft-seeded content is delivered only via an authorised patient prescription,
 // never through the generic exercise catalogue or exercise detail API.
 const privateSeedPattern = new RegExp('^' + EXERCISE_PREFIX); // Prefix is fixed alphanumeric/underscore text.
@@ -41,7 +41,7 @@ const normalizeExercisePayload = (body = {}) => {
         throw error;
       }
       payload.youtubeVideoId = videoId;
-      payload.isDemoVideo = (videoId === DEMO_VIDEO_ID);
+      payload.isDemoVideo = isDemoExerciseVideo({ youtubeVideoId: videoId });
     } else {
       payload.youtubeVideoId = '';
       payload.isDemoVideo = false;
@@ -236,7 +236,7 @@ const manageDemoExerciseVideos = asyncHandler(async (req, res) => {
   if (!['apply', 'remove'].includes(action)) {
     return res.status(400).json({ message: 'Action must be apply or remove' });
   }
-  const filter = action === 'apply' ? missingDemoVideoFilter() : installedDemoVideoFilter();
+  const filter = action === 'apply' ? pendingDemoVideoFilter() : installedDemoVideoFilter();
   const change = action === 'apply'
     ? { videoUrl: DEMO_VIDEO_URL, youtubeVideoId: DEMO_VIDEO_ID, isDemoVideo: true }
     : { videoUrl: '', youtubeVideoId: '', isDemoVideo: false };
@@ -256,7 +256,7 @@ const manageDemoExerciseVideos = asyncHandler(async (req, res) => {
 
   res.json({
     message: action === 'apply'
-      ? `Demo YouTube URL added to ${modified} exercises. Real videos preserved. Clinical approval remains locked.`
+      ? `Requested YouTube URL added/updated for ${modified} exercises (blank videos and previous demo only). Real videos preserved. Clinical approval remains locked.`
       : `Demo YouTube URLs removed from ${modified} exercises. Real videos preserved.`,
     action, matched: Number(result.matchedCount || 0), changed: modified,
     realVideosOverwritten: 0, programmePublished: false,
