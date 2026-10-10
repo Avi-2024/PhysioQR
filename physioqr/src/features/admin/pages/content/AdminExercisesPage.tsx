@@ -53,6 +53,8 @@ export default function AdminExercisesPage() {
   const [bulkNotice, setBulkNotice] = useState('');
   const [demoAction, setDemoAction] = useState<'apply' | 'remove' | null>(null);
   const [demoError, setDemoError] = useState('');
+  const [kneeVideoModal, setKneeVideoModal] = useState(false);
+  const [kneeVideoError, setKneeVideoError] = useState('');
 
   const query = useQuery<Response>({
     queryKey: ['admin-exercises', page, deferredSearch, status, categoryId, language, video],
@@ -102,6 +104,25 @@ export default function AdminExercisesPage() {
     setDemoError('');
     setDemoAction(action);
   };
+
+  const kneeVideoMutation = useMutation({
+    mutationFn: () => apiClient.post('/exercises/knee-draft-video-candidates', {
+      acknowledgeReviewPending: true,
+    }),
+    onSuccess: async (response) => {
+      setKneeVideoModal(false);
+      setKneeVideoError('');
+      setBulkNotice(response.data?.message || 'Knee exercise video candidates assigned.');
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['admin-exercises'] }),
+        queryClient.invalidateQueries({ queryKey: ['admin-exercise'] }),
+        queryClient.invalidateQueries({ queryKey: ['admin-program'] }),
+        queryClient.invalidateQueries({ queryKey: ['admin-programs'] }),
+      ]);
+    },
+    onError: (error: any) => setKneeVideoError(error?.response?.data?.message ||
+      'Unable to assign Knee exercise videos. Check the inactive draft and backend connection.'),
+  });
 
   const visibleItems = query.data?.items || [];
   const visibleIds = visibleItems.map((item) => item._id);
@@ -177,7 +198,10 @@ export default function AdminExercisesPage() {
   return <div className="min-w-0 space-y-6">
     <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
       <div><p className="text-xs font-bold uppercase tracking-[0.16em] text-primary-700">Clinical content</p><h1 className="mt-2 text-2xl font-bold tracking-tight text-neutral-950 sm:text-3xl">Exercises</h1><p className="mt-1 max-w-3xl text-sm leading-6 text-neutral-500">Manage reusable rehabilitation exercises used inside program days. Keep instructions, safety guidance and video metadata clinically clear.</p></div>
-      <div className="flex flex-wrap gap-2"><button type="button" onClick={() => query.refetch()} disabled={query.isFetching} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 text-sm font-semibold text-neutral-700"><RefreshCw className={cn('h-4 w-4', query.isFetching && 'animate-spin')} />Refresh</button><button type="button" onClick={() => openDemoAction('apply')} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 text-sm font-semibold text-amber-900 hover:bg-amber-100"><PlayCircle className="h-4 w-4" />Add Demo YouTube URLs</button>{(query.data?.summary.demoVideos || 0) > 0 && <button type="button" onClick={() => openDemoAction('remove')} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-neutral-300 bg-white px-3 text-sm font-semibold text-neutral-700">Remove demo links</button>}<button type="button" onClick={() => setShowCreate(true)} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white"><Plus className="h-4 w-4" />New exercise</button></div>
+      <div className="flex flex-wrap gap-2"><button type="button" onClick={() => query.refetch()} disabled={query.isFetching} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 text-sm font-semibold text-neutral-700"><RefreshCw className={cn('h-4 w-4', query.isFetching && 'animate-spin')} />Refresh</button><button type="button" onClick={() => { setKneeVideoError(''); setKneeVideoModal(true); }}
+      className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-4 text-sm font-semibold text-emerald-900 hover:bg-emerald-100">
+      <PlayCircle className="h-4 w-4"/>15 unique Knee videos
+    </button><button type="button" onClick={() => openDemoAction('apply')} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 text-sm font-semibold text-amber-900 hover:bg-amber-100"><PlayCircle className="h-4 w-4" />Add Demo YouTube URLs</button>{(query.data?.summary.demoVideos || 0) > 0 && <button type="button" onClick={() => openDemoAction('remove')} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-neutral-300 bg-white px-3 text-sm font-semibold text-neutral-700">Remove demo links</button>}<button type="button" onClick={() => setShowCreate(true)} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white"><Plus className="h-4 w-4" />New exercise</button></div>
     </header>
 
     {!query.isError && <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">{cards.map((card) => <div key={card.label} className="rounded-xl border border-neutral-200 bg-white p-4"><div className="flex items-center justify-between"><div><p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{card.label}</p><p className="mt-2 text-2xl font-bold text-neutral-950">{query.isLoading ? '—' : card.value}</p></div><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-neutral-50 text-neutral-600"><card.icon className="h-5 w-5" /></div></div></div>)}</section>}
@@ -217,6 +241,30 @@ export default function AdminExercisesPage() {
         <div className="flex items-center justify-between border-t border-neutral-200 px-4 py-3 sm:px-5"><p className="text-xs text-neutral-500">Page {query.data.meta.page} of {Math.max(query.data.meta.totalPages, 1)}</p><div className="flex gap-2"><button disabled={query.data.meta.page <= 1} onClick={() => { clearSelection(); setPage((value) => Math.max(1, value - 1)); }} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-neutral-200 disabled:opacity-40"><ChevronLeft className="h-4 w-4" /></button><button disabled={query.data.meta.page >= query.data.meta.totalPages} onClick={() => { clearSelection(); setPage((value) => value + 1); }} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-neutral-200 disabled:opacity-40"><ChevronRight className="h-4 w-4" /></button></div></div>
       </>}
     </section>
+
+    <Modal isOpen={kneeVideoModal} onClose={() => { if (!kneeVideoMutation.isPending) setKneeVideoModal(false); }}
+      title="Assign 15 different Knee exercise videos?" size="md">
+      <div className="space-y-4 pt-4">
+        <p className="text-sm leading-6 text-neutral-700">
+          Assign 15 different exercise-matched YouTube demonstrations to the General Knee Pain 30-day clinical draft.
+          Only blank video fields and old PhysioQR sample links will be updated. Real/custom video links are preserved.
+        </p>
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-950">
+          <strong>Candidate videos — clinical review pending.</strong> These are external educational demonstrations, not approved personalised prescriptions.
+          Each exercise video must be reviewed by a qualified physiotherapist. Patients cannot see these candidates, and publishing stays locked.
+        </div>
+        {kneeVideoError && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{kneeVideoError}</p>}
+        <div className="flex justify-end gap-2">
+          <button type="button" disabled={kneeVideoMutation.isPending} onClick={() => setKneeVideoModal(false)}
+            className="min-h-10 rounded-lg border border-neutral-300 px-4 text-sm font-semibold text-neutral-700">Cancel</button>
+          <button type="button" disabled={kneeVideoMutation.isPending}
+            onClick={() => kneeVideoMutation.mutate()}
+            className="min-h-10 rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white disabled:opacity-40">
+            {kneeVideoMutation.isPending ? 'Assigning…' : 'Assign 15 review-pending videos'}
+          </button>
+        </div>
+      </div>
+    </Modal>
 
     <Modal isOpen={demoAction !== null} onClose={() => { if (!demoMutation.isPending) { setDemoAction(null); setDemoError(''); } }}
       title={demoAction === 'apply' ? 'Add demo YouTube URLs to exercises?' : 'Remove testing-only demo videos?'} size="md">
