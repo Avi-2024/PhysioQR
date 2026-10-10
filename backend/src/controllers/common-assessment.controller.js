@@ -8,6 +8,7 @@ const notificationService = require('../services/notification.service');
 const { writeAuditLog } = require('../utils/auditLogger');
 const asyncHandler = require('../utils/asyncHandler');
 const { isRegionVisibleForCase, isSurgeryVisible } = require('../services/assessmentVisibility.service');
+const { patientQuestionTypeFilter } = require('../services/patientAssessmentQuestions.service');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const ALLOWED_SIDES = ['right', 'left', 'both', 'not_applicable'];
@@ -100,7 +101,9 @@ const questionScopeFilter = ({ caseTypeId, bodyRegionId, surgeryTypeId }) => {
   if (caseTypeId) scopes.push({ scopeType: 'case_type', caseType: caseTypeId });
   if (bodyRegionId) scopes.push({ scopeType: 'body_region', bodyRegion: bodyRegionId });
   if (surgeryTypeId) scopes.push({ scopeType: 'surgery_type', surgeryType: surgeryTypeId });
-  return { isActive: true, $or: scopes };
+  // Apply to both GET /questions and POST /submit so hidden free-writing
+  // questions cannot be submitted by bypassing the frontend.
+  return { isActive: true, ...patientQuestionTypeFilter(), $or: scopes };
 };
 
 const loadPathwayContext = async ({ caseTypeId, bodyRegionId, surgeryTypeId, surgeryDate, side }, { requireCaseType = true } = {}) => {
