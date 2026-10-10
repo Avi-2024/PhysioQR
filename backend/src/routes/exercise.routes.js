@@ -8,6 +8,7 @@ const {
   getExerciseById,
   updateExercise,
   setExerciseStatus,
+  bulkSetExerciseStatus,
   deleteExercise,
 } = require('../controllers/exercise.controller');
 
@@ -34,12 +35,23 @@ const exerciseBodySchema = {
 
 router.get('/', getExercises);
 router.post('/', authorize('admin'), validateSchema({ body: { ...exerciseBodySchema, name: { ...exerciseBodySchema.name, required: true } } }), createExercise);
+// Must precede /:id so the bulk action cannot be mistaken for an exercise ID.
+router.post(
+  '/bulk-status',
+  authorize('admin'),
+  validateSchema({ body: {
+    exerciseIds: { type: 'array', min: 1, max: 100, required: true },
+    action: { type: 'enum', values: ['activate', 'deactivate'], required: true },
+    reason: { type: 'string', max: 500 },
+  } }),
+  bulkSetExerciseStatus,
+);
 router.get('/:id', validateSchema({ params: { id: { type: 'objectId', required: true } } }), getExerciseById);
 router.put('/:id', authorize('admin'), validateSchema({ params: { id: { type: 'objectId', required: true } }, body: exerciseBodySchema }), updateExercise);
 router.post(
   '/:id/:action(deactivate|reactivate)',
   authorize('admin'),
-  validateSchema({ params: { id: { type: 'objectId', required: true } }, body: { reason: { type: 'string', max: 500, required: true } } }),
+  validateSchema({ params: { id: { type: 'objectId', required: true } }, body: { reason: { type: 'string', max: 500 } } }),
   setExerciseStatus
 );
 // Kept for older clients; admin UI uses the explicit lifecycle route above.
