@@ -21,6 +21,7 @@ try {
     if (request === '../models/Exercise.model') return { Exercise, ProgramDay: {} };
     if (request === '../models/PainCategory.model') return {};
     if (request === '../utils/auditLogger') return { writeAuditLog: async (value) => { audits.push(value); } };
+    if (request === '../services/kneeVideoCandidateMapping.service') return { assignKneeVideoCandidates: async () => ({ changed: 0, programmeCode: 'DRAFT-KNEE-GENERAL-30D' }) };
     if (request === '../utils/asyncHandler') return (handler) => handler;
     return originalLoad.apply(this, arguments);
   };
