@@ -6,6 +6,7 @@ const { ProgramDay } = require('../../models/Exercise.model');
 const { writeAuditLog } = require('../../utils/auditLogger');
 const { getPagination } = require('../../utils/queryHelpers');
 const asyncHandler = require('../../utils/asyncHandler');
+const { getProgrammeReleaseReadiness, ensureApprovedRelease } = require('../../services/programmeReleaseGate.service');
 
 const DIFFICULTY_LEVELS = [
   'beginner', 'intermediate', 'advanced', 'senior_friendly',
@@ -153,9 +154,17 @@ const getProgramById = asyncHandler(async (req, res) => {
   ]);
 
   const enrollment = enrollmentSummary[0] || { total: 0, active: 0, completed: 0, pendingPayment: 0 };
+  const releaseIssues = program.clinicalApprovalRequired ? await getProgrammeReleaseReadiness(program) : [];
   res.json({
     program,
     days,
+    releaseReadiness: {
+      required: Boolean(program.clinicalApprovalRequired),
+      clinicalApproved: Boolean(program.clinicalApproval?.approvedAt),
+      readyForSignOff: Boolean(program.clinicalApprovalRequired) && releaseIssues.length === 0,
+      issueCount: releaseIssues.length,
+      issues: releaseIssues.slice(0, 15),
+    },
     metrics: {
       configuredDays: days.length,
       totalExercises: days.reduce((sum, day) => sum + (day.exercises?.length || 0), 0),
@@ -185,6 +194,7 @@ const updateProgram = asyncHandler(async (req, res) => {
   const error = await validatePayload(payload, { partial: true, programId: program._id });
   if (error) return res.status(400).json({ message: error });
 
+  if (payload.isActive === true && !program.isActive) await ensureApprovedRelease(program);
   const previousValue = program.toObject();
   Object.assign(program, payload);
   // Keep any historical field out of active content configuration.
@@ -201,6 +211,7 @@ const setProgramStatus = asyncHandler(async (req, res) => {
 
   const nextActive = req.params.action === 'reactivate';
   if (program.isActive === nextActive) return res.status(409).json({ message: `Program is already ${nextActive ? 'active' : 'inactive'}` });
+  if (nextActive) await ensureApprovedRelease(program);
 
   const previousValue = { isActive: program.isActive };
   program.isActive = nextActive;
@@ -213,4 +224,37 @@ const setProgramStatus = asyncHandler(async (req, res) => {
   res.json({ message: `Program ${nextActive ? 'reactivated' : 'deactivated'}`, program });
 });
 
-module.exports = { getPrograms, getProgramById, createProgram, updateProgram, setProgramStatus };
+// Admin records a real clinician's sign-off, not a system-generated approval.
+// All 30 days, active exercises, safety instructions, and real video URLs must
+// exist before this action succeeds. Never auto-approve from a seed.
+const recordProgrammeClinicalApproval = asyncHandler(async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid programme ID' });
+  const program = await Program.findById(req.params.id);
+  if (!program) return res.status(404).json({ message: 'Programme not found' });
+  if (!program.clinicalApprovalRequired) return res.status(400).json({ message: 'Clinical sign-off is not enabled for this programme' });
+  if (program.isActive) return res.status(409).json({ message: 'Deactivate the programme before changing clinical sign-off' });
+  const clinicianName = String(req.body.clinicianName || '').trim();
+  const reviewNote = String(req.body.reviewNote || '').trim();
+  if (clinicianName.length < 3 || clinicianName.length > 160 || reviewNote.length < 10 || reviewNote.length > 2000) {
+    return res.status(400).json({ message: 'Provide the reviewing clinician name (3+ chars) and meaningful review note (10+ chars)' });
+  }
+  const issues = await getProgrammeReleaseReadiness(program);
+  if (issues.length) return res.status(409).json({
+    message: 'Complete and review all programme days, active exercises and videos before sign-off',
+    issueCount: issues.length, issues: issues.slice(0, 15),
+  });
+  const previousValue = program.clinicalApproval;
+  program.clinicalApproval = {
+    clinicianName, reviewNote, approvedAt: new Date(), recordedBy: req.user._id,
+  };
+  await program.save();
+  await writeAuditLog({
+    req, action: 'programme_clinical_signoff_recorded', module: 'Program',
+    recordId: program._id, previousValue,
+    newValue: program.clinicalApproval,
+    reason: reviewNote,
+  });
+  res.json({ message: 'Clinical sign-off recorded. Programme is still inactive until separately published.', program });
+});
+
+module.exports = { getPrograms, getProgramById, createProgram, updateProgram, setProgramStatus, recordProgrammeClinicalApproval };
