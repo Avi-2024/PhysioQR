@@ -9,6 +9,8 @@ const surgeryTypeSchema = new mongoose.Schema({
   requiresPhysioReview: { type: Boolean, default: true },
   displayOrder: { type: Number, default: 0 },
   isActive: { type: Boolean, default: true },
+  // Missing value uses Phase 1 defaults; Admin can publish each surgery later.
+  assessmentPublished: Boolean,
 }, { timestamps: true });
 
 surgeryTypeSchema.index({ bodyRegion: 1, isActive: 1, displayOrder: 1, name: 1 });
