@@ -39,8 +39,8 @@ type Prescription = {
   enrollment?: { id?: string; currentDay?: number; completionPercentage?: number };
   patient?: { patientId?: string; fullName?: string; mobile?: string; age?: number; dateOfBirth?: string; gender?: string };
   doctor?: { doctorId?: string; fullName?: string; qualification?: string; specialization?: string; clinicName?: string; clinicAddress?: string; city?: string; state?: string; postalCode?: string; clinicContact?: string };
-  program?: { programCode?: string; name?: string; nameHindi?: string; description?: string; durationDays?: number };
-  day?: { id?: string; dayNumber?: number; title?: string; exercises?: Array<{ displayOrder?: number; exercise?: ApiRecord | null }> };
+  program?: { programCode?: string; name?: string; nameHindi?: string; description?: string; instructions?: string; precautions?: string; durationDays?: number };
+  day?: { id?: string; dayNumber?: number; title?: string; focus?: string; exercises?: Array<{ displayOrder?: number; exercise?: ApiRecord | null }> };
 };
 
 export default function PatientProgrammePage() {
@@ -220,6 +220,9 @@ export default function PatientProgrammePage() {
                 Day {currentDay}{day?.title ? ` · ${day.title}` : ''}
               </h2>
               <p className="mt-1 text-sm text-neutral-500">{program.description || 'Your prescribed exercises for this recovery day.'}</p>
+              {day?.focus && <p className="mt-2 text-xs font-semibold leading-5 text-emerald-800">Today's focus: {day.focus}</p>}
+              {program.instructions && <p className="mt-2 text-xs leading-5 text-neutral-600">{program.instructions}</p>}
+              {program.precautions && <p className="mt-2 rounded-lg border border-amber-100 bg-amber-50 p-3 text-xs leading-5 text-amber-900"><strong>Precautions:</strong> {program.precautions}</p>}
             </div>
             <div className="inline-flex items-center gap-2 self-start rounded-full bg-neutral-100 px-3 py-1.5 text-xs font-bold text-neutral-600 sm:self-auto">
               <Video className="h-3.5 w-3.5" />
