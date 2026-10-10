@@ -6,6 +6,26 @@ The demo URL is YouTube's IFrame API sample:
 (see Google Developers' IFrame Player API documentation).
 It demonstrates embedded playback, not physiotherapy technique.
 
+## Easiest: use the Admin Panel (no separate DB script)
+
+1. Pull the latest GitHub `main`, then restart backend and frontend.
+2. Sign in as Admin, open **Exercises**.
+3. Click **Add Demo YouTube URLs**, review the test-only warning and confirm.
+4. The API operates on the same MongoDB connection as your running
+   `/api/exercises` listing, including exercises on later pages.
+5. The success message says how many records changed; refresh or filter by
+   **Video: With video** and check the **Demo · testing only** count.
+6. Use **Remove demo links** to reverse the exact test-only URLs.
+
+If `NODE_ENV=production`, the API returns HTTP 403 intentionally.
+This feature must not be used on a live patient production environment.
+
+**Important:** A GitHub commit never populates the database by itself.
+The old CLI defaults to preview only unless `--apply` is provided.
+If 0 records change, ensure the Exercises page and the script use the same
+MongoDB database and that exercises' `videoUrl` / `youtubeVideoId` are both empty.
+The UI action uses the API database directly to avoid that mismatch.
+
 ## Safe workflow
 
 In `backend`, with `MONGO_URI` configured for your **development** database:
