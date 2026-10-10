@@ -38,7 +38,8 @@ export default function AdminProgramDetailPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [showEdit, setShowEdit] = useState(false);
-  const [showStatus, setShowStatus] = useState(false);
+  const [statusError, setStatusError] = useState('');
+  const [statusNotice, setStatusNotice] = useState('');
   const [showClinicalSignoff, setShowClinicalSignoff] = useState(false);
   const [dayEditor, setDayEditor] = useState<DayEditorState | null>(null);
   const [formError, setFormError] = useState('');
@@ -71,9 +72,20 @@ export default function AdminProgramDetailPage() {
     onError: (error: any) => setFormError(error?.response?.data?.message || 'Program could not be updated.'),
   });
   const statusMutation = useMutation({
-    mutationFn: ({ action, reason }: { action: 'deactivate' | 'reactivate'; reason: string }) => apiClient.post(`/admin/programs/${programId}/${action}`, { reason }),
-    onSuccess: () => { setShowStatus(false); setFormError(''); refreshRelated(); },
-    onError: (error: any) => setFormError(error?.response?.data?.message || 'Program status could not be updated.'),
+    mutationFn: (action: 'deactivate' | 'reactivate') => apiClient.post(`/admin/programs/${programId}/${action}`, {
+      reason: action === 'reactivate'
+        ? 'Admin activated programme from Programme Detail'
+        : 'Admin deactivated programme from Programme Detail',
+    }),
+    onSuccess: (_, action) => {
+      setStatusError('');
+      setStatusNotice(action === 'reactivate' ? 'Programme activated.' : 'Programme deactivated.');
+      refreshRelated();
+    },
+    onError: (error: any) => {
+      setStatusNotice('');
+      setStatusError(error?.response?.data?.message || 'Programme status could not be changed.');
+    },
   });
   const signoffMutation = useMutation({
     mutationFn: (payload: { clinicianName: string; reviewNote: string }) =>
@@ -118,10 +130,11 @@ export default function AdminProgramDetailPage() {
     });
   };
 
-  const handleStatus = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    statusMutation.mutate({ action: program.isActive ? 'deactivate' : 'reactivate', reason: String(form.get('reason') || '').trim() });
+  const handleStatus = () => {
+    if (statusMutation.isPending) return;
+    setStatusError('');
+    setStatusNotice('');
+    statusMutation.mutate(program.isActive ? 'deactivate' : 'reactivate');
   };
 
   const handleDaySave = (event: FormEvent<HTMLFormElement>) => {
@@ -154,8 +167,18 @@ export default function AdminProgramDetailPage() {
   return <div className="min-w-0 space-y-6">
     <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
       <div className="min-w-0"><button type="button" onClick={() => navigate('/admin/programs')} className="mb-3 inline-flex items-center gap-2 text-sm font-semibold text-neutral-500 hover:text-neutral-900"><ArrowLeft className="h-4 w-4" />Programs</button><div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-bold tracking-tight text-neutral-950 sm:text-3xl">{program.name}</h1><span className={cn('rounded-full px-2.5 py-1 text-xs font-semibold', program.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-neutral-100 text-neutral-600')}>{program.isActive ? 'Active' : 'Inactive'}</span></div><p className="mt-2 text-sm text-neutral-500">{program.programCode || 'No program code'} · {program.painCategory?.name || 'No pain category'} · {labelize(program.difficultyLevel)}</p></div>
-      <div className="flex flex-wrap gap-2"><button type="button" onClick={() => query.refetch()} disabled={query.isFetching} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 text-sm font-semibold text-neutral-700"><RefreshCw className={cn('h-4 w-4', query.isFetching && 'animate-spin')} />Refresh</button><button type="button" onClick={() => setShowEdit(true)} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 text-sm font-semibold text-neutral-700"><Edit3 className="h-4 w-4" />Edit program</button>{(!program.clinicalApprovalRequired || program.isActive) && <button type="button" onClick={() => { setFormError(''); setShowStatus(true); }} className={cn('min-h-11 rounded-lg px-4 text-sm font-semibold text-white', program.isActive ? 'bg-neutral-800' : 'bg-primary-600')}>{program.isActive ? 'Deactivate' : 'Reactivate'}</button>}</div>
+      <div className="flex flex-wrap gap-2"><button type="button" onClick={() => query.refetch()} disabled={query.isFetching} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 text-sm font-semibold text-neutral-700"><RefreshCw className={cn('h-4 w-4', query.isFetching && 'animate-spin')} />Refresh</button><button type="button" onClick={() => setShowEdit(true)} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 text-sm font-semibold text-neutral-700"><Edit3 className="h-4 w-4" />Edit program</button>{(!program.clinicalApprovalRequired || program.isActive) && <button type="button" onClick={handleStatus} disabled={statusMutation.isPending}
+      className={cn('min-h-11 rounded-lg px-4 text-sm font-semibold text-white disabled:cursor-wait disabled:opacity-50', program.isActive ? 'bg-neutral-800' : 'bg-primary-600')}>
+      {statusMutation.isPending ? 'Updating…' : program.isActive ? 'Deactivate' : 'Reactivate'}
+    </button>}</div>
     </header>
+
+    {statusError && <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">
+      {statusError}
+    </div>}
+    {statusNotice && <div role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
+      {statusNotice}
+    </div>}
 
     {program.clinicalApprovalRequired && <ProgrammeReleaseChecklist
       programId={programId}
@@ -165,7 +188,7 @@ export default function AdminProgramDetailPage() {
       isRefreshing={query.isFetching}
       onRefresh={() => { query.refetch(); }}
       onSignoff={() => { setFormError(''); setShowClinicalSignoff(true); }}
-      onPublish={() => { setFormError(''); setShowStatus(true); }}
+      onPublish={handleStatus}
     />}
 
     <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{cards.map((card) => <div key={card.label} className="rounded-xl border border-neutral-200 bg-white p-4"><div className="flex items-center justify-between"><div><p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{card.label}</p><p className="mt-2 text-2xl font-bold text-neutral-950">{card.value}</p></div><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-neutral-50 text-neutral-600"><card.icon className="h-5 w-5" /></div></div></div>)}</section>
@@ -230,7 +253,6 @@ export default function AdminProgramDetailPage() {
       </form>
     </Modal>
 
-    <Modal isOpen={showStatus} onClose={() => { setShowStatus(false); setFormError(''); }} title={program.isActive ? 'Deactivate program' : 'Reactivate program'} size="md"><form onSubmit={handleStatus} className="space-y-4 pt-5"><p className="text-sm leading-6 text-neutral-600">{program.isActive ? 'Deactivating removes this program from new patient resolution while preserving historical enrollments.' : 'Reactivating makes this program eligible for future matching again.'}</p>{formError && <ErrorBox text={formError} />}<Field label="Reason *"><textarea name="reason" required rows={3} className={`${inputClass} py-3`} /></Field><div className="flex justify-end gap-2"><button type="button" onClick={() => setShowStatus(false)} className="min-h-11 rounded-lg border border-neutral-300 px-4 text-sm font-semibold text-neutral-700">Cancel</button><button type="submit" disabled={statusMutation.isPending || (program.clinicalApprovalRequired && !program.isActive && (!program.clinicalApproval?.approvedAt || !query.data?.releaseReadiness?.readyForSignOff))} className={cn('min-h-11 rounded-lg px-4 text-sm font-semibold text-white', program.isActive ? 'bg-neutral-800' : 'bg-primary-600')}>{statusMutation.isPending ? 'Saving...' : program.isActive ? 'Deactivate' : 'Reactivate'}</button></div></form></Modal>
   </div>;
 }
 
