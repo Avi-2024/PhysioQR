@@ -4,6 +4,7 @@ const PainCategory = require('../models/PainCategory.model');
 const { writeAuditLog } = require('../utils/auditLogger');
 const asyncHandler = require('../utils/asyncHandler');
 const { EXERCISE_PREFIX } = require('../data/generalKnee30DayDraft');
+const { assignKneeVideoCandidates } = require('../services/kneeVideoCandidateMapping.service');
 const { DEMO_VIDEO_ID, DEMO_VIDEO_URL, isDemoExerciseVideo, patientSafeExercise, missingDemoVideoFilter, installedDemoVideoFilter, pendingDemoVideoFilter } = require('../services/demoExerciseVideo.service');
 // Draft-seeded content is delivered only via an authorised patient prescription,
 // never through the generic exercise catalogue or exercise detail API.
@@ -264,10 +265,26 @@ const manageDemoExerciseVideos = asyncHandler(async (req, res) => {
   });
 });
 
+// Dedicated scoped action. Unlike the blanket demo button, this maps a
+// DIFFERENT exercise-matched video to each of the 15 Knee 30D seed exercises.
+const assignKneeDraftVideoCandidates = asyncHandler(async (req, res) => {
+  if (req.body?.acknowledgeReviewPending !== true) {
+    return res.status(400).json({ message: 'Confirm these are video candidates pending physiotherapist review.' });
+  }
+  const result = await assignKneeVideoCandidates({ apply: true });
+  await writeAuditLog({
+    req, action: 'knee_draft_video_candidates_assigned', module: 'Exercise',
+    reason: 'Admin requested 15 distinct exercise-matched videos for a clinical draft',
+    metadata: { programmeCode: result.programmeCode, changed: result.changed,
+      totalCandidates: result.totalCandidates, patientProgrammePublished: false },
+  });
+  res.json({ message: result.changed + ' Knee draft exercise videos assigned for clinical review. Programme remains unpublished.', ...result });
+});
+
 const deleteExercise = asyncHandler(async (req, res) => {
   const exercise = await Exercise.findByIdAndUpdate(req.params.id, { isActive: false }, { new: true });
   if (!exercise) return res.status(404).json({ message: 'Exercise not found' });
   res.json({ message: 'Exercise deactivated' });
 });
 
-module.exports = { getExercises, createExercise, getExerciseById, updateExercise, setExerciseStatus, bulkSetExerciseStatus, manageDemoExerciseVideos, deleteExercise };
+module.exports = { getExercises, createExercise, getExerciseById, updateExercise, setExerciseStatus, bulkSetExerciseStatus, manageDemoExerciseVideos, assignKneeDraftVideoCandidates, deleteExercise };
