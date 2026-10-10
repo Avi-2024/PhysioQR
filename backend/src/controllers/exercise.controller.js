@@ -159,8 +159,57 @@ const setExerciseStatus = asyncHandler(async (req, res) => {
   const previousValue = { isActive: exercise.isActive };
   exercise.isActive = nextActive;
   await exercise.save();
-  await writeAuditLog({ req, action: nextActive ? 'exercise_reactivated' : 'exercise_deactivated', module: 'Exercise', recordId: exercise._id, previousValue, newValue: { isActive: nextActive }, reason: cleanString(req.body.reason) });
+  await writeAuditLog({ req, action: nextActive ? 'exercise_reactivated' : 'exercise_deactivated', module: 'Exercise', recordId: exercise._id, previousValue, newValue: { isActive: nextActive }, reason: cleanString(req.body?.reason) || (nextActive ? 'Admin activated exercise from Exercise Library' : 'Admin deactivated exercise from Exercise Library') });
   res.json({ message: `Exercise ${nextActive ? 'reactivated' : 'deactivated'}`, exercise });
+});
+
+// Admin-only batch lifecycle action. IDs are explicit, validated and limited.
+// A shared optional note avoids typing the same reason for each exercise.
+// Each changed record still has its own attributed audit log.
+const bulkSetExerciseStatus = asyncHandler(async (req, res) => {
+  const { exerciseIds, action } = req.body || {};
+  if (!Array.isArray(exerciseIds) || exerciseIds.length < 1 || exerciseIds.length > 100
+    || !exerciseIds.every((id) => typeof id === 'string' && mongoose.isValidObjectId(id))) {
+    return res.status(400).json({ message: 'Choose between 1 and 100 valid exercise IDs' });
+  }
+  if (!['activate', 'deactivate'].includes(action)) {
+    return res.status(400).json({ message: 'Action must be activate or deactivate' });
+  }
+  const ids = [...new Set(exerciseIds.map((id) => id.toLowerCase()))];
+  const exercises = await Exercise.find({ _id: { $in: ids } })
+    .select('_id name isActive');
+  if (exercises.length !== ids.length) {
+    return res.status(404).json({ message: 'One or more selected exercises no longer exist. Refresh and retry.' });
+  }
+
+  const nextActive = action === 'activate';
+  const changes = exercises.filter((exercise) => exercise.isActive !== nextActive);
+  if (changes.length) {
+    await Exercise.updateMany(
+      { _id: { $in: changes.map((exercise) => exercise._id) }, isActive: !nextActive },
+      { $set: { isActive: nextActive } },
+    );
+  }
+  const reason = cleanString(req.body.reason) || (nextActive
+    ? 'Bulk activation from Admin Exercise Library'
+    : 'Bulk deactivation from Admin Exercise Library');
+  for (const exercise of changes) {
+    await writeAuditLog({
+      req, action: nextActive ? 'exercise_reactivated' : 'exercise_deactivated',
+      module: 'Exercise', recordId: exercise._id,
+      previousValue: { isActive: !nextActive },
+      newValue: { isActive: nextActive },
+      reason, metadata: { bulk: true, selectedCount: ids.length, batchAction: action },
+    });
+  }
+  res.json({
+    message: `${changes.length} exercises ${nextActive ? 'activated' : 'deactivated'}; ${ids.length - changes.length} already in that state.`,
+    selected: ids.length,
+    changed: changes.length,
+    skipped: ids.length - changes.length,
+    // Exercise activation is NOT clinical approval or programme publication.
+    programmePublished: false,
+  });
 });
 
 const deleteExercise = asyncHandler(async (req, res) => {
@@ -169,4 +218,4 @@ const deleteExercise = asyncHandler(async (req, res) => {
   res.json({ message: 'Exercise deactivated' });
 });
 
-module.exports = { getExercises, createExercise, getExerciseById, updateExercise, setExerciseStatus, deleteExercise };
+module.exports = { getExercises, createExercise, getExerciseById, updateExercise, setExerciseStatus, bulkSetExerciseStatus, deleteExercise };
