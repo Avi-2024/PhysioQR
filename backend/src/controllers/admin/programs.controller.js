@@ -155,13 +155,20 @@ const getProgramById = asyncHandler(async (req, res) => {
 
   const enrollment = enrollmentSummary[0] || { total: 0, active: 0, completed: 0, pendingPayment: 0 };
   const overview = await inspectProgrammeRelease(program, { checkApprovalFreshness: true });
+  const approvalOutdated = overview.issues.some((issue) =>
+    issue.startsWith('Day configuration or exercise library content changed after clinical sign-off'));
+  const nonSignatureIssues = overview.issues.filter((issue) =>
+    !issue.startsWith('Day configuration or exercise library content changed after clinical sign-off'));
   res.json({
     program,
     days,
     releaseReadiness: {
       required: Boolean(program.clinicalApprovalRequired),
       clinicalApproved: Boolean(program.clinicalApproval?.approvedAt),
-      readyForSignOff: Boolean(program.clinicalApprovalRequired) && overview.issues.length === 0,
+      // A stale old signature must not prevent recording a NEW clinician review.
+      readyForSignOff: Boolean(program.clinicalApprovalRequired) && nonSignatureIssues.length === 0,
+      readyForPublish: Boolean(program.clinicalApproval?.approvedAt) && overview.issues.length === 0,
+      approvalOutdated,
       issueCount: overview.issues.length,
       issues: overview.issues.slice(0, 15),
       exercises: overview.exercises,
