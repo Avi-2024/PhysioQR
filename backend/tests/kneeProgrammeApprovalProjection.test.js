@@ -21,7 +21,7 @@ const Exercise = {
       return {
         // Mimic Mongoose .select() so missing projected fields disappear.
         lean: async () => {
-          const requested = new Set(fields.split(/\\s+/));
+          const requested = new Set(fields.split(/\s+/));
           if (!exercise.videoCandidateReviewPending) return [];
           return [Object.fromEntries(Object.entries(exercise).filter(([key]) => requested.has(key)))];
         },
@@ -107,7 +107,7 @@ const submit = async () => {
 test('sign-off selects review-pending field and does not falsely reject a valid mapped video', async () => {
   const result = await submit();
   assert.equal(result.status, 200);
-  assert.match(projection, /\\bvideoCandidateReviewPending\\b/);
+  assert.match(projection, /\bvideoCandidateReviewPending\b/);
   assert.equal(updates, 1);
   assert.equal(exercise.videoCandidateReviewPending, false);
   assert.equal(exercise.isDemoVideo, false);
