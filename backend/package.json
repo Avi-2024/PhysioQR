@@ -18,6 +18,8 @@
     "test:knee-general-30d-draft": "node --test tests/generalKnee30DayDraft.test.js tests/programmeReleaseChecklist.test.js",
     "test:exercise-bulk-status": "node --test tests/exerciseBulkStatus.test.js",
     "demo:exercise-videos": "node scripts/addDemoYoutubeToExercises.js",
+    "demo:exercise-videos:apply": "node scripts/addDemoYoutubeToExercises.js --apply",
+    "demo:exercise-videos:remove": "node scripts/addDemoYoutubeToExercises.js --remove",
     "test:demo-exercise-videos": "node --test tests/demoExerciseVideos.test.js tests/demoExerciseAdminAction.test.js",
     "seed:clinical-content": "npm run seed:assessment-pathways && npm run seed:assessment-questions && npm run seed:rehab-programs",
     "reset:all-except-admin": "node scripts/resetAllExceptAdmin.js",
