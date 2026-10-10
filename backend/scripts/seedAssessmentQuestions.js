@@ -59,11 +59,13 @@ async function findRegion(name) {
   }).select('_id name isActive').lean();
 }
 
+// Keep retired open-ended prompts as inactive records. Historical patient
+// assessments still reference these IDs, so never delete them here.
 async function seedBaseQuestions() {
   const globalItems = [
     common('common_current_pain', 'How much pain do you have right now? (0 = no pain, 10 = worst pain)', 'pain_scale', 30),
     common('common_daily_activity_impact', 'How much does this problem affect your daily activities? Enter a number from 0 to 10.', 'number', 70),
-    common('common_biggest_difficulty', 'What is the biggest thing you cannot do comfortably because of this problem?', 'text', 80),
+    common('common_biggest_difficulty', 'What is the biggest thing you cannot do comfortably because of this problem?', 'text', 80, { isActive: false }),
     common('common_medical_conditions', 'Do you have any medical conditions your physiotherapist should know about?', 'multiple_choice', 90, {
       options: options(['Diabetes', 'High blood pressure', 'Heart condition', 'Previous fracture', 'Osteoporosis', 'Neurological condition', 'Other', 'None']),
     }),
@@ -73,7 +75,7 @@ async function seedBaseQuestions() {
     common('common_movement_description', 'How would you describe your movement right now?', 'single_choice', 120, {
       options: options([['Normal', 'normal'], ['Slightly limited', 'slightly_limited'], ['Moderately limited', 'moderately_limited'], ['Severely limited', 'severely_limited']]),
     }),
-    common('common_recovery_goal', 'What is the ONE main recovery goal you want to get back to?', 'text', 130),
+    common('common_recovery_goal', 'What is the ONE main recovery goal you want to get back to?', 'text', 130, { isActive: false }),
     common('common_goal_importance', 'How important is achieving this recovery goal? Enter a number from 1 to 10.', 'number', 140),
   ];
 
@@ -81,6 +83,7 @@ async function seedBaseQuestions() {
   for (const item of globalItems) saved.push(await upsertQuestion(item));
   const restrictions = saved.find((item) => item.seedKey === 'common_doctor_restrictions');
   await upsertQuestion(common('common_doctor_restrictions_detail', 'Please describe the exercise or movement restrictions your doctor gave you.', 'text', 110, {
+    isActive: false,
     showIfQuestion: restrictions._id,
     showIfAnswer: 'yes',
     conditionalLogic: { dependsOnQuestion: restrictions._id, operator: 'equals', value: 'yes' },
