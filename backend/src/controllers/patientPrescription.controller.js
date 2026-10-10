@@ -4,6 +4,7 @@ const PatientAssessment = require('../models/PatientAssessment.model');
 const { ProgramDay } = require('../models/Exercise.model');
 const asyncHandler = require('../utils/asyncHandler');
 const { withDayDosage } = require('../services/dayExerciseDosage.service');
+const { isDemoExerciseVideo, patientSafeExercise } = require('../services/demoExerciseVideo.service');
 
 const enrollmentPopulate = [
   { path: 'patient', select: 'patientId fullName mobile age dateOfBirth gender preferredLanguage' },
@@ -50,14 +51,14 @@ const getMyPrescription = asyncHandler(async (req, res) => {
       isActive: true,
       'exercises.0': { $exists: true },
     })
-      .populate('exercises.exercise', '_id isActive videoUrl youtubeVideoId')
+      .populate('exercises.exercise', '_id isActive videoUrl youtubeVideoId isDemoVideo')
       .lean();
 
     const activeExercises = (contentDay?.exercises || []).filter(
       (entry) => entry?.exercise && entry.exercise.isActive !== false,
     );
     const videoCount = activeExercises.filter(
-      (entry) => String(entry.exercise.videoUrl || '').trim() || String(entry.exercise.youtubeVideoId || '').trim(),
+      (entry) => !isDemoExerciseVideo(entry.exercise) && (String(entry.exercise.videoUrl || '').trim() || String(entry.exercise.youtubeVideoId || '').trim()),
     ).length;
 
     activeProgrammeSummaries.push({
@@ -109,7 +110,8 @@ const getMyPrescription = asyncHandler(async (req, res) => {
   const exerciseEntries = (programDay?.exercises || [])
     .filter((entry) => entry.exercise && entry.exercise.isActive !== false)
     .sort((a, b) => Number(a.displayOrder || 0) - Number(b.displayOrder || 0))
-    .map(withDayDosage);
+    .map(withDayDosage)
+    .map((entry) => ({ ...entry, exercise: patientSafeExercise(entry.exercise) }));
 
   const languages = [...new Set(exerciseEntries.map((entry) => entry.exercise?.language).filter(Boolean))];
   const frontendBase = String(process.env.FRONTEND_URL || '').split(',')[0].trim().replace(/\/$/, '');
