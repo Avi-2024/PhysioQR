@@ -2,9 +2,21 @@
 // Legacy programmes do not enter this process automatically.
 const { ProgramDay } = require('../models/Exercise.model');
 const { isDemoExerciseVideo } = require('./demoExerciseVideo.service');
+const { PROGRAM_CODE, EXERCISE_PREFIX } = require('../data/generalKnee30DayDraft');
 
+// A linked Knee-specific candidate may be considered for the SINGLE full
+// programme review, but never counts as already approved for publication.
+const isCandidateForProgrammeSignoff = (exercise, program) => {
+  if (!exercise?.videoCandidateReviewPending || !program || program.programCode !== PROGRAM_CODE) return false;
+  if (!String(exercise.seedKey || '').startsWith(EXERCISE_PREFIX)) return false;
+  const id = String(exercise.youtubeVideoId || '').trim();
+  if (!/^[A-Za-z0-9_-]{11}$/.test(id)) return false;
+  if (['ml6cT4AZdqI', 'M7lc1UVf-VE'].includes(id)) return false;
+  return Boolean(String(exercise.videoCandidateSourcePage || '').trim()
+    && String(exercise.videoUrl || '').trim());
+};
 const videoConfigured = (exercise) => {
-  if (isDemoExerciseVideo(exercise)) return false; // Demo videos never meet clinical readiness.
+  if (isDemoExerciseVideo(exercise)) return false; // Unreviewed/test-only videos cannot be published.
   const videoId = String(exercise?.youtubeVideoId || '').trim();
   if (/^[A-Za-z0-9_-]{11}$/.test(videoId)) return true;
   try {
@@ -26,7 +38,7 @@ const videoConfigured = (exercise) => {
 
 // Keep the detailed safety gate and the Admin checklist in sync.
 // Issue counts are per assignment; the checklist groups unique exercises.
-const inspectProgrammeRelease = async (program, { checkApprovalFreshness = false } = {}) => {
+const inspectProgrammeRelease = async (program, { checkApprovalFreshness = false, forProgrammeSignoff = false } = {}) => {
   const issues = [];
   const checklist = new Map();
   const missingDays = [];
@@ -35,7 +47,7 @@ const inspectProgrammeRelease = async (program, { checkApprovalFreshness = false
 
   const days = await ProgramDay.find({ program: program._id, isActive: true })
     .populate('exercises.exercise',
-      '_id name isActive videoUrl youtubeVideoId isDemoVideo videoCandidateReviewPending safetyInstructions sets repetitions painCategory updatedAt')
+      '_id name seedKey isActive videoUrl youtubeVideoId isDemoVideo videoCandidateReviewPending videoCandidateSourcePage safetyInstructions sets repetitions painCategory updatedAt')
     .lean();
 
   if (checkApprovalFreshness && program.clinicalApproval?.approvedAt) {
@@ -64,7 +76,8 @@ const inspectProgrammeRelease = async (program, { checkApprovalFreshness = false
       const active = exercise.isActive === true;
       const demoVideo = isDemoExerciseVideo(exercise);
       const candidateReviewPending = exercise.videoCandidateReviewPending === true;
-      const videoReady = videoConfigured(exercise);
+      const videoReady = videoConfigured(exercise) ||
+        (forProgrammeSignoff && isCandidateForProgrammeSignoff(exercise, program));
       const safetyReady = Boolean(String(exercise.safetyInstructions || '').trim());
       const categoryReady = String(exercise.painCategory?._id || exercise.painCategory || '') === String(program.painCategory?._id || program.painCategory);
       const sets = entry.sets ?? exercise.sets;
@@ -72,7 +85,7 @@ const inspectProgrammeRelease = async (program, { checkApprovalFreshness = false
       const doseReady = Number.isInteger(Number(sets)) && Number(sets) >= 1
         && Number.isInteger(Number(reps)) && Number(reps) >= 1;
       if (!active) issues.push('Day ' + n + ': exercise "' + exercise.name + '" is inactive');
-      if (!videoReady) issues.push('Day ' + n + ': exercise "' + exercise.name + '" ' + (candidateReviewPending ? 'has an exercise-specific video awaiting physiotherapist review' : demoVideo ? 'has TEST-ONLY video; replace with a clinically reviewed exercise video' : 'has no video'));
+      if (!videoReady) issues.push('Day ' + n + ': exercise "' + exercise.name + '" ' + (candidateReviewPending ? 'requires video suitability check during programme sign-off' : demoVideo ? 'has TEST-ONLY video; replace with an exercise-specific video' : 'has no video'));
       if (!safetyReady) issues.push('Day ' + n + ': exercise "' + exercise.name + '" needs safety instructions');
       if (!categoryReady) issues.push('Day ' + n + ': exercise "' + exercise.name + '" is mapped to another body region');
       if (!doseReady) issues.push('Day ' + n + ': exercise "' + exercise.name + '" needs valid sets/reps');
@@ -120,4 +133,4 @@ const ensureApprovedRelease = async (program) => {
   }
 };
 
-module.exports = { videoConfigured, inspectProgrammeRelease, getProgrammeReleaseReadiness, ensureApprovedRelease };
+module.exports = { videoConfigured, isCandidateForProgrammeSignoff, inspectProgrammeRelease, getProgrammeReleaseReadiness, ensureApprovedRelease };
