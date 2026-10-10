@@ -278,10 +278,16 @@ const recordProgrammeClinicalApproval = asyncHandler(async (req, res) => {
     const pending = await Exercise.find({
       _id: { $in: assignedIds }, seedKey: { $regex: '^' + EXERCISE_PREFIX },
       videoCandidateReviewPending: true,
-    }).select('_id name seedKey videoUrl youtubeVideoId isDemoVideo videoCandidateSourcePage').lean();
+    }).select('_id name seedKey videoUrl youtubeVideoId isDemoVideo videoCandidateReviewPending videoCandidateSourcePage').lean();
 
-    if (pending.some((exercise) => !isCandidateForProgrammeSignoff(exercise, program))) {
-      return res.status(409).json({ message: 'A linked exercise video is unsuitable for a combined programme review. Correct it first.' });
+    const invalidVideoCandidates = pending.filter((exercise) => !isCandidateForProgrammeSignoff(exercise, program));
+    if (invalidVideoCandidates.length) {
+      return res.status(409).json({
+        message: 'Cannot include these videos in the programme review: ' +
+          invalidVideoCandidates.slice(0, 3).map((exercise) => exercise.name).join(', ') +
+          '. Check the exercise-specific YouTube link and source details.',
+        exerciseIds: invalidVideoCandidates.map((exercise) => exercise._id),
+      });
     }
     if (pending.length) {
       // Restrict each update to the exact URL and review state just checked;
