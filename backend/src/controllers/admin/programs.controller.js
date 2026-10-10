@@ -2,11 +2,12 @@ const mongoose = require('mongoose');
 const Program = require('../../models/Program.model');
 const PainCategory = require('../../models/PainCategory.model');
 const PatientProgram = require('../../models/PatientProgram.model');
-const { ProgramDay } = require('../../models/Exercise.model');
+const { ProgramDay, Exercise } = require('../../models/Exercise.model');
 const { writeAuditLog } = require('../../utils/auditLogger');
 const { getPagination } = require('../../utils/queryHelpers');
 const asyncHandler = require('../../utils/asyncHandler');
-const { inspectProgrammeRelease, getProgrammeReleaseReadiness, ensureApprovedRelease } = require('../../services/programmeReleaseGate.service');
+const { inspectProgrammeRelease, ensureApprovedRelease, isCandidateForProgrammeSignoff } = require('../../services/programmeReleaseGate.service');
+const { PROGRAM_CODE, EXERCISE_PREFIX } = require('../../data/generalKnee30DayDraft');
 
 const DIFFICULTY_LEVELS = [
   'beginner', 'intermediate', 'advanced', 'senior_friendly',
@@ -154,7 +155,13 @@ const getProgramById = asyncHandler(async (req, res) => {
   ]);
 
   const enrollment = enrollmentSummary[0] || { total: 0, active: 0, completed: 0, pendingPayment: 0 };
-  const overview = await inspectProgrammeRelease(program, { checkApprovalFreshness: true });
+  // Knee exercise candidates are reviewed in ONE full-programme sign-off,
+  // rather than asking Admin to sign off every video in a separate modal.
+  // The publication check below remains strict until the sign-off is recorded.
+  const [overview, publishOverview] = await Promise.all([
+    inspectProgrammeRelease(program, { checkApprovalFreshness: true, forProgrammeSignoff: true }),
+    inspectProgrammeRelease(program, { checkApprovalFreshness: true }),
+  ]);
   const approvalOutdated = overview.issues.some((issue) =>
     issue.startsWith('Day configuration or exercise library content changed after clinical sign-off'));
   const nonSignatureIssues = overview.issues.filter((issue) =>
@@ -167,7 +174,7 @@ const getProgramById = asyncHandler(async (req, res) => {
       clinicalApproved: Boolean(program.clinicalApproval?.approvedAt),
       // A stale old signature must not prevent recording a NEW clinician review.
       readyForSignOff: Boolean(program.clinicalApprovalRequired) && nonSignatureIssues.length === 0,
-      readyForPublish: Boolean(program.clinicalApproval?.approvedAt) && overview.issues.length === 0,
+      readyForPublish: Boolean(program.clinicalApproval?.approvedAt) && publishOverview.issues.length === 0,
       approvalOutdated,
       issueCount: overview.issues.length,
       issues: overview.issues.slice(0, 15),
@@ -256,11 +263,57 @@ const recordProgrammeClinicalApproval = asyncHandler(async (req, res) => {
   if (clinicianName.length < 3 || clinicianName.length > 160 || reviewNote.length < 10 || reviewNote.length > 2000) {
     return res.status(400).json({ message: 'Provide the reviewing clinician name (3+ chars) and meaningful review note (10+ chars)' });
   }
-  const issues = await getProgrammeReleaseReadiness(program);
-  if (issues.length) return res.status(409).json({
+  // Candidate videos for this one 30-day draft can be included in the same
+  // authentic clinical review as the programme. They are NOT auto-approved
+  // during video assignment, edit, or seeding.
+  const reviewOverview = await inspectProgrammeRelease(program, { forProgrammeSignoff: true });
+  if (reviewOverview.issues.length) return res.status(409).json({
     message: 'Complete and review all programme days, active exercises and videos before sign-off',
-    issueCount: issues.length, issues: issues.slice(0, 15),
+    issueCount: reviewOverview.issues.length, issues: reviewOverview.issues.slice(0, 15),
   });
+
+  let reviewedCandidateCount = 0;
+  if (program.programCode === PROGRAM_CODE) {
+    const assignedIds = reviewOverview.exercises.map((row) => row.id);
+    const pending = await Exercise.find({
+      _id: { $in: assignedIds }, seedKey: { $regex: '^' + EXERCISE_PREFIX },
+      videoCandidateReviewPending: true,
+    }).select('_id name seedKey videoUrl youtubeVideoId isDemoVideo videoCandidateSourcePage').lean();
+
+    if (pending.some((exercise) => !isCandidateForProgrammeSignoff(exercise, program))) {
+      return res.status(409).json({ message: 'A linked exercise video is unsuitable for a combined programme review. Correct it first.' });
+    }
+    if (pending.length) {
+      // Restrict each update to the exact URL and review state just checked;
+      // a concurrent change cannot be silently declared reviewed.
+      for (const exercise of pending) {
+        const updated = await Exercise.updateOne({
+          _id: exercise._id, seedKey: exercise.seedKey,
+          youtubeVideoId: exercise.youtubeVideoId, videoUrl: exercise.videoUrl,
+          videoCandidateReviewPending: true,
+        }, { $set: {
+          videoCandidateReviewPending: false, isDemoVideo: false,
+          videoReview: { clinicianName, reviewNote, reviewedAt: new Date(), recordedBy: req.user._id },
+        } });
+        if (updated.modifiedCount !== 1) {
+          return res.status(409).json({
+            message: 'A video was modified during programme sign-off. Refresh, review the latest video, then retry.',
+          });
+        }
+        reviewedCandidateCount += 1;
+      }
+    }
+  }
+
+  // Re-check strict patient publication readiness AFTER candidate videos have
+  // been signed off. No programme can be marked approved if they remain blocked.
+  const finalIssues = await inspectProgrammeRelease(program);
+  if (finalIssues.issues.length) {
+    return res.status(409).json({
+      message: 'Programme still has incomplete clinical content after video review.',
+      issues: finalIssues.issues.slice(0, 15),
+    });
+  }
   const previousValue = program.clinicalApproval;
   program.clinicalApproval = {
     clinicianName, reviewNote, approvedAt: new Date(), recordedBy: req.user._id,
@@ -271,8 +324,10 @@ const recordProgrammeClinicalApproval = asyncHandler(async (req, res) => {
     recordId: program._id, previousValue,
     newValue: program.clinicalApproval,
     reason: reviewNote,
+    metadata: { videoCandidatesReviewedInProgrammeSignoff: reviewedCandidateCount },
   });
-  res.json({ message: 'Clinical sign-off recorded. Programme is still inactive until separately published.', program });
+  res.json({ message: 'Programme review recorded, including ' + reviewedCandidateCount +
+    ' exercise-video candidate(s). Programme remains inactive until separately published.', program });
 });
 
 module.exports = { getPrograms, getProgramById, createProgram, updateProgram, setProgramStatus, recordProgrammeClinicalApproval };
