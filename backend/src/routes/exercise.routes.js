@@ -11,7 +11,6 @@ const {
   bulkSetExerciseStatus,
   manageDemoExerciseVideos,
   assignKneeDraftVideoCandidates,
-  recordExerciseVideoReview,
   deleteExercise,
 } = require('../controllers/exercise.controller');
 
@@ -65,13 +64,6 @@ router.post(
   validateSchema({ body: { acknowledgeReviewPending: { type: 'boolean', required: true } } }),
   assignKneeDraftVideoCandidates,
 );
-router.post('/:id/review-video', authorize('admin'), validateSchema({
-  params: { id: { type: 'objectId', required: true } },
-  body: {
-    clinicianName: { type: 'string', min: 3, max: 160, required: true },
-    reviewNote: { type: 'string', min: 10, max: 2000, required: true },
-  },
-}), recordExerciseVideoReview);
 router.get('/:id', validateSchema({ params: { id: { type: 'objectId', required: true } } }), getExerciseById);
 router.put('/:id', authorize('admin'), validateSchema({ params: { id: { type: 'objectId', required: true } }, body: exerciseBodySchema }), updateExercise);
 router.post(
