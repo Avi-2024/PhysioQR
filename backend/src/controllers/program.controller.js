@@ -2,6 +2,7 @@ const Program = require('../models/Program.model');
 const { Exercise, ProgramDay } = require('../models/Exercise.model');
 const asyncHandler = require('../utils/asyncHandler');
 const { ensureApprovedRelease } = require('../services/programmeReleaseGate.service');
+const { patientSafeDay } = require('../services/demoExerciseVideo.service');
 
 const getPrograms = asyncHandler(async (req, res) => {
   const filter = req.user?.role === 'admin' ? {} : { isActive: true };
@@ -30,11 +31,10 @@ const getProgramDays = asyncHandler(async (req, res) => {
   if (!program || (req.user.role !== 'admin' && !program.isActive)) {
     return res.status(404).json({ message: 'Programme days not found' });
   }
-  res.json(
-    await ProgramDay.find({ program: req.params.id, isActive: true })
-      .populate('exercises.exercise')
-      .sort({ dayNumber: 1 })
-  );
+  const days = await ProgramDay.find({ program: req.params.id, isActive: true })
+    .populate('exercises.exercise')
+    .sort({ dayNumber: 1 }).lean();
+  res.json(req.user.role === 'admin' ? days : days.map(patientSafeDay));
 });
 
 const normalizeDayExercises = async (entries = [], { allowInactive = false } = {}) => {
