@@ -9,6 +9,7 @@ const {
   updateExercise,
   setExerciseStatus,
   bulkSetExerciseStatus,
+  manageDemoExerciseVideos,
   deleteExercise,
 } = require('../controllers/exercise.controller');
 
@@ -45,6 +46,16 @@ router.post(
     reason: { type: 'string', max: 500 },
   } }),
   bulkSetExerciseStatus,
+);
+// Same database as Admin Exercise Library; restricted to non-production only.
+router.post(
+  '/demo-videos',
+  authorize('admin'),
+  validateSchema({ body: {
+    action: { type: 'enum', values: ['apply', 'remove'], required: true },
+    acknowledgeTestingOnly: { type: 'boolean', required: true },
+  } }),
+  manageDemoExerciseVideos,
 );
 router.get('/:id', validateSchema({ params: { id: { type: 'objectId', required: true } } }), getExerciseById);
 router.put('/:id', authorize('admin'), validateSchema({ params: { id: { type: 'objectId', required: true } }, body: exerciseBodySchema }), updateExercise);
