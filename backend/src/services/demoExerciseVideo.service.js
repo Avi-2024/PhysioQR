@@ -24,6 +24,7 @@ const youtubeId = (value) => {
 };
 
 const isDemoExerciseVideo = (exercise) => Boolean(exercise && (
+  exercise.videoCandidateReviewPending === true ||
   exercise.isDemoVideo === true ||
   DEMO_IDS.has(String(exercise.youtubeVideoId || '').trim()) ||
   DEMO_IDS.has(youtubeId(exercise.videoUrl))
