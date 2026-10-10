@@ -49,7 +49,7 @@ async function ensureBodyRegion(name) {
   const aliases = [name, `${name} Pain`];
   let region = await PainCategory.findOne({ name: { $in: aliases.map((value) => new RegExp(`^${escapeRegex(value)}$`, 'i')) } });
   if (!region) region = await PainCategory.create({ name, description: `${name} rehabilitation body region`, isActive: true });
-  else if (!region.isActive) { region.isActive = true; await region.save(); }
+  // Respect Admin visibility and lifecycle decisions for existing regions.
   return region;
 }
 
@@ -67,8 +67,8 @@ async function run() {
         requiresSurgeryDetails: false,
         requiresPhysioReview: false,
         displayOrder: 10,
-        isActive: true,
       },
+      $setOnInsert: { isActive: true },
     },
     { upsert: true, new: true, setDefaultsOnInsert: true },
   );
@@ -82,8 +82,8 @@ async function run() {
         requiresSurgeryDetails: true,
         requiresPhysioReview: true,
         displayOrder: 20,
-        isActive: true,
       },
+      $setOnInsert: { isActive: true },
     },
     { upsert: true, new: true, setDefaultsOnInsert: true },
   );
@@ -103,8 +103,8 @@ async function run() {
             bodyRegion: region._id,
             requiresPhysioReview: true,
             displayOrder: (index + 1) * 10,
-            isActive: true,
           },
+          $setOnInsert: { isActive: true },
         },
         { upsert: true, new: true, setDefaultsOnInsert: true },
       );
