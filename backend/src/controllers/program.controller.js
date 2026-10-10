@@ -18,7 +18,9 @@ const updateProgram = asyncHandler(async (req, res) => {
   if (!existing) return res.status(404).json({ message: 'Program not found' });
   if (req.body.isActive === true && !existing.isActive) await ensureApprovedRelease(existing);
   // Release gate is immutable through the legacy generic update API.
-  const { clinicalApprovalRequired, clinicalApproval, ...safeBody } = req.body;
+  // Lifecycle switches are handled only by Admin's audited status endpoints.
+  // Never accept a disguised isActive value via this legacy update route.
+  const { clinicalApprovalRequired, clinicalApproval, isActive, ...safeBody } = req.body;
   const program = await Program.findByIdAndUpdate(req.params.id, safeBody, { new: true });
   res.json(program);
 });
