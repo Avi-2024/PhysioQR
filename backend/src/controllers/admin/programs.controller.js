@@ -6,7 +6,7 @@ const { ProgramDay } = require('../../models/Exercise.model');
 const { writeAuditLog } = require('../../utils/auditLogger');
 const { getPagination } = require('../../utils/queryHelpers');
 const asyncHandler = require('../../utils/asyncHandler');
-const { getProgrammeReleaseReadiness, ensureApprovedRelease } = require('../../services/programmeReleaseGate.service');
+const { inspectProgrammeRelease, getProgrammeReleaseReadiness, ensureApprovedRelease } = require('../../services/programmeReleaseGate.service');
 
 const DIFFICULTY_LEVELS = [
   'beginner', 'intermediate', 'advanced', 'senior_friendly',
@@ -138,8 +138,8 @@ const getProgramById = asyncHandler(async (req, res) => {
 
   const [days, enrollmentSummary] = await Promise.all([
     ProgramDay.find({ program: program._id, isActive: true })
-      .select('dayNumber title exercises isActive')
-      .populate('exercises.exercise', 'name nameHindi thumbnail videoUrl youtubeVideoId isActive')
+      .select('dayNumber title focus exercises isActive')
+      .populate('exercises.exercise', 'name nameHindi thumbnail videoUrl youtubeVideoId isActive seedKey')
       .sort({ dayNumber: 1 }).lean(),
     PatientProgram.aggregate([
       { $match: { program: program._id } },
@@ -154,16 +154,20 @@ const getProgramById = asyncHandler(async (req, res) => {
   ]);
 
   const enrollment = enrollmentSummary[0] || { total: 0, active: 0, completed: 0, pendingPayment: 0 };
-  const releaseIssues = program.clinicalApprovalRequired ? await getProgrammeReleaseReadiness(program) : [];
+  const overview = await inspectProgrammeRelease(program, { checkApprovalFreshness: true });
   res.json({
     program,
     days,
     releaseReadiness: {
       required: Boolean(program.clinicalApprovalRequired),
       clinicalApproved: Boolean(program.clinicalApproval?.approvedAt),
-      readyForSignOff: Boolean(program.clinicalApprovalRequired) && releaseIssues.length === 0,
-      issueCount: releaseIssues.length,
-      issues: releaseIssues.slice(0, 15),
+      readyForSignOff: Boolean(program.clinicalApprovalRequired) && overview.issues.length === 0,
+      issueCount: overview.issues.length,
+      issues: overview.issues.slice(0, 15),
+      exercises: overview.exercises,
+      missingDays: overview.missingDays,
+      configuredDays: overview.configuredDays,
+      requiredDays: overview.requiredDays,
     },
     metrics: {
       configuredDays: days.length,
