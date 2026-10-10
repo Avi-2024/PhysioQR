@@ -17,6 +17,12 @@ const exerciseSchema = new mongoose.Schema({
   videoCandidateTitle: String,
   videoCandidateProvider: String,
   videoCandidateSourcePage: String,
+  videoReview: {
+    clinicianName: String,
+    reviewNote: String,
+    reviewedAt: Date,
+    recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  },
   thumbnail: String,
   repetitions: Number,
   sets: Number,
