@@ -4,6 +4,7 @@ const Program = require('../models/Program.model');
 const { ProgramDay } = require('../models/Exercise.model');
 const { writeAuditLog } = require('../utils/auditLogger');
 const asyncHandler = require('../utils/asyncHandler');
+const { withDayDosageInProgramme } = require('../services/dayExerciseDosage.service');
 
 const EXERCISE_EVENTS = ['video_started', 'video_completed', 'marked_completed', 'skipped'];
 
@@ -229,7 +230,7 @@ const getDayContent = asyncHandler(async (req, res) => {
   const progress = await getOrCreateProgress({ patientProgram, dayNumber: day, dayUnlocked: true, dayStarted: req.user.role === 'patient' });
   await progress.save();
 
-  res.json({ day, isUnlocked: true, programDay, progress });
+  res.json({ day, isUnlocked: true, programDay: withDayDosageInProgramme(programDay), progress });
 });
 
 // POST /api/progress/:patientProgramId/day/:dayNumber/exercises/:exerciseId/event
