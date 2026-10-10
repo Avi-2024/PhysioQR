@@ -2,8 +2,25 @@
 // Legacy programmes do not enter this process automatically.
 const { ProgramDay } = require('../models/Exercise.model');
 
-const videoConfigured = (exercise) =>
-  Boolean(String(exercise?.videoUrl || '').trim() || String(exercise?.youtubeVideoId || '').trim());
+const videoConfigured = (exercise) => {
+  const videoId = String(exercise?.youtubeVideoId || '').trim();
+  if (/^[A-Za-z0-9_-]{11}$/.test(videoId)) return true;
+  try {
+    const url = new URL(String(exercise?.videoUrl || '').trim());
+    if (!['https:', 'http:'].includes(url.protocol)) return false;
+    const host = url.hostname.toLowerCase();
+    const path = url.pathname.split('/').filter(Boolean);
+    let id = '';
+    if (host === 'youtu.be' || host === 'www.youtu.be') id = path[0] || '';
+    else if (['youtube.com','www.youtube.com','m.youtube.com'].includes(host)) {
+      id = path[0] === 'watch' ? url.searchParams.get('v') || ''
+        : ['embed', 'shorts', 'live'].includes(path[0]) ? path[1] || '' : '';
+    }
+    return /^[A-Za-z0-9_-]{11}$/.test(id);
+  } catch {
+    return false;
+  }
+};
 
 const getProgrammeReleaseReadiness = async (program, { checkApprovalFreshness = false } = {}) => {
   const issues = [];
