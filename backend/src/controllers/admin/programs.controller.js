@@ -194,9 +194,16 @@ const updateProgram = asyncHandler(async (req, res) => {
   const error = await validatePayload(payload, { partial: true, programId: program._id });
   if (error) return res.status(400).json({ message: error });
 
+  if (program.clinicalApprovalRequired && payload.isActive !== undefined) {
+    return res.status(409).json({ message: 'This reviewed programme can only be published or unpublished through the audited status action' });
+  }
   if (payload.isActive === true && !program.isActive) await ensureApprovedRelease(program);
   const previousValue = program.toObject();
   Object.assign(program, payload);
+  if (program.clinicalApprovalRequired && program.clinicalApproval?.approvedAt) {
+    // Any clinical programme detail change requires a renewed sign-off.
+    program.clinicalApproval = {};
+  }
   // Keep any historical field out of active content configuration.
   program.defaultPrice = undefined;
   await program.save();
