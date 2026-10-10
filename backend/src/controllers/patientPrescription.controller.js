@@ -3,6 +3,7 @@ const PatientProgram = require('../models/PatientProgram.model');
 const PatientAssessment = require('../models/PatientAssessment.model');
 const { ProgramDay } = require('../models/Exercise.model');
 const asyncHandler = require('../utils/asyncHandler');
+const { withDayDosage } = require('../services/dayExerciseDosage.service');
 
 const enrollmentPopulate = [
   { path: 'patient', select: 'patientId fullName mobile age dateOfBirth gender preferredLanguage' },
@@ -106,8 +107,9 @@ const getMyPrescription = asyncHandler(async (req, res) => {
     .lean();
 
   const exerciseEntries = (programDay?.exercises || [])
-    .filter((entry) => entry.exercise?.isActive !== false)
-    .sort((a, b) => Number(a.displayOrder || 0) - Number(b.displayOrder || 0));
+    .filter((entry) => entry.exercise && entry.exercise.isActive !== false)
+    .sort((a, b) => Number(a.displayOrder || 0) - Number(b.displayOrder || 0))
+    .map(withDayDosage);
 
   const languages = [...new Set(exerciseEntries.map((entry) => entry.exercise?.language).filter(Boolean))];
   const frontendBase = String(process.env.FRONTEND_URL || '').split(',')[0].trim().replace(/\/$/, '');
@@ -135,6 +137,7 @@ const getMyPrescription = asyncHandler(async (req, res) => {
       id: programDay._id,
       dayNumber: programDay.dayNumber,
       title: programDay.title,
+      focus: programDay.focus,
       exercises: exerciseEntries,
     } : {
       dayNumber: currentDay,
