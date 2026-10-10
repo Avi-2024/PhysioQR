@@ -6,6 +6,7 @@ export type ReleaseExercise = {
   name: string;
   active: boolean;
   videoReady: boolean;
+  demoVideo?: boolean;
   safetyReady: boolean;
   categoryReady: boolean;
   doseReady: boolean;
@@ -103,7 +104,7 @@ export default function ProgrammeReleaseChecklist({
                   <p className="text-sm font-bold text-neutral-900">{index + 1}. {task.name}</p>
                   <p className="mt-1 text-xs text-neutral-500">Used on {task.usedOnDays.length} programme day(s)</p>
                   <div className="mt-2 flex flex-wrap gap-1.5">
-                    <Status label={task.videoReady ? 'Video added' : 'Video missing'} ok={task.videoReady} />
+                    <Status label={task.demoVideo ? 'Demo video — replace with real exercise video' : task.videoReady ? 'Video added' : 'Video missing'} ok={task.videoReady} />
                     <Status label={task.active ? 'Active' : 'Inactive'} ok={task.active} />
                     <Status label={task.safetyReady ? 'Safety checked' : 'Safety notes missing'} ok={task.safetyReady} />
                     {!task.categoryReady && <Status label="Wrong body region" ok={false} />}
