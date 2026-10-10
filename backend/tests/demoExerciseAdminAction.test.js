@@ -55,11 +55,13 @@ test('apply fills missing videos and records an audit without publishing program
   assert.equal(result.body.realVideosOverwritten, 0);
   assert.equal(writes.length, 1);
   assert.deepEqual(writes[0].change.$set, {
-    videoUrl: 'https://www.youtube.com/watch?v=M7lc1UVf-VE',
-    youtubeVideoId: 'M7lc1UVf-VE',
+    videoUrl: 'https://youtu.be/ml6cT4AZdqI?si=0VwhyxF63Vulcq5Z',
+    youtubeVideoId: 'ml6cT4AZdqI',
     isDemoVideo: true,
   });
-  assert.equal(writes[0].filter.$and.length, 2);
+  assert.equal(writes[0].filter.$or.length, 2);
+  assert.equal(writes[0].filter.$or[0].$and.length, 2);
+  assert.equal(writes[0].filter.$or[1].youtubeVideoId, 'M7lc1UVf-VE');
   assert.equal(audits.length, 1);
   assert.equal(audits[0].action, 'exercise_demo_videos_bulk_added');
 });
@@ -69,8 +71,10 @@ test('remove only targets exact flagged test-only videos', async () => {
   const result = await execute({ action: 'remove', acknowledgeTestingOnly: true });
   assert.equal(result.body.changed, 10);
   assert.deepEqual(writes[0].filter, {
-    isDemoVideo: true, videoUrl: 'https://www.youtube.com/watch?v=M7lc1UVf-VE',
-    youtubeVideoId: 'M7lc1UVf-VE',
+    $or: [
+      { isDemoVideo: true, videoUrl: 'https://youtu.be/ml6cT4AZdqI?si=0VwhyxF63Vulcq5Z', youtubeVideoId: 'ml6cT4AZdqI' },
+      { isDemoVideo: true, videoUrl: 'https://www.youtube.com/watch?v=M7lc1UVf-VE', youtubeVideoId: 'M7lc1UVf-VE' },
+    ],
   });
   assert.deepEqual(writes[0].change.$set, {
     videoUrl: '', youtubeVideoId: '', isDemoVideo: false,
