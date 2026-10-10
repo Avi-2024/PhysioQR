@@ -30,7 +30,7 @@ const getProgrammeReleaseReadiness = async (program) => {
       if (exercise.isActive !== true) issues.push(`Day ${n}: exercise "${exercise.name}" is inactive`);
       if (!videoConfigured(exercise)) issues.push(`Day ${n}: exercise "${exercise.name}" has no video`);
       if (!String(exercise.safetyInstructions || '').trim()) issues.push(`Day ${n}: exercise "${exercise.name}" needs safety instructions`);
-      if (String(exercise.painCategory || '') !== String(program.painCategory)) issues.push(`Day ${n}: exercise "${exercise.name}" is mapped to another body region`);
+      if (String(exercise.painCategory?._id || exercise.painCategory || '') !== String(program.painCategory?._id || program.painCategory)) issues.push(`Day ${n}: exercise "${exercise.name}" is mapped to another body region`);
       const sets = entry.sets ?? exercise.sets;
       const reps = entry.repetitions ?? exercise.repetitions;
       if (!Number.isInteger(Number(sets)) || Number(sets) < 1 ||
