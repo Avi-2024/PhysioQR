@@ -351,6 +351,17 @@ export default function AdminAgentsPage() {
                           View
                           <ExternalLink className="h-3.5 w-3.5" />
                         </button>
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            navigate(`/admin/agents/${agent._id}?edit=1`);
+                          }}
+                          className="ml-2 inline-flex items-center rounded-lg border border-primary-200 bg-primary-50 px-3 py-2 text-xs font-semibold text-primary-700 transition hover:bg-primary-100"
+                          aria-label={`Edit ${agent.fullName}`}
+                        >
+                          Edit
+                        </button>
                       </td>
                     </tr>
                   ))}
