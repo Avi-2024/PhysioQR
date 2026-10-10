@@ -16,6 +16,7 @@
     "seed:clinical-content": "npm run seed:assessment-pathways && npm run seed:assessment-questions && npm run seed:rehab-programs",
     "reset:all-except-admin": "node scripts/resetAllExceptAdmin.js",
     "test:integration": "node scripts/integrationSmoke.js",
+    "test:assessment-visibility": "node --test tests/assessmentVisibility.test.js",
     "worker:notifications": "node scripts/notificationWorker.js",
     "migrate:rehab-content": "node scripts/migrateProgramContent.js",
     "audit:rehab-content": "node scripts/auditRehabContent.js",
