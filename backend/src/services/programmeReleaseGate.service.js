@@ -22,10 +22,14 @@ const videoConfigured = (exercise) => {
   }
 };
 
-const getProgrammeReleaseReadiness = async (program, { checkApprovalFreshness = false } = {}) => {
+// Keep the detailed safety gate and the Admin checklist in sync.
+// Issue counts are per assignment; the checklist groups unique exercises.
+const inspectProgrammeRelease = async (program, { checkApprovalFreshness = false } = {}) => {
   const issues = [];
-  if (!program) return ['Programme not found'];
-  if (!program.clinicalApprovalRequired) return issues;
+  const checklist = new Map();
+  const missingDays = [];
+  if (!program) return { issues: ['Programme not found'], exercises: [], missingDays, configuredDays: 0, requiredDays: 0 };
+  if (!program.clinicalApprovalRequired) return { issues, exercises: [], missingDays, configuredDays: 0, requiredDays: program.durationDays || 0 };
 
   const days = await ProgramDay.find({ program: program._id, isActive: true })
     .populate('exercises.exercise',
@@ -44,30 +48,56 @@ const getProgrammeReleaseReadiness = async (program, { checkApprovalFreshness = 
   }
   const daysByNumber = new Map();
   for (const day of days) {
-    if (daysByNumber.has(day.dayNumber)) issues.push(`Day ${day.dayNumber}: duplicate active day`);
+    if (daysByNumber.has(day.dayNumber)) issues.push('Day ' + day.dayNumber + ': duplicate active day');
     daysByNumber.set(day.dayNumber, day);
   }
   for (let n = 1; n <= program.durationDays; n += 1) {
     const day = daysByNumber.get(n);
-    if (!day) { issues.push(`Day ${n}: not configured`); continue; }
-    if (!day.exercises?.length) { issues.push(`Day ${n}: no exercises assigned`); continue; }
+    if (!day) { issues.push('Day ' + n + ': not configured'); missingDays.push(n); continue; }
+    if (!day.exercises?.length) { issues.push('Day ' + n + ': no exercises assigned'); missingDays.push(n); continue; }
     for (const entry of day.exercises) {
       const exercise = entry.exercise;
-      if (!exercise) { issues.push(`Day ${n}: missing exercise reference`); continue; }
-      if (exercise.isActive !== true) issues.push(`Day ${n}: exercise "${exercise.name}" is inactive`);
-      if (!videoConfigured(exercise)) issues.push(`Day ${n}: exercise "${exercise.name}" has no video`);
-      if (!String(exercise.safetyInstructions || '').trim()) issues.push(`Day ${n}: exercise "${exercise.name}" needs safety instructions`);
-      if (String(exercise.painCategory?._id || exercise.painCategory || '') !== String(program.painCategory?._id || program.painCategory)) issues.push(`Day ${n}: exercise "${exercise.name}" is mapped to another body region`);
+      if (!exercise) { issues.push('Day ' + n + ': missing exercise reference'); continue; }
+      const id = String(exercise._id);
+      const active = exercise.isActive === true;
+      const videoReady = videoConfigured(exercise);
+      const safetyReady = Boolean(String(exercise.safetyInstructions || '').trim());
+      const categoryReady = String(exercise.painCategory?._id || exercise.painCategory || '') === String(program.painCategory?._id || program.painCategory);
       const sets = entry.sets ?? exercise.sets;
       const reps = entry.repetitions ?? exercise.repetitions;
-      if (!Number.isInteger(Number(sets)) || Number(sets) < 1 ||
-          !Number.isInteger(Number(reps)) || Number(reps) < 1) {
-        issues.push(`Day ${n}: exercise "${exercise.name}" needs valid sets/reps`);
-      }
+      const doseReady = Number.isInteger(Number(sets)) && Number(sets) >= 1
+        && Number.isInteger(Number(reps)) && Number(reps) >= 1;
+      if (!active) issues.push('Day ' + n + ': exercise "' + exercise.name + '" is inactive');
+      if (!videoReady) issues.push('Day ' + n + ': exercise "' + exercise.name + '" has no video');
+      if (!safetyReady) issues.push('Day ' + n + ': exercise "' + exercise.name + '" needs safety instructions');
+      if (!categoryReady) issues.push('Day ' + n + ': exercise "' + exercise.name + '" is mapped to another body region');
+      if (!doseReady) issues.push('Day ' + n + ': exercise "' + exercise.name + '" needs valid sets/reps');
+      if (!checklist.has(id)) checklist.set(id, {
+        id, name: exercise.name, active, videoReady, safetyReady,
+        categoryReady, doseReady: true, usedOnDays: [],
+      });
+      const row = checklist.get(id);
+      row.active = row.active && active;
+      row.videoReady = row.videoReady && videoReady;
+      row.safetyReady = row.safetyReady && safetyReady;
+      row.categoryReady = row.categoryReady && categoryReady;
+      row.doseReady = row.doseReady && doseReady;
+      if (!row.usedOnDays.includes(n)) row.usedOnDays.push(n);
     }
   }
-  return issues;
+  return {
+    issues,
+    exercises: [...checklist.values()].map((row) => ({
+      ...row, ready: row.active && row.videoReady && row.safetyReady && row.categoryReady && row.doseReady,
+    })).sort((a, b) => a.name.localeCompare(b.name)),
+    missingDays,
+    configuredDays: daysByNumber.size,
+    requiredDays: program.durationDays,
+  };
 };
+
+const getProgrammeReleaseReadiness = async (program, options) =>
+  (await inspectProgrammeRelease(program, options)).issues;
 
 const ensureApprovedRelease = async (program) => {
   if (!program?.clinicalApprovalRequired) return;
@@ -84,4 +114,4 @@ const ensureApprovedRelease = async (program) => {
   }
 };
 
-module.exports = { videoConfigured, getProgrammeReleaseReadiness, ensureApprovedRelease };
+module.exports = { videoConfigured, inspectProgrammeRelease, getProgrammeReleaseReadiness, ensureApprovedRelease };
