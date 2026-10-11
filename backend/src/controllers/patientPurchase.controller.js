@@ -18,7 +18,7 @@ const getPurchaseQuote = asyncHandler(async (req, res) => {
     ),
     PatientAssessment.findOne({ patient: patientId })
       .sort({ createdAt: -1 })
-      .select('painCategory status reviewType requiresPhysioReview approvedProgram approvedPrograms hasRedFlag')
+      .select('painCategory status reviewType requiresPhysioReview approvedProgram approvedPrograms hasRedFlag clinicalSelectionRequired')
       .lean(),
   ]);
 
