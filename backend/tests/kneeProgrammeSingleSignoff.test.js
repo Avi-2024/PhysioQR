@@ -62,15 +62,36 @@ test('after ONE real whole-programme review, candidate can satisfy strict releas
   assert.equal(release.issues.length, 0);
 });
 
-test('generic demo, missing source, or wrong programme cannot use single sign-off', async () => {
+test('direct exercise-matched YouTube URLs work without separate source page', async () => {
   const exercise = days[0].exercises[0].exercise;
-  exercise.youtubeVideoId = 'ml6cT4AZdqI';
-  assert.equal(gate.isCandidateForProgrammeSignoff(exercise, program), false);
-  exercise.youtubeVideoId = 'WK-5Pb9nNwQ';
   exercise.videoCandidateSourcePage = '';
-  assert.equal(gate.isCandidateForProgrammeSignoff(exercise, program), false);
-  exercise.videoCandidateSourcePage = 'https://example.com/video';
+  assert.equal(gate.candidateVideoProblem(exercise, program), null);
+  assert.equal(gate.isCandidateForProgrammeSignoff(exercise, program), true);
+  exercise.videoUrl = 'https://youtu.be/WK-5Pb9nNwQ?si=share';
+  assert.equal(gate.isCandidateForProgrammeSignoff(exercise, program), true);
+  const ready = await gate.inspectProgrammeRelease(program, { forProgrammeSignoff: true });
+  assert.equal(ready.issues.length, 0);
+});
+
+test('generic demo, wrong YouTube ID or wrong programme still fail with clear reason', async () => {
+  const exercise = days[0].exercises[0].exercise;
+  exercise.videoUrl = 'https://youtu.be/ml6cT4AZdqI';
+  exercise.youtubeVideoId = 'ml6cT4AZdqI';
+  assert.match(gate.candidateVideoProblem(exercise, program), /Generic playback-test video/);
+  exercise.youtubeVideoId = 'WK-5Pb9nNwQ';
+  assert.match(gate.candidateVideoProblem(exercise, program), /does not match/);
+  exercise.videoUrl = 'https://video.example.com/WK-5Pb9nNwQ';
+  assert.match(gate.candidateVideoProblem(exercise, program), /valid YouTube/);
+  const blocked = await gate.inspectProgrammeRelease(program, { forProgrammeSignoff: true });
+  assert.match(blocked.issues.join('; '), /Gentle Glute Bridge.*YouTube/);
+  exercise.videoUrl = 'https://youtu.be/WK-5Pb9nNwQ';
   assert.equal(gate.isCandidateForProgrammeSignoff(exercise, { ...program, programCode: 'other' }), false);
+});
+
+test('HTTP (non-HTTPS) exercise candidate URL must be corrected before review', () => {
+  const exercise = days[0].exercises[0].exercise;
+  exercise.videoUrl = 'http://youtu.be/WK-5Pb9nNwQ';
+  assert.match(gate.candidateVideoProblem(exercise, program), /HTTPS/);
 });
 
 test('missing/invalid content still blocks full-programme sign-off', async () => {
