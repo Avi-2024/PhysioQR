@@ -93,6 +93,14 @@ const getOnboardingStatus = asyncHandler(async (req, res) => {
   if (paymentCompleted && !programActivated) { nextStep = 6; nextAction = 'activation_pending'; }
   if (programActivated) { nextStep = 6; nextAction = 'dashboard'; }
 
+  // A new or unresolved safety review must NEVER be hidden by an older
+  // programme/payment state when resuming the patient journey.
+  if (reviewPending || reviewBlocked) {
+    nextStep = 5;
+    nextAction = reviewBlocked ? 'assessment_blocked'
+      : assessment.reviewType === 'physio_review' ? 'clinical_review' : 'risk_review';
+  }
+
   res.json({
     patient: { id: patient._id, patientId: patient.patientId, fullName: patient.fullName, mobile: patient.mobile, status: patient.status },
     registered: true,
