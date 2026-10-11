@@ -116,7 +116,7 @@ const getOnboardingQuote = asyncHandler(async (req, res) => {
   const requestedPainCategoryId = String(req.query.painCategoryId || '').trim();
   const [patient, assessment] = await Promise.all([
     Patient.findById(req.user._id).populate('referringDoctor', 'doctorId fullName clinicName status qrCodeActive approvedPatientFee revenueModel'),
-    PatientAssessment.findOne({ patient: req.user._id }).sort({ createdAt: -1 }).select('painCategory status reviewType requiresPhysioReview approvedProgram').lean(),
+    PatientAssessment.findOne({ patient: req.user._id }).sort({ createdAt: -1 }).select('painCategory status reviewType requiresPhysioReview hasRedFlag approvedProgram').lean(),
   ]);
   if (!patient) return res.status(404).json({ message: 'Patient not found' });
   if (!assessment) return res.status(400).json({ message: 'Complete your assessment before selecting a rehabilitation programme' });
@@ -142,7 +142,9 @@ const getOnboardingQuote = asyncHandler(async (req, res) => {
   if (!painCategoryId) return res.status(400).json({ message: 'Assessment body region is not configured' });
 
   let program;
-  if (assessment.requiresPhysioReview) {
+  // A previously reviewed red-flag case must use the clinician's approved
+  // programme even if it is not a post-operative/physio-review pathway.
+  if (assessment.requiresPhysioReview || assessment.hasRedFlag) {
     if (!assessment.approvedProgram) {
       return res.status(409).json({ code: 'PROGRAM_APPROVAL_REQUIRED', message: 'The physiotherapist must approve a rehabilitation programme before payment can continue.' });
     }
