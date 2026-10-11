@@ -8,6 +8,7 @@ const { Payment } = require('../models/Payment.model');
 const Program = require('../models/Program.model');
 const { ProgramDay } = require('../models/Exercise.model');
 const asyncHandler = require('../utils/asyncHandler');
+const { requiresClinicalProgrammeSelection } = require('../services/patientAssessmentClearance.service');
 
 // POST /api/patients/register
 const registerPatient = asyncHandler(async (req, res) => {
@@ -152,7 +153,7 @@ const getOnboardingQuote = asyncHandler(async (req, res) => {
   let program;
   // A previously reviewed red-flag case must use the clinician's approved
   // programme even if it is not a post-operative/physio-review pathway.
-  if (assessment.requiresPhysioReview || assessment.hasRedFlag) {
+  if (requiresClinicalProgrammeSelection(assessment)) {
     if (!assessment.approvedProgram) {
       return res.status(409).json({ code: 'PROGRAM_APPROVAL_REQUIRED', message: 'The physiotherapist must approve a rehabilitation programme before payment can continue.' });
     }
