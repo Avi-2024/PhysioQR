@@ -95,6 +95,7 @@ const getRedFlagDetails = (visibleQuestions, answerMap) => (
         answer: submittedAnswer.answer,
         reason: question.redFlagOperator || 'any_answer',
         safetyMessage: question.redFlagSafetyMessage,
+      severity: question.redFlagSeverity === 'routine' && question.redFlagClassification?.clinicianName ? 'routine' : 'critical',
       });
     }
 
@@ -268,6 +269,9 @@ const submitAssessment = asyncHandler(async (req, res) => {
     answers,
     hasRedFlag,
     redFlagDetails,
+    clinicalSelectionRequired: clearance.clinicalSelectionRequired,
+    criticalFlagCount: clearance.criticalFlagCount,
+    routineFlagCount: clearance.routineFlagCount,
     status: clearance.status,
   });
 
@@ -283,6 +287,8 @@ const submitAssessment = asyncHandler(async (req, res) => {
   }
 
   res.status(201).json({ assessment, hasRedFlag, redFlagDetails, redFlagCount: clearance.redFlagCount,
+    criticalFlagCount: clearance.criticalFlagCount,
+    routineFlagCount: clearance.routineFlagCount,
     reviewRequired: clearance.reviewRequired, autoCleared: clearance.autoCleared });
 });
 
