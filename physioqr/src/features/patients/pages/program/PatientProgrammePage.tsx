@@ -129,7 +129,7 @@ export default function PatientProgrammePage() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <span className={cn('block truncate text-sm font-extrabold', selected ? 'text-primary-900' : 'text-neutral-900')}>
-                        {item.program?.name || 'Rehabilitation programme'}
+                        {patientProgrammeName(item.program?.name)}
                       </span>
                       <span className="mt-1 block text-[11px] font-medium text-neutral-500">
                         Day {item.currentDay || 1} · {item.program?.durationDays || '—'} days
@@ -202,9 +202,9 @@ export default function PatientProgrammePage() {
               <span className="text-xs font-medium text-neutral-500">{exercises.length} exercises</span>
             </div>
             <h2 className="mt-2 text-lg font-semibold leading-snug tracking-tight text-neutral-950 sm:text-xl">
-              {day?.title || program.name || 'Your recovery session'}
+              {day?.title || patientProgrammeName(program.name)}
             </h2>
-            <p className="mt-1.5 text-sm text-neutral-600">{program.name || 'Your rehabilitation programme'}</p>
+            <p className="mt-1.5 text-sm text-neutral-600">{patientProgrammeName(program.name)}</p>
             {day?.focus && <p className="mt-2 text-sm text-neutral-700"><span className="font-medium">Today's focus:</span> {day.focus}</p>}
             {(program.instructions || program.description || program.precautions) && (
               <div className="mt-4 border-t border-neutral-100 pt-3">
@@ -278,7 +278,10 @@ export default function PatientProgrammePage() {
                         </p>
                       )}
                       {Boolean(exercise.frequency) && (
-                        <p className="mt-2 text-xs leading-5 text-neutral-500">Frequency: {text(exercise.frequency)}</p>
+                        <details className="mt-3 text-xs text-neutral-600 print:open">
+                          <summary className="cursor-pointer font-medium text-emerald-800">Additional guidance</summary>
+                          <p className="mt-1 leading-5">{text(exercise.frequency)}</p>
+                        </details>
                       )}
                     </div>
                   </div>
@@ -313,6 +316,13 @@ function DosePill({ label, value }: { label: string; value: unknown }) {
       <dd className="text-sm font-semibold text-neutral-900">{text(value)}</dd>
     </div>
   );
+}
+
+function patientProgrammeName(value?: string) {
+  // Draft suffix is an internal editorial label. The backend only serves
+  // clinician-gated programmes to patients after genuine sign-off/publication.
+  const cleaned = String(value || '').replace(/\\s*\\(CLINICAL DRAFT\\)\\s*$/i, '').trim();
+  return cleaned || 'Rehabilitation programme';
 }
 
 function text(value: unknown, fallback = '') {
