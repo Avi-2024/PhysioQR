@@ -275,7 +275,7 @@ const submitAssessment = asyncHandler(async (req, res) => {
     status: clearance.status,
   });
 
-  if (hasRedFlag) {
+  if (clearance.reviewRequired && hasRedFlag) {
     await notifyHighRiskAssessment(assessment);
     await writeAuditLog({
       req,
