@@ -23,4 +23,9 @@ const decidePatientAssessmentClearance = ({
   };
 };
 
-module.exports = { decidePatientAssessmentClearance };
+// Even after an Admin clears a red-flag assessment, its assigned treatment
+// programme must be clinician-selected rather than auto-picked by region.
+const requiresClinicalProgrammeSelection = (assessment) =>
+  Boolean(assessment && (assessment.hasRedFlag || assessment.requiresPhysioReview));
+
+module.exports = { decidePatientAssessmentClearance, requiresClinicalProgrammeSelection };
