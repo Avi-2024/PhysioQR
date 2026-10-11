@@ -91,7 +91,11 @@ export default function AdminProgramDetailPage() {
     mutationFn: (payload: { clinicianName: string; reviewNote: string }) =>
       apiClient.post(`/admin/programs/${programId}/clinical-approval`, payload),
     onSuccess: () => { setShowClinicalSignoff(false); setFormError(''); refreshRelated(); },
-    onError: (error: any) => setFormError(error?.response?.data?.message || 'Clinical sign-off could not be recorded.'),
+    onError: (error: any) => {
+      const data = error?.response?.data;
+      const issue = Array.isArray(data?.issues) ? data.issues.find((item: unknown) => typeof item === 'string') : '';
+      setFormError([data?.message || 'Clinical sign-off could not be recorded.', issue].filter(Boolean).join(' — '));
+    },
   });
   const dayMutation = useMutation({
     mutationFn: ({ day, payload }: { day?: Day; payload: Record<string, unknown> }) => day
