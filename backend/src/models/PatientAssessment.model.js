@@ -27,6 +27,10 @@ const patientAssessmentSchema = new mongoose.Schema({
     },
   ],
   hasRedFlag: { type: Boolean, default: false },
+  // Set explicitly on NEW assessments; missing for historical records.
+  clinicalSelectionRequired: Boolean,
+  routineFlagCount: { type: Number, default: 0 },
+  criticalFlagCount: { type: Number, default: 0 },
   redFlagDetails: [
     {
       question: { type: mongoose.Schema.Types.ObjectId, ref: 'AssessmentQuestion' },
