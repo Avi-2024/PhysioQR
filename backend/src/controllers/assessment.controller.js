@@ -7,6 +7,7 @@ const { writeAuditLog } = require('../utils/auditLogger');
 const { buildSort, paginateModel } = require('../utils/queryHelpers');
 const asyncHandler = require('../utils/asyncHandler');
 const { decidePatientAssessmentClearance } = require('../services/patientAssessmentClearance.service');
+const { effectiveRedFlagSeverity } = require('../services/assessmentFlagSeverity.service');
 
 // Converts an answer value into a stable comparable string.
 const toComparable = (value) => {
@@ -95,7 +96,7 @@ const getRedFlagDetails = (visibleQuestions, answerMap) => (
         answer: submittedAnswer.answer,
         reason: question.redFlagOperator || 'any_answer',
         safetyMessage: question.redFlagSafetyMessage,
-      severity: question.redFlagSeverity === 'routine' && question.redFlagClassification?.clinicianName ? 'routine' : 'critical',
+      severity: effectiveRedFlagSeverity(question),
       });
     }
 
