@@ -213,6 +213,8 @@ const createAssessmentQuestion = asyncHandler(async (req, res) => {
   if (HIDDEN_PATIENT_QUESTION_TYPES.includes(payload.questionType)) {
     return res.status(400).json({ message: 'Free-text and image-answer questions are retired from the patient assessment. Please choose a structured answer type.' });
   }
+  // New safety questions always start critical until classified by a real clinician.
+  payload.redFlagSeverity = 'critical';
   await applyCreateDefaults(payload);
   const error = await validatePayload(payload);
   if (error) return res.status(400).json({ message: error });
@@ -225,6 +227,37 @@ const updateAssessmentQuestion = asyncHandler(async (req, res) => {
   const question = await AssessmentQuestion.findById(req.params.id);
   if (!question) return res.status(404).json({ message: 'Assessment question not found' });
   const payload = normalizePayload(req.body);
+  // Never let arbitrary payloads silently downgrade a safety rule.
+  // A clinician-backed rationale is mandatory for EVERY routine classification.
+  const desiredSeverity = req.body.redFlagSeverity ?? question.redFlagSeverity ?? 'critical';
+  if (!['critical', 'routine'].includes(desiredSeverity)) {
+    return res.status(400).json({ message: 'Screening severity must be critical or routine' });
+  }
+  const safetyFields = ['questionText','questionType','isRedFlag','redFlagOperator',
+    'redFlagAnswerValues','redFlagMinValue','redFlagMaxValue','redFlagSafetyMessage'];
+  const safetyChanged = safetyFields.some((field) =>
+    payload[field] !== undefined && JSON.stringify(payload[field]) !== JSON.stringify(question[field]));
+  const needsNewClassification = desiredSeverity === 'routine' &&
+    (question.redFlagSeverity !== 'routine' || !question.redFlagClassification?.clinicianName || safetyChanged);
+  if (needsNewClassification) {
+    const clinicianName = String(req.body.classificationClinicianName || '').trim();
+    const justification = String(req.body.classificationJustification || '').trim();
+    if (clinicianName.length < 3 || clinicianName.length > 160 || justification.length < 20 || justification.length > 2000) {
+      return res.status(400).json({ message:
+        'A qualified clinician must classify this as non-urgent. Enter their name (3+ characters) and clinical justification (20+ characters).' });
+    }
+    if ((payload.isRedFlag ?? question.isRedFlag) !== true) {
+      return res.status(400).json({ message: 'Routine flag classification requires an enabled safety screening rule' });
+    }
+    payload.redFlagClassification = {
+      clinicianName, justification, recordedBy: req.user._id, recordedAt: new Date(),
+    };
+  }
+  if (desiredSeverity === 'routine' && safetyChanged && !needsNewClassification) {
+    return res.status(409).json({ message: 'Safety rule changed; renew clinician classification first' });
+  }
+  payload.redFlagSeverity = (payload.isRedFlag ?? question.isRedFlag) ? desiredSeverity : 'critical';
+  if (payload.redFlagSeverity !== 'routine') payload.redFlagClassification = undefined;
   const effectiveForValidation = { ...payload, questionType: payload.questionType || question.questionType, isRedFlag: payload.isRedFlag ?? question.isRedFlag };
   if (HIDDEN_PATIENT_QUESTION_TYPES.includes(effectiveForValidation.questionType)) {
     // Existing records may be edited for audit/history but never republished.
@@ -242,7 +275,9 @@ const updateAssessmentQuestion = asyncHandler(async (req, res) => {
     surgeryType: effectiveForValidation.surgeryType,
   });
   await question.save();
-  await writeAuditLog({ req, action: 'assessment_question_updated', module: 'AssessmentQuestion', recordId: question._id, previousValue, newValue: question });
+  await writeAuditLog({ req, action: needsNewClassification ? 'assessment_screening_severity_clinically_classified' : 'assessment_question_updated',
+    module: 'AssessmentQuestion', recordId: question._id, previousValue, newValue: question,
+    reason: needsNewClassification ? payload.redFlagClassification.justification : 'Admin question configuration update' });
   res.json(question);
 });
 
