@@ -159,13 +159,13 @@ export default function PatientProgrammePage() {
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2 print:hidden">
-              <label className="flex min-h-10 items-center gap-1.5 rounded-lg border border-neutral-200 px-2.5 text-xs font-medium text-neutral-700">
+              {languages.length > 1 && <label className="flex min-h-10 items-center gap-1.5 rounded-lg border border-neutral-200 px-2.5 text-xs font-medium text-neutral-700">
                 <Languages className="h-4 w-4" aria-hidden="true" />
                 <span className="sr-only">Exercise language</span>
                 <select aria-label="Exercise language" value={language} onChange={(event) => setLanguage(event.target.value)} className="bg-transparent py-2 outline-none">
                   {languages.map((item) => <option key={item} value={item}>{item === 'hi' ? 'Hindi' : 'English'}</option>)}
                 </select>
-              </label>
+              </label>}
               <button type="button" onClick={() => setShowPrescription((value) => !value)}
                 aria-expanded={showPrescription} className="min-h-10 rounded-lg border border-neutral-200 px-3 text-xs font-medium text-neutral-700 hover:bg-neutral-50">
                 {showPrescription ? 'Hide prescription' : 'Prescription details'}
@@ -278,7 +278,7 @@ export default function PatientProgrammePage() {
                         </p>
                       )}
                       {Boolean(exercise.frequency) && (
-                        <details className="mt-3 text-xs text-neutral-600 print:open">
+                        <details className="mt-3 text-xs text-neutral-600">
                           <summary className="cursor-pointer font-medium text-emerald-800">Additional guidance</summary>
                           <p className="mt-1 leading-5">{text(exercise.frequency)}</p>
                         </details>
