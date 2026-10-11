@@ -6,6 +6,7 @@ const notificationService = require('../services/notification.service');
 const { writeAuditLog } = require('../utils/auditLogger');
 const { buildSort, paginateModel } = require('../utils/queryHelpers');
 const asyncHandler = require('../utils/asyncHandler');
+const { decidePatientAssessmentClearance } = require('../services/patientAssessmentClearance.service');
 
 // Converts an answer value into a stable comparable string.
 const toComparable = (value) => {
@@ -259,14 +260,15 @@ const submitAssessment = asyncHandler(async (req, res) => {
   }
 
   const redFlagDetails = getRedFlagDetails(visibleQuestions, answerMap);
-  const hasRedFlag = redFlagDetails.length > 0;
+  const clearance = decidePatientAssessmentClearance({ redFlagDetails });
+  const { hasRedFlag } = clearance;
   const assessment = await PatientAssessment.create({
     patient: patientId,
     painCategory: painCategoryId,
     answers,
     hasRedFlag,
     redFlagDetails,
-    status: hasRedFlag ? 'pending_review' : 'cleared',
+    status: clearance.status,
   });
 
   if (hasRedFlag) {
@@ -280,7 +282,8 @@ const submitAssessment = asyncHandler(async (req, res) => {
     });
   }
 
-  res.status(201).json({ assessment, hasRedFlag, redFlagDetails });
+  res.status(201).json({ assessment, hasRedFlag, redFlagDetails, redFlagCount: clearance.redFlagCount,
+    reviewRequired: clearance.reviewRequired, autoCleared: clearance.autoCleared });
 });
 
 // GET /api/assessments/red-flags
