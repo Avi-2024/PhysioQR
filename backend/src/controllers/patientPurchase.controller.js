@@ -2,6 +2,7 @@ const Patient = require('../models/Patient.model');
 const PatientAssessment = require('../models/PatientAssessment.model');
 const Program = require('../models/Program.model');
 const asyncHandler = require('../utils/asyncHandler');
+const { requiresClinicalProgrammeSelection } = require('../services/patientAssessmentClearance.service');
 
 const normalizeIds = (values = []) => [...new Set((values || []).map((value) => String(value)).filter(Boolean))];
 
@@ -64,7 +65,7 @@ const getPurchaseQuote = asyncHandler(async (req, res) => {
       });
     }
     assignmentSource = 'clinical_review';
-  } else if (assessment.requiresPhysioReview || assessment.hasRedFlag) {
+  } else if (requiresClinicalProgrammeSelection(assessment)) {
     return res.status(409).json({
       code: 'PROGRAM_APPROVAL_REQUIRED',
       message: 'Admin must approve at least one rehabilitation programme for this cleared clinical review before payment can continue.',
