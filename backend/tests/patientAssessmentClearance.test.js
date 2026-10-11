@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { decidePatientAssessmentClearance } = require('../src/services/patientAssessmentClearance.service');
+const { decidePatientAssessmentClearance, requiresClinicalProgrammeSelection } =
+  require('../src/services/patientAssessmentClearance.service');
 
 const flags = (count) => Array.from({ length: count }, (_, i) => ({
   question: String(i + 1), answer: 'yes', safetyMessage: 'Seek review',
@@ -60,4 +61,12 @@ test('missing or invalid redFlagDetails never invent red flags', () => {
   assert.equal(result.status, 'cleared');
   const invalid = decidePatientAssessmentClearance({ redFlagDetails: null });
   assert.equal(invalid.redFlagCount, 0);
+});
+
+test('only low-risk assessments may receive an automatically selected programme', () => {
+  assert.equal(requiresClinicalProgrammeSelection({ hasRedFlag: false, requiresPhysioReview: false }), false);
+  assert.equal(requiresClinicalProgrammeSelection({ hasRedFlag: true, requiresPhysioReview: false }), true);
+  assert.equal(requiresClinicalProgrammeSelection({ hasRedFlag: false, requiresPhysioReview: true }), true);
+  assert.equal(requiresClinicalProgrammeSelection({ hasRedFlag: true, requiresPhysioReview: true }), true);
+  assert.equal(requiresClinicalProgrammeSelection(null), false);
 });
