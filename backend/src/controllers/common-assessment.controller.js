@@ -9,6 +9,7 @@ const { writeAuditLog } = require('../utils/auditLogger');
 const asyncHandler = require('../utils/asyncHandler');
 const { isRegionVisibleForCase, isSurgeryVisible } = require('../services/assessmentVisibility.service');
 const { patientQuestionTypeFilter } = require('../services/patientAssessmentQuestions.service');
+const { decidePatientAssessmentClearance } = require('../services/patientAssessmentClearance.service');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const ALLOWED_SIDES = ['right', 'left', 'both', 'not_applicable'];
@@ -261,9 +262,12 @@ const submitCommonAssessment = asyncHandler(async (req, res) => {
   }
 
   const redFlagDetails = getRedFlagDetails(visibleQuestions, sanitizedAnswerMap);
-  const hasRedFlag = redFlagDetails.length > 0;
-  const requiresPhysioReview = Boolean(context.caseType?.requiresPhysioReview || context.surgeryType?.requiresPhysioReview);
-  const reviewRequired = hasRedFlag || requiresPhysioReview;
+  const clearance = decidePatientAssessmentClearance({
+    redFlagDetails,
+    requiresPhysioReview: Boolean(context.caseType?.requiresPhysioReview || context.surgeryType?.requiresPhysioReview),
+    isPostOperative: Boolean(context.caseType?.requiresSurgeryDetails),
+  });
+  const { hasRedFlag, requiresPhysioReview, reviewRequired } = clearance;
   const postOpDayAtAssessment = context.surgeryDate
     ? Math.max(0, Math.floor((Date.now() - context.surgeryDate.getTime()) / DAY_MS))
     : undefined;
@@ -277,11 +281,11 @@ const submitCommonAssessment = asyncHandler(async (req, res) => {
     side: context.side,
     postOpDayAtAssessment,
     requiresPhysioReview,
-    reviewType: hasRedFlag ? 'red_flag' : requiresPhysioReview ? 'physio_review' : undefined,
+    reviewType: clearance.reviewType,
     answers: sanitizedAnswers,
     hasRedFlag,
     redFlagDetails,
-    status: reviewRequired ? 'pending_review' : 'cleared',
+    status: clearance.status,
   });
 
   if (reviewRequired) {
@@ -310,6 +314,8 @@ const submitCommonAssessment = asyncHandler(async (req, res) => {
     hasRedFlag,
     requiresPhysioReview,
     reviewRequired,
+    autoCleared: clearance.autoCleared,
+    redFlagCount: clearance.redFlagCount,
     redFlagDetails,
     postOpDay: postOpDayAtAssessment,
     postOpWeek: postOpDayAtAssessment === undefined ? undefined : Math.floor(postOpDayAtAssessment / 7) + 1,
