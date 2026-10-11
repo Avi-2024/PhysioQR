@@ -105,7 +105,13 @@ const inspectProgrammeRelease = async (program, { checkApprovalFreshness = false
       const doseReady = Number.isInteger(Number(sets)) && Number(sets) >= 1
         && Number.isInteger(Number(reps)) && Number(reps) >= 1;
       if (!active) issues.push('Day ' + n + ': exercise "' + exercise.name + '" is inactive');
-      if (!videoReady) issues.push('Day ' + n + ': exercise "' + exercise.name + '" ' + (candidateReviewPending ? 'requires video suitability check during programme sign-off' : demoVideo ? 'has TEST-ONLY video; replace with an exercise-specific video' : 'has no video'));
+      if (!videoReady) {
+        const detail = forProgrammeSignoff && candidateReviewPending
+          ? candidateVideoProblem(exercise, program)
+          : candidateReviewPending ? 'requires video suitability check during programme sign-off'
+            : demoVideo ? 'has TEST-ONLY video; replace with an exercise-specific video' : 'has no video';
+        issues.push('Day ' + n + ': exercise "' + exercise.name + '" — ' + detail);
+      }
       if (!safetyReady) issues.push('Day ' + n + ': exercise "' + exercise.name + '" needs safety instructions');
       if (!categoryReady) issues.push('Day ' + n + ': exercise "' + exercise.name + '" is mapped to another body region');
       if (!doseReady) issues.push('Day ' + n + ': exercise "' + exercise.name + '" needs valid sets/reps');
