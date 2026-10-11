@@ -6,6 +6,7 @@ const { writeAuditLog } = require('../utils/auditLogger');
 const asyncHandler = require('../utils/asyncHandler');
 const { withDayDosageInProgramme } = require('../services/dayExerciseDosage.service');
 const { patientSafeDay } = require('../services/demoExerciseVideo.service');
+const { isReleasedForPatient } = require('../services/patientProgrammePublication.service');
 
 const EXERCISE_EVENTS = ['video_started', 'video_completed', 'marked_completed', 'skipped'];
 
@@ -23,6 +24,16 @@ const loadAccessiblePatientProgram = async (req, patientProgramId) => {
     const error = new Error('Access denied');
     error.status = 403;
     throw error;
+  }
+
+  if (req.user.role === 'patient') {
+    const clinicalProgramme = await Program.findById(patientProgram.program)
+      .select('clinicalApprovalRequired clinicalApproval isActive').lean();
+    if (!isReleasedForPatient(clinicalProgramme)) {
+      const error = new Error('This programme is not yet published for patient sessions.');
+      error.status = 403;
+      throw error;
+    }
   }
 
   return patientProgram;
