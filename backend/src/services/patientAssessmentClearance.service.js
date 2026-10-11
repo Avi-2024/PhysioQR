@@ -1,31 +1,46 @@
-// Risk-sensitive self-service clearance policy.
-// No clinician should have to approve normal low-risk, non-surgical
-// assessments one by one. ONE positive clinical red flag is sufficient
-// to require review; a numeric threshold such as 3 would miss urgent cases.
-// Post-operative cases also require review irrespective of red-flag count.
+// Fast-track genuinely low-risk, non-operative assessments.
+// Important: ALL existing/unclassified red flags remain CRITICAL. A single
+// critical red flag must never be auto-cleared based on a count threshold.
+// Only warnings explicitly clinically classified as "routine" can use
+// the 3+ trigger. Surgery or an explicit physio-review pathway still blocks.
+const ROUTINE_REVIEW_THRESHOLD = 3;
+
 const decidePatientAssessmentClearance = ({
   redFlagDetails = [],
   requiresPhysioReview = false,
   isPostOperative = false,
 } = {}) => {
-  const redFlagCount = Array.isArray(redFlagDetails) ? redFlagDetails.length : 0;
+  const flags = Array.isArray(redFlagDetails) ? redFlagDetails : [];
+  const redFlagCount = flags.length;
+  const criticalFlagCount = flags.filter((flag) => flag?.severity !== 'routine').length;
+  const routineFlagCount = redFlagCount - criticalFlagCount;
   const hasRedFlag = redFlagCount > 0;
   const clinicalReviewRequired = Boolean(requiresPhysioReview || isPostOperative);
-  const reviewRequired = hasRedFlag || clinicalReviewRequired;
+  const riskReviewRequired = criticalFlagCount > 0 || routineFlagCount >= ROUTINE_REVIEW_THRESHOLD;
+  const reviewRequired = clinicalReviewRequired || riskReviewRequired;
   return {
     redFlagCount,
+    criticalFlagCount,
+    routineFlagCount,
     hasRedFlag,
     requiresPhysioReview: clinicalReviewRequired,
+    clinicalSelectionRequired: reviewRequired,
     reviewRequired,
     autoCleared: !reviewRequired,
     status: reviewRequired ? 'pending_review' : 'cleared',
-    reviewType: hasRedFlag ? 'red_flag' : clinicalReviewRequired ? 'physio_review' : undefined,
+    reviewType: riskReviewRequired ? 'red_flag'
+      : clinicalReviewRequired ? 'physio_review' : undefined,
   };
 };
 
-// Even after an Admin clears a red-flag assessment, its assigned treatment
-// programme must be clinician-selected rather than auto-picked by region.
-const requiresClinicalProgrammeSelection = (assessment) =>
-  Boolean(assessment && (assessment.hasRedFlag || assessment.requiresPhysioReview));
+// Backward compatibility: assessments saved before the new classifier have no
+// stored clinicalSelectionRequired, and retain their historical safety gate.
+const requiresClinicalProgrammeSelection = (assessment) => {
+  if (!assessment) return false;
+  if (typeof assessment.clinicalSelectionRequired === 'boolean') {
+    return assessment.clinicalSelectionRequired;
+  }
+  return Boolean(assessment.hasRedFlag || assessment.requiresPhysioReview);
+};
 
-module.exports = { decidePatientAssessmentClearance, requiresClinicalProgrammeSelection };
+module.exports = { ROUTINE_REVIEW_THRESHOLD, decidePatientAssessmentClearance, requiresClinicalProgrammeSelection };
