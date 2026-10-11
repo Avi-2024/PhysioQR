@@ -7,7 +7,6 @@ import {
   Languages,
   Play,
   Printer,
-  Stethoscope,
   Video,
 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -49,6 +48,8 @@ export default function PatientProgrammePage() {
   const selectedEnrollmentId = searchParams.get('enrollment') || '';
   const [language, setLanguage] = useState('en');
   const [playingId, setPlayingId] = useState('');
+  const [showPrescription, setShowPrescription] = useState(false);
+  const [showGuidance, setShowGuidance] = useState(false);
   const query = useQuery<Prescription>({
     queryKey: ['patient-prescription', selectedEnrollmentId],
     queryFn: () => apiClient.get('/patients/me/prescription', { params: selectedEnrollmentId ? { enrollmentId: selectedEnrollmentId } : {} }).then((response) => response.data),
@@ -101,7 +102,7 @@ export default function PatientProgrammePage() {
   };
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4 text-neutral-900 print:max-w-none print:space-y-0">
+    <div className="mx-auto max-w-4xl space-y-4 text-neutral-900 print:max-w-none print:space-y-0">
       {activePrograms.length > 1 && (
         <section className="rounded-2xl border border-neutral-200/80 bg-white p-4 shadow-sm print:hidden sm:p-5">
           <div>
@@ -147,89 +148,78 @@ export default function PatientProgrammePage() {
         </section>
       )}
 
-      <section className="overflow-hidden rounded-[24px] border border-neutral-200/80 bg-white shadow-sm print:rounded-none print:border-0 print:shadow-none">
-        <div className="grid gap-5 border-b border-neutral-100 bg-neutral-50/70 p-5 md:grid-cols-[1fr_1.25fr_auto] md:items-start print:bg-white sm:p-6">
-          <div className="flex items-center gap-3">
-            <img src="/PhysioQR.png" alt="PhysioQR" className="h-12 w-auto object-contain sm:h-14" />
+      <section className="overflow-hidden rounded-2xl border border-neutral-200 bg-white print:rounded-none print:border-0">
+        <header className="border-b border-neutral-100 px-4 py-4 sm:px-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <div className="text-lg font-black tracking-tight text-neutral-950 sm:text-xl">PhysioQR</div>
-              <div className="text-[10px] font-bold uppercase tracking-[0.15em] text-neutral-400">guided rehabilitation</div>
+              <p className="text-xs font-medium text-neutral-500">My rehabilitation plan</p>
+              <h1 className="mt-1 text-xl font-semibold tracking-tight text-neutral-900">Today's exercises</h1>
+              <p className="mt-1 text-xs text-neutral-500">
+                {patient.fullName || 'Patient'}{doctor.fullName ? ' · ' + doctor.fullName : ''}
+              </p>
             </div>
-          </div>
-
-          <div className="min-w-0 rounded-xl border border-neutral-200 bg-white p-3.5 text-sm shadow-sm print:border-0 print:p-0 print:shadow-none">
-            <div className="flex items-center gap-2 font-extrabold text-neutral-950">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-50 text-primary-700 print:hidden">
-                <Stethoscope className="h-4 w-4" />
-              </div>
-              <span>{doctor.fullName || 'PhysioQR Clinical Team'}</span>
-            </div>
-            <p className="mt-2 text-xs text-neutral-500">
-              {[doctor.qualification, doctor.specialization].filter(Boolean).join(' · ') || 'Clinical rehabilitation provider'}
-            </p>
-            <p className="mt-1.5 text-xs leading-5 text-neutral-600">
-              {doctor.clinicName || (doctor.fullName ? 'PhysioQR Partner Clinic' : 'PhysioQR Direct')}
-              {clinicLocation ? ` · ${clinicLocation}` : ''}
-            </p>
-            {doctor.clinicContact && <p className="mt-1 text-xs text-neutral-500">Clinic: {doctor.clinicContact}</p>}
-          </div>
-
-          <div className="flex items-center gap-3 md:flex-col md:items-end">
-            {data.prescriptionQr && (
-              <img
-                src={data.prescriptionQr}
-                alt="Prescription QR code"
-                className="h-16 w-16 rounded-xl border border-neutral-200 bg-white p-1 sm:h-20 sm:w-20 print:h-16 print:w-16"
-              />
-            )}
-            <div className="flex flex-wrap gap-2 print:hidden md:justify-end">
-              <label className="relative inline-flex min-h-9 items-center gap-2 rounded-lg border border-neutral-300 bg-white px-2.5 text-xs font-semibold text-neutral-700">
-                <Languages className="h-3.5 w-3.5 text-neutral-400" />
-                <select value={language} onChange={(event) => setLanguage(event.target.value)} className="appearance-none bg-transparent pr-3 outline-none">
+            <div className="flex flex-wrap items-center gap-2 print:hidden">
+              <label className="flex min-h-10 items-center gap-1.5 rounded-lg border border-neutral-200 px-2.5 text-xs font-medium text-neutral-700">
+                <Languages className="h-4 w-4" aria-hidden="true" />
+                <span className="sr-only">Exercise language</span>
+                <select aria-label="Exercise language" value={language} onChange={(event) => setLanguage(event.target.value)} className="bg-transparent py-2 outline-none">
                   {languages.map((item) => <option key={item} value={item}>{item === 'hi' ? 'Hindi' : 'English'}</option>)}
                 </select>
               </label>
-              <button type="button" onClick={() => window.print()} className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg border border-neutral-300 bg-white px-3 text-xs font-semibold text-neutral-700 hover:bg-neutral-50">
-                <Printer className="h-3.5 w-3.5" />
-                Print
+              <button type="button" onClick={() => setShowPrescription((value) => !value)}
+                aria-expanded={showPrescription} className="min-h-10 rounded-lg border border-neutral-200 px-3 text-xs font-medium text-neutral-700 hover:bg-neutral-50">
+                {showPrescription ? 'Hide prescription' : 'Prescription details'}
+              </button>
+              <button type="button" onClick={() => window.print()}
+                className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-neutral-200 px-3 text-xs font-medium text-neutral-700 hover:bg-neutral-50">
+                <Printer className="h-4 w-4" aria-hidden="true" /> Print
               </button>
             </div>
           </div>
-        </div>
-
-        <div className="grid gap-4 border-b border-neutral-100 px-5 py-4 sm:grid-cols-[1fr_auto] sm:items-center sm:px-6">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-neutral-400">Patient</p>
-            <h1 className="mt-1 text-lg font-black text-neutral-950">{patient.fullName || 'Patient'}</h1>
-            <p className="mt-1 text-xs text-neutral-500">
-              {[patientAge ? `${patientAge}y` : '', patient.gender, patient.mobile || patient.patientId].filter(Boolean).join(' · ') || 'Patient profile'}
-            </p>
-          </div>
-          <div className="sm:text-right">
-            <div className="text-[10px] font-bold uppercase tracking-[0.08em] text-neutral-400">Prescription date</div>
-            <div className="mt-1 text-sm font-extrabold text-neutral-900">{dateText(data.prescriptionDate)}</div>
-            <div className="mt-1 text-[10px] text-neutral-400">{data.prescriptionId}</div>
-          </div>
-        </div>
-
-        <div className="p-5 sm:p-6">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        </header>
+        <div className={cn('border-b border-neutral-100 bg-neutral-50 px-4 py-4 sm:px-6', showPrescription ? 'block' : 'hidden', 'print:block print:bg-white')}>
+          <div className="flex flex-wrap items-start justify-between gap-5 text-sm">
             <div>
-              <div className="text-[10px] font-extrabold uppercase tracking-[0.09em] text-primary-700">{program.name || 'Rehabilitation programme'}</div>
-              <h2 className="mt-1 text-xl font-black text-neutral-950">
-                Day {currentDay}{day?.title ? ` · ${day.title}` : ''}
-              </h2>
-              <p className="mt-1 text-sm text-neutral-500">{program.description || 'Your prescribed exercises for this recovery day.'}</p>
-              {day?.focus && <p className="mt-2 text-xs font-semibold leading-5 text-emerald-800">Today's focus: {day.focus}</p>}
-              {program.instructions && <p className="mt-2 text-xs leading-5 text-neutral-600">{program.instructions}</p>}
-              {program.precautions && <p className="mt-2 rounded-lg border border-amber-100 bg-amber-50 p-3 text-xs leading-5 text-amber-900"><strong>Precautions:</strong> {program.precautions}</p>}
+              <img src="/PhysioQR.png" alt="PhysioQR" className="mb-3 h-10 w-auto object-contain" />
+              <p className="font-semibold text-neutral-900">{patient.fullName || 'Patient'}</p>
+              <p className="mt-1 text-xs text-neutral-500">{[patientAge ? patientAge + 'y' : '', patient.gender, patient.mobile || patient.patientId].filter(Boolean).join(' · ')}</p>
+              <p className="mt-3 font-medium text-neutral-800">{doctor.fullName || 'PhysioQR Clinical Team'}</p>
+              <p className="mt-1 text-xs text-neutral-500">{[doctor.qualification, doctor.specialization, doctor.clinicName, clinicLocation].filter(Boolean).join(' · ')}</p>
             </div>
-            <div className="inline-flex items-center gap-2 self-start rounded-full bg-neutral-100 px-3 py-1.5 text-xs font-bold text-neutral-600 sm:self-auto">
-              <Video className="h-3.5 w-3.5" />
-              {exercises.length} exercise{exercises.length === 1 ? '' : 's'}
+            <div className="flex items-start gap-3">
+              <div className="text-right text-xs text-neutral-500">
+                <p>Issued {dateText(data.prescriptionDate)}</p>
+                <p className="mt-1">{data.prescriptionId}</p>
+              </div>
+              {data.prescriptionQr && <img src={data.prescriptionQr} alt="Prescription QR code" className="h-16 w-16 rounded-lg border border-neutral-200 bg-white p-1" />}
             </div>
           </div>
-
+        </div>
+        <div className="p-5 sm:p-6">
+          <div>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs font-semibold text-emerald-800">Day {currentDay} of {program.durationDays || '—'}</p>
+              <span className="text-xs font-medium text-neutral-500">{exercises.length} exercises</span>
+            </div>
+            <h2 className="mt-2 text-lg font-semibold leading-snug tracking-tight text-neutral-950 sm:text-xl">
+              {day?.title || program.name || 'Your recovery session'}
+            </h2>
+            <p className="mt-1.5 text-sm text-neutral-600">{program.name || 'Your rehabilitation programme'}</p>
+            {day?.focus && <p className="mt-2 text-sm text-neutral-700"><span className="font-medium">Today's focus:</span> {day.focus}</p>}
+            {(program.instructions || program.description || program.precautions) && (
+              <div className="mt-4 border-t border-neutral-100 pt-3">
+                <button type="button" onClick={() => setShowGuidance((value) => !value)} aria-expanded={showGuidance}
+                  className="text-sm font-medium text-emerald-800 underline-offset-4 hover:underline print:hidden">
+                  {showGuidance ? 'Hide programme guidance −' : 'Read programme guidance +'}
+                </button>
+                <div className={cn('mt-3 space-y-2 text-sm leading-6 text-neutral-600', showGuidance ? 'block' : 'hidden', 'print:block')}>
+                  {program.description && <p>{program.description}</p>}
+                  {program.instructions && <p>{program.instructions}</p>}
+                  {program.precautions && <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-950"><strong>Precautions:</strong> {program.precautions}</p>}
+                </div>
+              </div>
+            )}
+          </div>
           <div className="mt-5 space-y-4">
             {exercises.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-neutral-300 bg-neutral-50/70 px-4 py-10 text-center">
@@ -245,58 +235,50 @@ export default function PatientProgrammePage() {
               const thumbnail = text(exercise.thumbnail) || (youtubeId ? `https://i.ytimg.com/vi/${youtubeId}/hqdefault.jpg` : '');
 
               return (
-                <article key={id || index} className="overflow-hidden rounded-2xl border border-neutral-200 bg-white print:break-inside-avoid">
-                  <div className="grid md:grid-cols-[42%_1fr]">
-                    <div className="relative min-h-56 overflow-hidden bg-neutral-950 print:min-h-44">
+                <article key={id || index} className="overflow-hidden rounded-xl border border-neutral-200 bg-white print:break-inside-avoid">
+                  <div className="grid gap-0 sm:grid-cols-[minmax(0,36%)_1fr]">
+                    <div className="relative aspect-video overflow-hidden bg-neutral-950 print:aspect-[16/10]">
                       {playingId === id && youtubeId ? (
-                        <iframe
-                          src={`https://www.youtube-nocookie.com/embed/${youtubeId}?autoplay=1`}
-                          title={title}
-                          className="absolute inset-0 h-full w-full border-0"
-                          allow="autoplay; encrypted-media; picture-in-picture"
-                          allowFullScreen
-                        />
+                        <iframe src={`https://www.youtube-nocookie.com/embed/${youtubeId}?autoplay=1`}
+                          title={title} className="absolute inset-0 h-full w-full border-0"
+                          allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen />
                       ) : thumbnail ? (
-                        <img src={thumbnail} alt={`${title} exercise`} className="absolute inset-0 h-full w-full object-cover opacity-90" />
+                        <img src={thumbnail} alt={`${title} demonstration thumbnail`}
+                          className="absolute inset-0 h-full w-full object-cover" />
                       ) : (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center px-4 text-center text-white">
-                          <Video className="h-8 w-8 text-neutral-600" />
-                          <p className="mt-3 text-sm font-bold">Video not configured</p>
+                        <div className="absolute inset-0 flex items-center justify-center gap-2 text-xs text-white/80">
+                          <Video className="h-4 w-4" /> Video not available
                         </div>
                       )}
-
                       {playingId !== id && youtubeId && (
-                        <button
-                          type="button"
-                          onClick={() => startVideo(exercise)}
-                          className="absolute inset-0 m-auto flex h-14 w-14 items-center justify-center rounded-full bg-white text-neutral-950 shadow-xl transition hover:scale-105 print:hidden"
-                          aria-label={`Play ${title}`}
-                        >
-                          <Play className="ml-1 h-5 w-5 fill-current" />
+                        <button type="button" onClick={() => startVideo(exercise)}
+                          className="absolute inset-0 m-auto flex h-12 w-12 items-center justify-center rounded-full bg-white text-neutral-900 shadow-md transition hover:scale-105 print:hidden"
+                          aria-label={`Play ${title}`}>
+                          <Play className="ml-0.5 h-5 w-5 fill-current" />
                         </button>
                       )}
-
-                      <div className="absolute left-3 top-3 rounded-full bg-neutral-950/70 px-2.5 py-1 text-[10px] font-bold text-white backdrop-blur">
-                        Exercise {index + 1}
-                      </div>
+                      <span className="absolute left-3 top-3 rounded-md bg-neutral-950/75 px-2 py-1 text-[11px] font-medium text-white">
+                        {index + 1} / {exercises.length}
+                      </span>
                     </div>
-
-                    <div className="p-5 sm:p-6">
-                      <h3 className="text-lg font-black text-neutral-950">{title}</h3>
-                      <p className="mt-2 text-sm leading-6 text-neutral-600">{text(exercise.description, 'Follow the prescribed movement slowly and with control.')}</p>
-
-                      <dl className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                        <PrescriptionValue label="Reps" value={exercise.repetitions} />
-                        <PrescriptionValue label="Sets" value={exercise.sets} />
-                        <PrescriptionValue label="Hold" value={exercise.holdDuration} />
-                        <PrescriptionValue label="Rest" value={exercise.restDuration} />
-                        <PrescriptionValue label="Frequency" value={exercise.frequency} />
+                    <div className="p-4 sm:p-5">
+                      <h3 className="text-base font-semibold text-neutral-950">{title}</h3>
+                      <p className="mt-2 text-sm leading-6 text-neutral-600">
+                        {text(exercise.description, 'Move slowly and stay within a comfortable range.')}
+                      </p>
+                      <dl className="mt-3 flex flex-wrap gap-2">
+                        <DosePill label="Sets" value={exercise.sets} />
+                        <DosePill label="Reps" value={exercise.repetitions} />
+                        <DosePill label="Hold" value={exercise.holdDuration} />
+                        <DosePill label="Rest" value={exercise.restDuration} />
                       </dl>
-
                       {Boolean(exercise.safetyInstructions) && (
-                        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-xs leading-5 text-amber-900">
-                          {text(exercise.safetyInstructions)}
-                        </div>
+                        <p className="mt-3 border-t border-neutral-100 pt-3 text-xs leading-5 text-amber-900">
+                          <strong>Safety:</strong> {text(exercise.safetyInstructions)}
+                        </p>
+                      )}
+                      {Boolean(exercise.frequency) && (
+                        <p className="mt-2 text-xs leading-5 text-neutral-500">Frequency: {text(exercise.frequency)}</p>
                       )}
                     </div>
                   </div>
@@ -305,25 +287,17 @@ export default function PatientProgrammePage() {
             })}
           </div>
 
-          <div className="mt-6 flex flex-col gap-3 rounded-2xl bg-neutral-50 p-4 sm:flex-row sm:items-center sm:justify-between print:hidden">
-            <p className="max-w-2xl text-xs leading-5 text-neutral-500">
-              Follow only the exercises prescribed for you. Use daily tracking to record completion and feedback.
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 pt-4 print:hidden">
+            <p className="max-w-sm text-xs leading-5 text-neutral-500">
+              Stop if a movement increases pain. Record how your session went.
             </p>
             {day?.id && allExercises.length > 0 ? (
-              <button
-                type="button"
+              <button type="button"
                 onClick={() => navigate(`/patient/programme/day/${currentDay}?enrollment=${enrollment?.id || ''}`)}
-                className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-primary-600 px-4 text-sm font-extrabold text-white shadow-sm transition hover:bg-primary-700"
-              >
-                <CalendarDays className="h-4 w-4" />
-                Start daily tracking
-                <ChevronRight className="h-4 w-4" />
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white transition hover:bg-emerald-800">
+                <CalendarDays className="h-4 w-4" /> Start daily session <ChevronRight className="h-4 w-4" />
               </button>
-            ) : (
-              <div className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 px-4 text-sm font-bold text-amber-800">
-                Day content not configured
-              </div>
-            )}
+            ) : <p className="text-sm text-amber-800">Daily session is not configured yet</p>}
           </div>
         </div>
       </section>
@@ -331,11 +305,12 @@ export default function PatientProgrammePage() {
   );
 }
 
-function PrescriptionValue({ label, value }: { label: string; value: unknown }) {
+function DosePill({ label, value }: { label: string; value: unknown }) {
+  if (value === undefined || value === null || value === '') return null;
   return (
-    <div className="rounded-xl bg-neutral-50 p-3">
-      <dt className="text-[10px] font-bold uppercase tracking-wide text-neutral-400">{label}</dt>
-      <dd className="mt-0.5 text-sm font-black text-neutral-900">{text(value, '—')}</dd>
+    <div className="rounded-md bg-neutral-50 px-2.5 py-1.5">
+      <dt className="text-[11px] font-medium text-neutral-500">{label}</dt>
+      <dd className="text-sm font-semibold text-neutral-900">{text(value)}</dd>
     </div>
   );
 }
