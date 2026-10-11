@@ -56,7 +56,9 @@ export default function PatientRegistrationPageV3() {
   const assessmentStatus=text(asRecord(assessmentResult?.assessment).status);
   const assessmentReviewRequired=assessmentStatus==='pending_review'||(!assessmentStatus&&Boolean(assessmentResult?.reviewRequired||assessmentResult?.requiresPhysioReview||assessmentResult?.hasRedFlag));
   const assessmentBlocked=assessmentStatus==='blocked';
-  const assessmentAutoCleared=assessmentStatus==='cleared'&&!Boolean(assessmentResult?.hasRedFlag||assessmentResult?.requiresPhysioReview);
+  // Backend assessment.status is authoritative: 1–2 clinician-classified routine
+  // concerns may be cleared automatically, even when their count is nonzero.
+  const assessmentAutoCleared=assessmentStatus==='cleared';
   const postOpDay=assessmentResult?.postOpDay===undefined?null:Number(assessmentResult.postOpDay);
   const quoteQuery=useQuery({queryKey:['patient-onboarding-quote',bodyRegionId,text(asRecord(assessmentResult?.assessment)._id)],enabled:step>=5&&Boolean(bodyRegionId)&&otpVerified&&assessmentStatus==='cleared'&&!assessmentReviewRequired&&!assessmentBlocked,queryFn:async()=>(await apiClient.get('/patients/me/onboarding-quote',{params:{painCategoryId:bodyRegionId}})).data});
   const quote=asRecord(quoteQuery.data); const quoteProgram=asRecord(quote.program); const quoteDoctor=asRecord(quote.doctor); const pricing=asRecord(quote.pricing); const payable=Number(pricing.finalAmount||0);
