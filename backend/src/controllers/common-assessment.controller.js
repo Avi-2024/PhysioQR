@@ -89,6 +89,7 @@ const getRedFlagDetails = (visibleQuestions, answerMap) => visibleQuestions.redu
       answer: submittedAnswer.answer,
       reason: question.redFlagOperator || 'any_answer',
       safetyMessage: question.redFlagSafetyMessage,
+      severity: question.redFlagSeverity === 'routine' && question.redFlagClassification?.clinicianName ? 'routine' : 'critical',
     });
   }
   return details;
@@ -285,6 +286,9 @@ const submitCommonAssessment = asyncHandler(async (req, res) => {
     answers: sanitizedAnswers,
     hasRedFlag,
     redFlagDetails,
+    clinicalSelectionRequired: clearance.clinicalSelectionRequired,
+    criticalFlagCount: clearance.criticalFlagCount,
+    routineFlagCount: clearance.routineFlagCount,
     status: clearance.status,
   });
 
@@ -316,6 +320,8 @@ const submitCommonAssessment = asyncHandler(async (req, res) => {
     reviewRequired,
     autoCleared: clearance.autoCleared,
     redFlagCount: clearance.redFlagCount,
+    criticalFlagCount: clearance.criticalFlagCount,
+    routineFlagCount: clearance.routineFlagCount,
     redFlagDetails,
     postOpDay: postOpDayAtAssessment,
     postOpWeek: postOpDayAtAssessment === undefined ? undefined : Math.floor(postOpDayAtAssessment / 7) + 1,
