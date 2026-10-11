@@ -5,6 +5,7 @@ const { ProgramDay } = require('../models/Exercise.model');
 const asyncHandler = require('../utils/asyncHandler');
 const { withDayDosage } = require('../services/dayExerciseDosage.service');
 const { isDemoExerciseVideo, patientSafeExercise } = require('../services/demoExerciseVideo.service');
+const { isReleasedForPatient } = require('../services/patientProgrammePublication.service');
 
 const enrollmentPopulate = [
   { path: 'patient', select: 'patientId fullName mobile age dateOfBirth gender preferredLanguage' },
@@ -12,13 +13,6 @@ const enrollmentPopulate = [
   { path: 'doctor', select: 'doctorId fullName qualification specialization clinicName clinicAddress city state postalCode clinicContact clinicEmail' },
 ];
 
-// A legacy active patient enrolment must not expose an unpublished,
- // or unsigned clinical draft. Legacy programmes use their existing lifecycle.
- const isReleasedForPatient = (program) => {
-   if (!program) return false;
-   if (!program.clinicalApprovalRequired) return true;
-   return program.isActive === true && Boolean(program.clinicalApproval?.approvedAt);
- };
 
 const getMyPrescription = asyncHandler(async (req, res) => {
   const patientId = req.user._id;
