@@ -1,20 +1,40 @@
 // Release gate for programmes explicitly requiring clinical approval.
 // Legacy programmes do not enter this process automatically.
 const { ProgramDay } = require('../models/Exercise.model');
-const { isDemoExerciseVideo } = require('./demoExerciseVideo.service');
+const { isDemoExerciseVideo, youtubeId, DEMO_VIDEO_ID, LEGACY_DEMO_VIDEO_ID } = require('./demoExerciseVideo.service');
 const { PROGRAM_CODE, EXERCISE_PREFIX } = require('../data/generalKnee30DayDraft');
 
 // A linked Knee-specific candidate may be considered for the SINGLE full
 // programme review, but never counts as already approved for publication.
-const isCandidateForProgrammeSignoff = (exercise, program) => {
-  if (!exercise?.videoCandidateReviewPending || !program || program.programCode !== PROGRAM_CODE) return false;
-  if (!String(exercise.seedKey || '').startsWith(EXERCISE_PREFIX)) return false;
+const candidateVideoProblem = (exercise, program) => {
+  if (!exercise?.videoCandidateReviewPending || !program || program.programCode !== PROGRAM_CODE) {
+    return 'This video is not linked as a candidate for the General Knee 30-Day draft';
+  }
+  if (!String(exercise.seedKey || '').startsWith(EXERCISE_PREFIX)) {
+    return 'Exercise is not part of the General Knee 30-Day draft';
+  }
   const id = String(exercise.youtubeVideoId || '').trim();
-  if (!/^[A-Za-z0-9_-]{11}$/.test(id)) return false;
-  if (['ml6cT4AZdqI', 'M7lc1UVf-VE'].includes(id)) return false;
-  return Boolean(String(exercise.videoCandidateSourcePage || '').trim()
-    && String(exercise.videoUrl || '').trim());
+  const videoUrl = String(exercise.videoUrl || '').trim();
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(videoUrl);
+  } catch {
+    return 'Add a valid YouTube or youtu.be URL';
+  }
+  if (parsedUrl.protocol !== 'https:') return 'Use an HTTPS YouTube URL';
+  const idFromUrl = youtubeId(videoUrl);
+  if (!/^[A-Za-z0-9_-]{11}$/.test(idFromUrl)) return 'Add a valid YouTube video URL';
+  if (id !== idFromUrl) return 'Saved YouTube video ID does not match its URL. Open the exercise and save the URL again';
+  if ([DEMO_VIDEO_ID, LEGACY_DEMO_VIDEO_ID].includes(id)) {
+    return 'Generic playback-test video is not an exercise-specific demonstration';
+  }
+  // Video source is the YouTube URL itself. An additional source-page field is
+  // optional because clinicians often paste the video directly from YouTube.
+  return null;
 };
+
+const isCandidateForProgrammeSignoff = (exercise, program) =>
+  candidateVideoProblem(exercise, program) === null;
 const videoConfigured = (exercise) => {
   if (isDemoExerciseVideo(exercise)) return false; // Unreviewed/test-only videos cannot be published.
   const videoId = String(exercise?.youtubeVideoId || '').trim();
@@ -133,4 +153,4 @@ const ensureApprovedRelease = async (program) => {
   }
 };
 
-module.exports = { videoConfigured, isCandidateForProgrammeSignoff, inspectProgrammeRelease, getProgrammeReleaseReadiness, ensureApprovedRelease };
+module.exports = { videoConfigured, candidateVideoProblem, isCandidateForProgrammeSignoff, inspectProgrammeRelease, getProgrammeReleaseReadiness, ensureApprovedRelease };
