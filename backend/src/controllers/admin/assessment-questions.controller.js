@@ -6,6 +6,7 @@ const { writeAuditLog } = require('../../utils/auditLogger');
 const { buildSearchFilter, buildSort, paginateModel } = require('../../utils/queryHelpers');
 const asyncHandler = require('../../utils/asyncHandler');
 const { HIDDEN_PATIENT_QUESTION_TYPES } = require('../../services/patientAssessmentQuestions.service');
+const { isNonDowngradableSafetyQuestion } = require('../../services/assessmentFlagSeverity.service');
 
 const QUESTION_TYPES = ['single_choice', 'multiple_choice', 'yes_no', 'pain_scale', 'number', 'text', 'date', 'image'];
 const CHOICE_TYPES = ['single_choice', 'multiple_choice'];
@@ -232,6 +233,9 @@ const updateAssessmentQuestion = asyncHandler(async (req, res) => {
   const desiredSeverity = req.body.redFlagSeverity ?? question.redFlagSeverity ?? 'critical';
   if (!['critical', 'routine'].includes(desiredSeverity)) {
     return res.status(400).json({ message: 'Screening severity must be critical or routine' });
+  }
+  if (desiredSeverity === 'routine' && isNonDowngradableSafetyQuestion(question)) {
+    return res.status(409).json({ message: 'This serious safety red flag cannot be classified as routine or fast-tracked by count.' });
   }
   const safetyFields = ['questionText','questionType','isRedFlag','redFlagOperator',
     'redFlagAnswerValues','redFlagMinValue','redFlagMaxValue','redFlagSafetyMessage'];
