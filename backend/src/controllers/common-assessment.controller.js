@@ -10,6 +10,7 @@ const asyncHandler = require('../utils/asyncHandler');
 const { isRegionVisibleForCase, isSurgeryVisible } = require('../services/assessmentVisibility.service');
 const { patientQuestionTypeFilter } = require('../services/patientAssessmentQuestions.service');
 const { decidePatientAssessmentClearance } = require('../services/patientAssessmentClearance.service');
+const { effectiveRedFlagSeverity } = require('../services/assessmentFlagSeverity.service');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const ALLOWED_SIDES = ['right', 'left', 'both', 'not_applicable'];
@@ -89,7 +90,7 @@ const getRedFlagDetails = (visibleQuestions, answerMap) => visibleQuestions.redu
       answer: submittedAnswer.answer,
       reason: question.redFlagOperator || 'any_answer',
       safetyMessage: question.redFlagSafetyMessage,
-      severity: question.redFlagSeverity === 'routine' && question.redFlagClassification?.clinicianName ? 'routine' : 'critical',
+      severity: effectiveRedFlagSeverity(question),
     });
   }
   return details;
