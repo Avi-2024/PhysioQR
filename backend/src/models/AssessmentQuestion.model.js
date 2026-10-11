@@ -28,6 +28,15 @@ const assessmentQuestionSchema = new mongoose.Schema({
   surgeryType: { type: mongoose.Schema.Types.ObjectId, ref: 'SurgeryType' },
 
   isRedFlag: { type: Boolean, default: false },
+  // Every legacy red flag defaults to critical. Routine classification needs
+  // a documented clinician review before the 3-warning fast-track can apply.
+  redFlagSeverity: { type: String, enum: ['critical', 'routine'], default: 'critical' },
+  redFlagClassification: {
+    clinicianName: String,
+    justification: String,
+    recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    recordedAt: Date,
+  },
   redFlagAnswerValues: [{ type: mongoose.Schema.Types.Mixed }],
   redFlagOperator: {
     type: String,
