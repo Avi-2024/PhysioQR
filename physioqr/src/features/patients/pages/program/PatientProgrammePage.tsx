@@ -321,7 +321,7 @@ function DosePill({ label, value }: { label: string; value: unknown }) {
 function patientProgrammeName(value?: string) {
   // Draft suffix is an internal editorial label. The backend only serves
   // clinician-gated programmes to patients after genuine sign-off/publication.
-  const cleaned = String(value || '').replace(/\\s*\\(CLINICAL DRAFT\\)\\s*$/i, '').trim();
+  const cleaned = String(value || '').replace(/\s*\(CLINICAL DRAFT\)\s*$/i, '').trim();
   return cleaned || 'Rehabilitation programme';
 }
 
