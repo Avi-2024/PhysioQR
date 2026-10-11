@@ -38,6 +38,7 @@ const patientAssessmentSchema = new mongoose.Schema({
       answer: mongoose.Schema.Types.Mixed,
       reason: String,
       safetyMessage: String,
+      severity: { type: String, enum: ['critical', 'routine'], default: 'critical' },
     },
   ],
   redFlagNotes: String,
