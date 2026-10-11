@@ -57,6 +57,24 @@ This calls the running backend's connected development database.
 
 This does not affect post-operative Knee/Shoulder or other programmes.
 
+## YouTube-only video links
+
+The Exercise Library stores an exercise's **direct YouTube URL** and its
+matching 11-character YouTube video ID; hosted file uploads are not required.
+The physiotherapist can review the linked demonstrations in the one
+General Knee 30-day programme sign-off.
+
+For an exercise-specific candidate, a separate `videoCandidateSourcePage`
+field is **optional**. A valid HTTPS `youtube.com` or `youtu.be` URL with a
+matching saved video ID is sufficient for the video-link check at sign-off.
+The link must be reviewed for exercise suitability, and a generic
+playback-testing URL (e.g. `ml6cT4AZdqI`) remains ineligible.
+
+If the sign-off popup fails now, it reports the **exercise name and video
+problem**, e.g. a mismatched URL/video ID. In Admin → Exercises → Manage → Edit,
+re-save that exercise's YouTube URL and retry. No exercise-specific
+approval form is needed; programme sign-off is recorded separately.
+
 ## Review and release process
 
 - Each candidate is saved `isDemoVideo=true` AND
