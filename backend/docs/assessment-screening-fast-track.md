@@ -24,7 +24,10 @@ silently downgraded by a deployment or seeder. Unknown severity is also
 critical, not routine. Examples of potentially dangerous questions in
 the seed library include bladder/bowel changes, saddle numbness, worsening
 bilateral leg weakness, serious trauma and systemic illness. Do NOT classify
-these as routine to avoid queueing patients.
+these as routine to avoid queueing patients. These specific seeded
+urgent questions are **hard-protected in the backend**: a direct API update,
+Admin edit, or accidentally modified database severity does not permit them
+to use the routine fast-track.
 
 ## How an Admin can classify a non-urgent routine concern
 
@@ -69,7 +72,7 @@ assessment, and do not fabricate a clinician review.
 From `backend`:
 
 ```powershell
-node --test tests/patientAssessmentClearance.test.js
+node --test tests/patientAssessmentClearance.test.js tests/assessmentFlagSeverity.test.js
 ```
 
 Check in staging: zero flags (fast-track), 1 and 2 *actual clinician-marked
