@@ -8,9 +8,17 @@ const { isDemoExerciseVideo, patientSafeExercise } = require('../services/demoEx
 
 const enrollmentPopulate = [
   { path: 'patient', select: 'patientId fullName mobile age dateOfBirth gender preferredLanguage' },
-  { path: 'program', select: 'programCode name nameHindi description durationDays sessionsPerDay instructions precautions painCategory' },
+  { path: 'program', select: 'programCode name nameHindi description durationDays sessionsPerDay instructions precautions painCategory isActive clinicalApprovalRequired clinicalApproval' },
   { path: 'doctor', select: 'doctorId fullName qualification specialization clinicName clinicAddress city state postalCode clinicContact clinicEmail' },
 ];
+
+// A legacy active patient enrolment must not expose an unpublished,
+ // or unsigned clinical draft. Legacy programmes use their existing lifecycle.
+ const isReleasedForPatient = (program) => {
+   if (!program) return false;
+   if (!program.clinicalApprovalRequired) return true;
+   return program.isActive === true && Boolean(program.clinicalApproval?.approvedAt);
+ };
 
 const getMyPrescription = asyncHandler(async (req, res) => {
   const patientId = req.user._id;
@@ -34,16 +42,22 @@ const getMyPrescription = asyncHandler(async (req, res) => {
   }
 
   const activeEnrollments = await PatientProgram.find({ patient: patientId, status: 'active' })
-    .populate('program', 'programCode name nameHindi durationDays')
+    .populate('program', 'programCode name nameHindi durationDays isActive clinicalApprovalRequired clinicalApproval.approvedAt')
     .sort({ startDate: -1, createdAt: -1 })
     .lean();
 
-  if (!activeEnrollments.length) {
-    return res.status(404).json({ message: 'No active rehabilitation prescription found.' });
+  const releasedEnrollments = activeEnrollments.filter((item) => isReleasedForPatient(item.program));
+  if (!releasedEnrollments.length) {
+    return res.status(activeEnrollments.length ? 409 : 404).json({
+      code: activeEnrollments.length ? 'PROGRAMME_NOT_PUBLISHED' : 'NO_ACTIVE_PRESCRIPTION',
+      message: activeEnrollments.length
+        ? 'Your rehabilitation programme is not yet published. Please contact your clinical team.'
+        : 'No active rehabilitation prescription found.',
+    });
   }
 
   const activeProgrammeSummaries = [];
-  for (const item of activeEnrollments) {
+  for (const item of releasedEnrollments) {
     const itemCurrentDay = Math.max(1, Number(item.currentDay || 1));
     const contentDay = await ProgramDay.findOne({
       program: item.program?._id || item.program,
@@ -80,14 +94,14 @@ const getMyPrescription = asyncHandler(async (req, res) => {
 
   const requestedEnrollmentId = String(req.query.enrollmentId || '').trim();
   let selectedSummary = requestedEnrollmentId
-    ? activeEnrollments.find((item) => String(item._id) === requestedEnrollmentId)
+    ? releasedEnrollments.find((item) => String(item._id) === requestedEnrollmentId)
     : null;
 
   if (!requestedEnrollmentId) {
     const videoReady = activeProgrammeSummaries.find((item) => item.currentDayContent.videoReady);
     const contentReady = activeProgrammeSummaries.find((item) => item.currentDayContent.contentReady);
     const preferredId = videoReady?.enrollmentId || contentReady?.enrollmentId || activeEnrollments[0]._id;
-    selectedSummary = activeEnrollments.find((item) => String(item._id) === String(preferredId));
+    selectedSummary = releasedEnrollments.find((item) => String(item._id) === String(preferredId));
   }
 
   if (!selectedSummary) return res.status(404).json({ message: 'Selected rehabilitation programme is not active for this patient.' });
@@ -96,7 +110,9 @@ const getMyPrescription = asyncHandler(async (req, res) => {
     .populate(enrollmentPopulate)
     .lean();
 
-  if (!enrollment) return res.status(404).json({ message: 'Selected rehabilitation prescription is unavailable.' });
+  if (!enrollment || !isReleasedForPatient(enrollment.program)) {
+    return res.status(404).json({ message: 'Selected rehabilitation prescription is unavailable.' });
+  }
 
   const currentDay = Math.max(1, Number(enrollment.currentDay || 1));
   const programDay = await ProgramDay.findOne({
