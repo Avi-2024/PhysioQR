@@ -6,7 +6,7 @@ const { ProgramDay, Exercise } = require('../../models/Exercise.model');
 const { writeAuditLog } = require('../../utils/auditLogger');
 const { getPagination } = require('../../utils/queryHelpers');
 const asyncHandler = require('../../utils/asyncHandler');
-const { inspectProgrammeRelease, ensureApprovedRelease, isCandidateForProgrammeSignoff } = require('../../services/programmeReleaseGate.service');
+const { inspectProgrammeRelease, ensureApprovedRelease, isCandidateForProgrammeSignoff, candidateVideoProblem } = require('../../services/programmeReleaseGate.service');
 const { PROGRAM_CODE, EXERCISE_PREFIX } = require('../../data/generalKnee30DayDraft');
 
 const DIFFICULTY_LEVELS = [
@@ -283,9 +283,9 @@ const recordProgrammeClinicalApproval = asyncHandler(async (req, res) => {
     const invalidVideoCandidates = pending.filter((exercise) => !isCandidateForProgrammeSignoff(exercise, program));
     if (invalidVideoCandidates.length) {
       return res.status(409).json({
-        message: 'Cannot include these videos in the programme review: ' +
-          invalidVideoCandidates.slice(0, 3).map((exercise) => exercise.name).join(', ') +
-          '. Check the exercise-specific YouTube link and source details.',
+        message: 'Check these exercise videos: ' +
+          invalidVideoCandidates.slice(0, 3).map((exercise) =>
+            exercise.name + ' — ' + candidateVideoProblem(exercise, program)).join('; '),
         exerciseIds: invalidVideoCandidates.map((exercise) => exercise._id),
       });
     }
