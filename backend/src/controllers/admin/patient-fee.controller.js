@@ -17,8 +17,8 @@ const updateDirectPatientFee = asyncHandler(async (req, res) => {
   // Admin patient detail URLs use public IDs (e.g. PT00016), whereas some
   // internal callers use the MongoDB _id. Resolve either exact format safely.
   const identifier = String(req.params.id || '').trim();
-  const isMongoId = /^[a-f\\d]{24}$/i.test(identifier);
-  const isPublicId = /^PT\\d{5,}$/.test(identifier);
+  const isMongoId = /^[a-f\d]{24}$/i.test(identifier);
+  const isPublicId = /^PT\d{5,}$/.test(identifier);
   if (!isMongoId && !isPublicId) {
     return res.status(400).json({ message: 'Invalid patient ID. Use a PT-number or MongoDB ID.' });
   }
