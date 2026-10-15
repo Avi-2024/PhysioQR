@@ -59,7 +59,7 @@ export default function AdminPatientDetailPage() {
     onError: (error: any) => setActionError(error?.response?.data?.message || 'Patient status could not be updated.'),
   });
   const feeMutation = useMutation({
-    mutationFn: (payload: { fee: number; reason: string }) => apiClient.patch(`/admin/patients/${patientId}/direct-fee`, payload),
+    mutationFn: (payload: { fee: number; reason: string }) => apiClient.patch(`/admin/patients/${query.data?._id || patientId}/direct-fee`, payload),
     onSuccess: async () => { setFeeReason(''); setActionError(''); await refreshPatient(); },
     onError: (error: any) => setActionError(error?.response?.data?.message || 'Patient fee could not be updated.'),
   });
