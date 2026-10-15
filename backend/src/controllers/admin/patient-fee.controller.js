@@ -14,7 +14,17 @@ const updateDirectPatientFee = asyncHandler(async (req, res) => {
   if (!Number.isFinite(fee) || fee <= 0) return res.status(400).json({ message: 'Patient fee must be greater than zero' });
   if (!reason) return res.status(400).json({ message: 'Reason is required' });
 
-  const patient = await Patient.findById(req.params.id);
+  // Admin patient detail URLs use public IDs (e.g. PT00016), whereas some
+  // internal callers use the MongoDB _id. Resolve either exact format safely.
+  const identifier = String(req.params.id || '').trim();
+  const isMongoId = /^[a-f\\d]{24}$/i.test(identifier);
+  const isPublicId = /^PT\\d{5,}$/.test(identifier);
+  if (!isMongoId && !isPublicId) {
+    return res.status(400).json({ message: 'Invalid patient ID. Use a PT-number or MongoDB ID.' });
+  }
+  const patient = await Patient.findOne(isMongoId
+    ? { _id: identifier }
+    : { patientId: identifier });
   if (!patient) return res.status(404).json({ message: 'Patient not found' });
   if (patient.referringDoctor) {
     return res.status(409).json({ message: 'This patient is linked to a Doctor. Patient fee is controlled by the referring Doctor.' });
