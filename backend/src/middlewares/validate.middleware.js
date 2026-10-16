@@ -1,3 +1,5 @@
+const { isValidYouTubeVideoUrl } = require('../utils/youtubeVideoUrl');
+
 const isBlank = (value) => value === undefined || value === null || String(value).trim() === '';
 
 const requireFields = (...fields) => (req, res, next) => {
@@ -44,7 +46,7 @@ const validateNumberRange = (field, { min, max } = {}) => (req, res, next) => {
 const objectIdPattern = /^[a-f\d]{24}$/i;
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const mobilePattern = /^\+?\d{10,15}$/;
-const youtubePattern = /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)[a-zA-Z0-9_-]{11}(&.*)?$/;
+// Shared URL parser also handles YouTube share links containing ?si= and Shorts URLs.
 
 const validators = {
   string: (value, rule) => {
@@ -72,7 +74,7 @@ const validators = {
     if (rule.max !== undefined && value.length > rule.max) return `must contain at most ${rule.max} item(s)`;
     return null;
   },
-  youtubeUrl: (value) => (youtubePattern.test(String(value).trim()) ? null : 'must be a valid YouTube video URL'),
+  youtubeUrl: (value) => (isValidYouTubeVideoUrl(String(value).trim()) ? null : 'must be a valid YouTube watch, youtu.be, Shorts, embed or live video URL'),
 };
 
 // Validates request body, params, and query using lightweight schema rules.
