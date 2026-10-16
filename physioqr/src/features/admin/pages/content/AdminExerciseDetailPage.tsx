@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Activity, Dumbbell, Edit3, PlayCircle, RefreshCw, ShieldCheck } from 'lucide-react';
 import apiClient from '@/lib/api-client';
+import { formatApiValidationError } from '../../utils/formatApiValidationError';
 import ErrorState from '@/components/feedback/ErrorState';
 import { Modal } from '@/components/ui/Modal';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -46,7 +47,7 @@ export default function AdminExerciseDetailPage() {
   const updateMutation = useMutation({
     mutationFn: (payload: Record<string, unknown>) => apiClient.put(`/exercises/${exerciseId}`, payload),
     onSuccess: () => { setShowEdit(false); setFormError(''); refreshRelated(); },
-    onError: (error: any) => setFormError(error?.response?.data?.message || 'Exercise could not be updated.'),
+    onError: (error: any) => setFormError(formatApiValidationError(error, 'Exercise could not be updated.')),
   });
   const statusMutation = useMutation({
     mutationFn: ({ action }: { action: 'deactivate' | 'reactivate' }) => apiClient.post(`/exercises/${exerciseId}/${action}`, {}),
