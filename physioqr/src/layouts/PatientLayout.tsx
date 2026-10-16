@@ -10,6 +10,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth.store';
+import { signOutAndSwitchAccount } from '@/lib/switch-account';
 import { Logo } from '@/components/brand/Logo';
 import { cn } from '@/lib/cn';
 
@@ -24,10 +25,12 @@ const patientNav = [
 export function PatientLayout() {
   const { logout } = useAuthStore();
   const navigate = useNavigate();
+  const [isSigningOut, setIsSigningOut] = React.useState(false);
 
   const handleLogout = () => {
-    logout();
-    navigate('/login', { replace: true });
+    if (isSigningOut) return;
+    setIsSigningOut(true);
+    void signOutAndSwitchAccount(logout, () => navigate('/login', { replace: true }));
   };
 
   return (
@@ -45,9 +48,10 @@ export function PatientLayout() {
               type="button"
               className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-neutral-200 px-3 text-xs font-semibold text-neutral-700 transition hover:bg-neutral-100 hover:text-neutral-900"
               aria-label="Log out and switch account"
+              disabled={isSigningOut}
             >
               <LogOut className="h-4.5 w-4.5" aria-hidden="true" />
-              Switch account
+              {isSigningOut ? 'Signing out…' : 'Logout'}
             </button>
           </div>
         </div>
