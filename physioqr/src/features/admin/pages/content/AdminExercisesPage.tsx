@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Activity, ChevronLeft, ChevronRight, Dumbbell, ExternalLink, PlayCircle, Plus, RefreshCw, CheckSquare, ShieldAlert } from 'lucide-react';
 import apiClient from '@/lib/api-client';
+import { formatApiValidationError } from '../../utils/formatApiValidationError';
 import ErrorState from '@/components/feedback/ErrorState';
 import { Modal } from '@/components/ui/Modal';
 import { SearchInput } from '@/components/ui/SearchInput';
@@ -81,7 +82,7 @@ export default function AdminExercisesPage() {
       setFormError('');
       queryClient.invalidateQueries({ queryKey: ['admin-exercises'] });
     },
-    onError: (error: any) => setFormError(error?.response?.data?.message || 'Exercise could not be created.'),
+    onError: (error: any) => setFormError(formatApiValidationError(error, 'Exercise could not be created.')),
   });
 
   const demoMutation = useMutation({
