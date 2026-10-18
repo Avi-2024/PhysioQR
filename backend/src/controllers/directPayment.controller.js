@@ -13,6 +13,7 @@ const { getNextSequence } = require('../services/sequence.service');
 const { activateProgrammeBundle } = require('../services/programBundle.service');
 const fraudService = require('../services/fraud.service');
 const asyncHandler = require('../utils/asyncHandler');
+const { resolveDirectPatientFee } = require('../services/directPatientPricing.service');
 
 let razorpayClient;
 const VERIFIED_STATUSES = ['successful', 'manually_verified', 'refunded', 'partially_refunded', 'disputed', 'chargeback'];
@@ -46,8 +47,9 @@ const verifyWebhookSignature = ({ rawBody, signature }) => {
 };
 
 const resolveDirectPricing = async ({ patient, programIds, couponCode }) => {
-  const originalAmount = Number(patient.directPatientFee || 0);
-  if (originalAmount <= 0) throw paymentError('Admin has not configured the fee for this direct patient yet.', 409);
+  const resolvedFee = await resolveDirectPatientFee(patient);
+  const originalAmount = resolvedFee.amount;
+  if (originalAmount <= 0) throw paymentError('Admin has not configured a default direct-patient fee or patient-specific fee yet.', 409);
 
   let discountAmount = 0;
   let appliedCoupon = null;
@@ -73,6 +75,7 @@ const resolveDirectPricing = async ({ patient, programIds, couponCode }) => {
       revenueModel: 'platform_direct',
       feeAuthority: 'admin',
       adminPatientFee: originalAmount,
+      directFeeSource: resolvedFee.source,
       doctorFeeShare: 0,
       platformShare: finalAmount,
       couponCode: appliedCoupon?.couponCode || null,
