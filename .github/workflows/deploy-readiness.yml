@@ -70,3 +70,8 @@ jobs:
         env:
           NODE_ENV: test
         run: node -e "require('./src/app')"
+
+      - name: Run direct-patient pricing regression tests
+        env:
+          NODE_ENV: test
+        run: npm run test:direct-patient-pricing
