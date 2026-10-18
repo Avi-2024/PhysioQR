@@ -14,6 +14,7 @@ const { activateProgrammeBundle } = require('../services/programBundle.service')
 const fraudService = require('../services/fraud.service');
 const asyncHandler = require('../utils/asyncHandler');
 const { resolveDirectPatientFee } = require('../services/directPatientPricing.service');
+const { requiresClinicalProgrammeSelection } = require('../services/patientAssessmentClearance.service');
 
 let razorpayClient;
 const VERIFIED_STATUSES = ['successful', 'manually_verified', 'refunded', 'partially_refunded', 'disputed', 'chargeback'];
@@ -98,6 +99,11 @@ const resolveDirectBundle = async ({ patient, primaryProgramId }) => {
     ...(assessment.approvedPrograms || []),
     ...(assessment.approvedProgram ? [assessment.approvedProgram] : []),
   ]);
+  // A cleared high-risk/post-operative assessment still needs its clinician-selected
+  // programme. Never let a direct API caller pick a generic programme instead.
+  if (!programIds.length && requiresClinicalProgrammeSelection(assessment)) {
+    throw paymentError('A clinician must approve the rehabilitation programme before payment can continue', 409);
+  }
   if (!programIds.length) programIds = [String(primaryProgramId)];
   if (!programIds.includes(String(primaryProgramId))) throw paymentError('Selected programme is not part of the clinically approved programme bundle', 409);
 
