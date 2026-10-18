@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, CalendarDays, CheckCircle2, Dumbbell, Edit3, PlayCircle, Plus, RefreshCw, ShieldCheck, Users } from 'lucide-react';
 import apiClient from '@/lib/api-client';
+import { formatApiValidationError } from '../../utils/formatApiValidationError';
 import ErrorState from '@/components/feedback/ErrorState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Modal } from '@/components/ui/Modal';
@@ -102,7 +103,7 @@ export default function AdminProgramDetailPage() {
       ? apiClient.put(`/programs/${programId}/days/${day._id}`, payload)
       : apiClient.post(`/programs/${programId}/days`, payload),
     onSuccess: () => { setDayEditor(null); setFormError(''); refreshRelated(); },
-    onError: (error: any) => setFormError(error?.response?.data?.message || 'Program day could not be saved.'),
+    onError: (error: any) => setFormError(formatApiValidationError(error, 'Program day could not be saved.')),
   });
 
   const program = query.data?.program;

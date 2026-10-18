@@ -5,8 +5,10 @@ import {
   ArrowUpRight, ShieldCheck, User, LogOut, Bell, Menu, X, MessageSquare
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth.store';
+import { signOutAndSwitchAccount } from '@/lib/switch-account';
 import { Logo } from '@/components/brand/Logo';
 import { cn } from '@/lib/cn';
+import { MobileAccountActions } from '@/components/navigation/MobileAccountActions';
 
 export function DoctorLayout() {
   const { user, logout } = useAuthStore();
@@ -31,9 +33,12 @@ export function DoctorLayout() {
     { label: 'Profile', path: '/doctor/profile', icon: User },
   ];
 
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const handleLogout = () => {
-    logout();
-    navigate('/login');
+    if (isSigningOut) return;
+    setIsSigningOut(true);
+    setMobileOpen(false);
+    void signOutAndSwitchAccount(logout, () => navigate('/login', { replace: true }));
   };
 
   return (
@@ -119,6 +124,7 @@ export function DoctorLayout() {
                 </NavLink>
               ))}
             </nav>
+            <MobileAccountActions name={user?.name} role="Doctor" onSwitchAccount={handleLogout} />
           </aside>
         </div>
       )}
@@ -135,11 +141,22 @@ export function DoctorLayout() {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-            <button className="p-2 text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100 rounded-lg relative">
+            <button aria-label="Notifications" className="hidden sm:inline-flex p-2 text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100 rounded-lg relative">
               <Bell className="w-5 h-5" />
             </button>
             <div className="hidden sm:block h-8 w-px bg-neutral-200"></div>
-            <button onClick={handleLogout} className="hidden sm:flex items-center gap-2 text-xs font-semibold text-neutral-600 hover:text-neutral-900">
+<button
+              type="button"
+              onClick={handleLogout}
+              aria-label="Log out and switch account"
+              title="Logout / Switch Account"
+              disabled={isSigningOut}
+              className="lg:hidden inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-neutral-200 px-2.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50"
+            >
+              <LogOut className="h-4 w-4" aria-hidden="true" />
+              <span>{isSigningOut ? 'Signing out…' : 'Logout'}</span>
+            </button>
+            <button onClick={handleLogout} className="hidden lg:flex items-center gap-2 text-xs font-semibold text-neutral-600 hover:text-neutral-900">
               <LogOut className="w-4 h-4" /> Logout
             </button>
           </div>

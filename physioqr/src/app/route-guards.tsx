@@ -1,10 +1,18 @@
 import React, { type ReactNode } from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth.store';
 import { getRedirectPathForRole } from '@/lib/permissions';
 import type { UserRole, RevenueModel } from '@/types';
 
-const PermissionDenied = () => (
+const PermissionDenied = () => {
+  const { logout } = useAuthStore();
+  const navigate = useNavigate();
+  const handleSwitchAccount = () => {
+    logout();
+    navigate('/login', { replace: true });
+  };
+
+  return (
   <div className="flex min-h-screen items-center justify-center bg-gray-50">
     <div className="text-center max-w-md mx-auto px-4">
       <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-red-100">
@@ -13,10 +21,18 @@ const PermissionDenied = () => (
         </svg>
       </div>
       <h1 className="mb-2 text-2xl font-bold text-gray-900">Access Denied</h1>
-      <p className="text-gray-500">You do not have permission to view this page. Please contact your administrator if you believe this is an error.</p>
+      <p className="text-gray-500">This account cannot open that portal. Sign out and log in using an account with the correct role.</p>
+      <button
+        type="button"
+        onClick={handleSwitchAccount}
+        className="mt-6 inline-flex min-h-11 items-center justify-center rounded-lg bg-primary-700 px-5 text-sm font-semibold text-white hover:bg-primary-800"
+      >
+        Logout / Switch Account
+      </button>
     </div>
   </div>
-);
+  );
+};
 
 interface PublicRouteProps { children: ReactNode; }
 export const PublicRoute = ({ children }: PublicRouteProps) => {

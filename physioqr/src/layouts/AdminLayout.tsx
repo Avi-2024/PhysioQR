@@ -7,8 +7,10 @@ import {
   MessageSquare, FileSearch, AlertTriangle, Route
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth.store';
+import { signOutAndSwitchAccount } from '@/lib/switch-account';
 import { Logo } from '@/components/brand/Logo';
 import { cn } from '@/lib/cn';
+import { MobileAccountActions } from '@/components/navigation/MobileAccountActions';
 
 const NAV_GROUPS = [
   {
@@ -121,9 +123,12 @@ export function AdminLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const handleLogout = () => {
-    logout();
-    navigate('/login');
+    if (isSigningOut) return;
+    setIsSigningOut(true);
+    setMobileOpen(false);
+    void signOutAndSwitchAccount(logout, () => navigate('/login', { replace: true }));
   };
 
   return (
@@ -158,6 +163,7 @@ export function AdminLayout() {
               <button onClick={() => setMobileOpen(false)} className="p-2 rounded-lg text-neutral-300 hover:bg-neutral-800 hover:text-white" aria-label="Close menu"><X className="w-5 h-5" /></button>
             </div>
             <AdminNavigation onNavigate={() => setMobileOpen(false)} />
+            <MobileAccountActions name={user?.name} role="Admin" onSwitchAccount={handleLogout} />
           </aside>
         </div>
       )}
@@ -176,9 +182,20 @@ export function AdminLayout() {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-            <button className="p-2 text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100 rounded-lg relative"><Bell className="w-5 h-5" /><span className="w-2 h-2 bg-primary-600 rounded-full absolute top-2 right-2"></span></button>
+            <button aria-label="Notifications" className="hidden sm:inline-flex p-2 text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100 rounded-lg relative"><Bell className="w-5 h-5" /><span className="w-2 h-2 bg-primary-600 rounded-full absolute top-2 right-2"></span></button>
             <div className="hidden sm:block h-8 w-px bg-neutral-200"></div>
-            <button onClick={handleLogout} className="hidden sm:flex items-center gap-2 text-xs font-semibold text-neutral-600 hover:text-neutral-900"><LogOut className="w-4 h-4" /> Logout</button>
+<button
+              type="button"
+              onClick={handleLogout}
+              aria-label="Log out and switch account"
+              title="Logout / Switch Account"
+              disabled={isSigningOut}
+              className="lg:hidden inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-neutral-200 px-2.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50"
+            >
+              <LogOut className="h-4 w-4" aria-hidden="true" />
+              <span>{isSigningOut ? 'Signing out…' : 'Logout'}</span>
+            </button>
+            <button onClick={handleLogout} className="hidden lg:flex items-center gap-2 text-xs font-semibold text-neutral-600 hover:text-neutral-900"><LogOut className="w-4 h-4" /> Logout</button>
           </div>
         </header>
 

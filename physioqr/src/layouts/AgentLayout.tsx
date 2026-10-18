@@ -15,8 +15,10 @@ import {
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/auth.store";
+import { signOutAndSwitchAccount } from "@/lib/switch-account";
 import { Logo } from "@/components/brand/Logo";
 import { cn } from "@/lib/cn";
+import { MobileAccountActions } from '@/components/navigation/MobileAccountActions';
 import apiClient from "@/lib/api-client";
 const NAV_ITEMS = [
   { label: "Dashboard", path: "/agent/dashboard", icon: LayoutDashboard },
@@ -39,9 +41,12 @@ export function AgentLayout() {
     refetchInterval: 60000,
   });
   const unread = Number((nq.data as any)?.unreadCount || 0);
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const handleLogout = () => {
-    logout();
-    navigate("/login");
+    if (isSigningOut) return;
+    setIsSigningOut(true);
+    setMobileOpen(false);
+    void signOutAndSwitchAccount(logout, () => navigate('/login', { replace: true }));
   };
   const nav = (mobile = false) => (
     <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
@@ -108,6 +113,7 @@ export function AgentLayout() {
               </button>
             </div>
             {nav(true)}
+            <MobileAccountActions name={user?.name} role="Agent" onSwitchAccount={handleLogout} />
           </aside>
         </div>
       )}
@@ -124,7 +130,7 @@ export function AgentLayout() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => navigate("/agent/notifications")}
-              className="relative p-2 text-neutral-500 hover:bg-neutral-100 rounded-lg"
+              className="relative hidden sm:inline-flex p-2 text-neutral-500 hover:bg-neutral-100 rounded-lg"
               aria-label="Notifications"
             >
               <Bell className="w-5 h-5" />
@@ -134,9 +140,20 @@ export function AgentLayout() {
                 </span>
               )}
             </button>
+<button
+              type="button"
+              onClick={handleLogout}
+              aria-label="Log out and switch account"
+              title="Logout / Switch Account"
+              disabled={isSigningOut}
+              className="lg:hidden inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-neutral-200 px-2.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50"
+            >
+              <LogOut className="h-4 w-4" aria-hidden="true" />
+              <span>{isSigningOut ? 'Signing out…' : 'Logout'}</span>
+            </button>
             <button
               onClick={handleLogout}
-              className="hidden sm:flex items-center gap-2 text-xs font-semibold text-neutral-600"
+              className="hidden lg:flex items-center gap-2 text-xs font-semibold text-neutral-600"
             >
               <LogOut className="w-4 h-4" />
               Logout

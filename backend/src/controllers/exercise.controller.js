@@ -3,6 +3,7 @@ const { Exercise, ProgramDay } = require('../models/Exercise.model');
 const PainCategory = require('../models/PainCategory.model');
 const { writeAuditLog } = require('../utils/auditLogger');
 const asyncHandler = require('../utils/asyncHandler');
+const { extractYouTubeVideoId } = require('../utils/youtubeVideoUrl');
 const { EXERCISE_PREFIX } = require('../data/generalKnee30DayDraft');
 const { assignKneeVideoCandidates } = require('../services/kneeVideoCandidateMapping.service');
 const { DEMO_VIDEO_ID, DEMO_VIDEO_URL, isDemoExerciseVideo, patientSafeExercise, missingDemoVideoFilter, installedDemoVideoFilter, pendingDemoVideoFilter } = require('../services/demoExerciseVideo.service');
@@ -14,12 +15,6 @@ const privateSeedPattern = new RegExp('^' + EXERCISE_PREFIX); // Prefix is fixed
 const LANGUAGES = ['en', 'hi'];
 const cleanString = (value) => String(value ?? '').trim();
 const escapeRegex = (value) => cleanString(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-const extractYouTubeVideoId = (videoUrl) => {
-  if (!videoUrl) return null;
-  const match = cleanString(videoUrl).match(/(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/|live\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
-  return match?.[1] || null;
-};
 
 const normalizeExercisePayload = (body = {}) => {
   const payload = {};

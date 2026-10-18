@@ -10,6 +10,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth.store';
+import { signOutAndSwitchAccount } from '@/lib/switch-account';
 import { Logo } from '@/components/brand/Logo';
 import { cn } from '@/lib/cn';
 
@@ -24,10 +25,12 @@ const patientNav = [
 export function PatientLayout() {
   const { logout } = useAuthStore();
   const navigate = useNavigate();
+  const [isSigningOut, setIsSigningOut] = React.useState(false);
 
   const handleLogout = () => {
-    logout();
-    navigate('/login');
+    if (isSigningOut) return;
+    setIsSigningOut(true);
+    void signOutAndSwitchAccount(logout, () => navigate('/login', { replace: true }));
   };
 
   return (
@@ -36,16 +39,19 @@ export function PatientLayout() {
         <div className="flex h-16 items-center justify-between px-4">
           <Logo width={52} height={52} />
           <div className="flex items-center gap-2">
-            <div className="hidden rounded-full bg-emerald-50 px-3 py-1.5 text-[11px] font-bold text-emerald-700 min-[380px]:flex">
+            <div className="hidden rounded-full bg-emerald-50 px-3 py-1.5 text-[11px] font-bold text-emerald-700 min-[520px]:flex">
               <ShieldCheck className="mr-1.5 h-3.5 w-3.5" />
               Secure patient portal
             </div>
             <button
               onClick={handleLogout}
-              className="flex h-10 w-10 items-center justify-center rounded-xl text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-900"
-              aria-label="Logout"
+              type="button"
+              className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-neutral-200 px-3 text-xs font-semibold text-neutral-700 transition hover:bg-neutral-100 hover:text-neutral-900"
+              aria-label="Log out and switch account"
+              disabled={isSigningOut}
             >
-              <LogOut className="h-4.5 w-4.5" />
+              <LogOut className="h-4.5 w-4.5" aria-hidden="true" />
+              {isSigningOut ? 'Signing out…' : 'Logout'}
             </button>
           </div>
         </div>

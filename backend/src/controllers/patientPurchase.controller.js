@@ -3,6 +3,7 @@ const PatientAssessment = require('../models/PatientAssessment.model');
 const Program = require('../models/Program.model');
 const asyncHandler = require('../utils/asyncHandler');
 const { requiresClinicalProgrammeSelection } = require('../services/patientAssessmentClearance.service');
+const { resolveDirectPatientFee } = require('../services/directPatientPricing.service');
 
 const normalizeIds = (values = []) => [...new Set((values || []).map((value) => String(value)).filter(Boolean))];
 
@@ -84,16 +85,17 @@ const getPurchaseQuote = asyncHandler(async (req, res) => {
   }
 
   const purchaseMode = doctor ? 'doctor_referral' : 'direct';
+  const directPricing = doctor ? null : await resolveDirectPatientFee(patient);
   const amount = doctor
     ? Number(doctor.approvedPatientFee || 0)
-    : Number(patient.directPatientFee || 0);
+    : directPricing.amount;
 
   if (amount <= 0) {
     return res.status(400).json({
       code: 'PATIENT_FEE_NOT_CONFIGURED',
       message: doctor
         ? 'The referring Doctor has not configured the patient fee yet.'
-        : 'Admin has not configured the fee for this direct patient yet.',
+        : 'Admin has not configured a default direct-patient fee or patient-specific fee yet.',
     });
   }
 
@@ -135,7 +137,7 @@ const getPurchaseQuote = asyncHandler(async (req, res) => {
       taxAmount: 0,
       finalAmount: amount,
       currency: 'INR',
-      source: doctor ? 'doctor_patient_fee' : 'admin_patient_fee',
+      source: doctor ? 'doctor_patient_fee' : directPricing.source,
       feeAuthority: doctor ? 'doctor' : 'admin',
     },
     assignment: { source: assignmentSource, programmeCount: programs.length },
