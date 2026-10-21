@@ -1,10 +1,9 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Activity, BadgeCheck, Building2, IndianRupee, Stethoscope, Target, Users } from 'lucide-react';
+import { Activity, BadgeCheck, Building2, Stethoscope, Target, Users } from 'lucide-react';
 import apiClient from '@/lib/api-client';
 import ErrorState from '@/components/feedback/ErrorState';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { formatCurrency } from '@/lib/formatters';
 
 type R = Record<string, unknown>;
 export default function AgentPerformancePage() {
@@ -16,8 +15,8 @@ export default function AgentPerformancePage() {
     <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <Card loading={query.isLoading} icon={Stethoscope} label="Doctors Onboarded" value={num(s.totalDoctors)} helper={`${num(s.approvedDoctors)} approved`} />
       <Card loading={query.isLoading} icon={Building2} label="Clinic Visits" value={num(s.clinicVisits)} helper={`${num(s.followUpCompletionPercent)}% follow-up completion`} />
-      <Card loading={query.isLoading} icon={Users} label="Patients Generated" value={num(s.patientRegistrations)} helper={`${num(s.paidPatients)} paid patients`} />
-      <Card loading={query.isLoading} icon={IndianRupee} label="Net Revenue" value={formatCurrency(num(s.netRevenue))} helper="Verified collections after refunds" />
+      <Card loading={query.isLoading} icon={Users} label="Connected Patients" value={num(s.patientRegistrations)} helper="Referred registrations across your doctors" />
+      <Card loading={query.isLoading} icon={Stethoscope} label="Doctors With Patients" value={num(s.doctorsWithPatients)} helper="Doctors with at least one referred patient" />
     </section>
     <section className="grid gap-6 lg:grid-cols-2">
       <div className="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm"><div className="flex items-center gap-2"><Target className="h-5 w-5 text-primary-600"/><h2 className="font-bold">Monthly Target</h2></div>{query.isLoading?<Skeleton className="mt-5 h-24"/>: target.monthlyTarget == null ? <div className="mt-5 rounded-lg border border-dashed p-4 text-sm text-neutral-600">Admin has not configured a monthly target. This month: <b>{num(target.achieved)}</b> doctors onboarded.</div>:<div className="mt-5"><div className="flex justify-between"><div><b className="text-3xl">{num(target.achieved)}</b><span className="text-sm text-neutral-500"> / {num(target.monthlyTarget)}</span></div><b className="text-primary-700">{num(target.achievementPercent)}%</b></div><div className="mt-3 h-2.5 rounded-full bg-neutral-100 overflow-hidden"><div className="h-full bg-primary-600 rounded-full" style={{width:`${Math.min(num(target.achievementPercent),100)}%`}}/></div></div>}</div>
