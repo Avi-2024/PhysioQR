@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Clock3, Pencil, Plus, QrCode, Search, ShieldCheck, Stethoscope, XCircle } from 'lucide-react';
+import { Pencil, Plus, QrCode, Search, ShieldCheck, Stethoscope, Users, XCircle } from 'lucide-react';
 import apiClient from '@/lib/api-client';
 import { DataTable, type DataTableColumn } from '@/components/data-display/DataTable';
 import ErrorState from '@/components/feedback/ErrorState';
@@ -17,6 +17,7 @@ type DoctorRow = {
   mobile: string;
   status: string;
   qrCodeActive: boolean;
+  connectedPatients: number;
   createdAt: string;
 };
 
@@ -38,8 +39,6 @@ export default function AgentDoctorsPage() {
       return matchesSearch && (status === 'all' || row.status === status);
     });
   }, [rows, search, status]);
-
-  const needsReview = rows.filter((row) => ['submitted', 'under_review', 'documents_required'].includes(row.status)).length;
 
   const columns: DataTableColumn<DoctorRow>[] = [
     {
@@ -71,6 +70,11 @@ export default function AgentDoctorsPage() {
       key: 'mobile',
       header: 'Contact',
       render: (row) => <span className="text-sm text-neutral-700">{row.mobile}</span>,
+    },
+    {
+      key: 'connectedPatients',
+      header: 'Connected Patients',
+      render: (row) => <span className="font-bold text-emerald-700">{row.connectedPatients}</span>,
     },
     {
       key: 'status',
@@ -162,7 +166,7 @@ export default function AgentDoctorsPage() {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi icon={Stethoscope} label="Total doctors" value={rows.length} />
         <Kpi icon={ShieldCheck} label="Approved" value={rows.filter((row) => row.status === 'approved').length} />
-        <Kpi icon={Clock3} label="Needs attention" value={needsReview} />
+        <Kpi icon={Users} label="Connected patients" value={rows.reduce((total, row) => total + row.connectedPatients, 0)} />
         <Kpi icon={XCircle} label="Rejected / suspended" value={rows.filter((row) => ['rejected', 'suspended'].includes(row.status)).length} />
       </div>
 
@@ -241,6 +245,7 @@ function mapDoctor(record: ApiRecord): DoctorRow {
     mobile: text(record.mobile, '-'),
     status: text(record.status, 'draft'),
     qrCodeActive: Boolean(record.qrCodeActive),
+    connectedPatients: Math.max(0, Number(record.connectedPatients) || 0),
     createdAt: text(record.createdAt),
   };
 }
