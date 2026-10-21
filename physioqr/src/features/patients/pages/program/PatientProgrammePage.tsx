@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   CalendarDays,
   CheckCircle2,
+  LockKeyhole,
   ChevronRight,
   Languages,
   Play,
@@ -57,6 +58,13 @@ export default function PatientProgrammePage() {
   });
 
   const data = query.data;
+  const enrollmentIdForHistory = data?.enrollment?.id || selectedEnrollmentId;
+  const daysQuery = useQuery<{ unlockedDays?: number[]; durationDays?: number; progress?: Array<{ dayNumber: number; dayCompleted?: boolean }> }>({
+    queryKey: ['patient-progress-summary', enrollmentIdForHistory],
+    enabled: Boolean(enrollmentIdForHistory),
+    queryFn: () => apiClient.get(`/progress/${enrollmentIdForHistory}/summary`).then((response) => response.data),
+    retry: false,
+  });
   const day = data?.day;
   const enrollment = data?.enrollment;
   const activePrograms = data?.activePrograms || [];
@@ -145,6 +153,24 @@ export default function PatientProgrammePage() {
               );
             })}
           </div>
+        </section>
+      )}
+
+      {enrollmentIdForHistory && (
+        <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm print:hidden sm:p-5">
+          <h2 className="text-base font-bold text-neutral-900">Your unlocked days</h2>
+          <p className="mt-1 text-xs leading-5 text-neutral-500">Watch yesterday’s videos again or revisit any day you have already unlocked. Future days remain locked.</p>
+          {daysQuery.isLoading && <p className="mt-3 text-sm text-neutral-500">Loading unlocked days…</p>}
+          {daysQuery.isError && <p role="alert" className="mt-3 text-sm text-amber-700">Day history is unavailable. <button type="button" className="underline" onClick={() => daysQuery.refetch()}>Try again</button></p>}
+          {daysQuery.isSuccess && (
+            <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {Array.from({ length: Math.min(365, Math.max(0, Number(daysQuery.data?.durationDays || program.durationDays || 0))) }, (_, index) => index + 1).map((dayNumber) => {
+                const unlocked = Boolean(daysQuery.data?.unlockedDays?.includes(dayNumber));
+                const completed = Boolean(daysQuery.data?.progress?.some((item) => item.dayNumber === dayNumber && item.dayCompleted));
+                return <button key={dayNumber} type="button" disabled={!unlocked} onClick={() => navigate(`/patient/programme/day/${dayNumber}?enrollment=${encodeURIComponent(enrollmentIdForHistory)}`)} className={cn('flex min-h-12 items-center justify-between rounded-xl border px-3 py-2 text-left text-sm font-semibold', unlocked ? 'border-emerald-200 bg-emerald-50 text-emerald-900 hover:bg-emerald-100' : 'cursor-not-allowed border-neutral-200 bg-neutral-50 text-neutral-400')} aria-label={`Day ${dayNumber} ${unlocked ? completed ? 'completed, replay videos' : 'unlocked, view videos' : 'locked'}`}><span>Day {dayNumber}</span>{unlocked ? completed ? <CheckCircle2 className="h-4 w-4" /> : <Play className="h-4 w-4" /> : <LockKeyhole className="h-4 w-4" />}</button>;
+              })}
+            </div>
+          )}
         </section>
       )}
 
