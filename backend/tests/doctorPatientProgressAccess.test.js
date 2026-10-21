@@ -29,6 +29,7 @@ const mocks = {
     find: (filter) => {
       programsQueried = true;
       assert.equal(String(filter.patient), PATIENT);
+      assert.equal(String(filter.doctor), DOCTOR);
       return {
         select: () => ({
           populate: () => ({
