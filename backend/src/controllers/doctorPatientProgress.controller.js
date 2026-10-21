@@ -28,7 +28,7 @@ const getMyPatientProgress = asyncHandler(async (req, res) => {
   // Never reveal whether an unrelated/direct patient exists.
   if (!patient) return res.status(404).json({ message: 'Patient not found in your referrals' });
 
-  const enrollments = await PatientProgram.find({ patient: patient._id })
+  const enrollments = await PatientProgram.find({ patient: patient._id, doctor: doctor._id })
     .select('program status currentDay completionPercentage startDate expiryDate createdAt')
     .populate('program', 'name programCode durationDays')
     .sort({ createdAt: -1 })
