@@ -28,6 +28,7 @@ type DayReport = {
   difficultyRating: number | null;
   feedback: string;
   discomfortReported: boolean;
+  hasDiscomfortResponse: boolean;
   fullSessionCompleted: boolean;
   completedExercises: number;
   skippedExercises: number;
@@ -187,7 +188,7 @@ export default function DoctorPatientProgressPage() {
                     <Mini label="Pain before" value={score(day.painBefore)} />
                     <Mini label="Pain after" value={score(day.painAfter)} />
                     <Mini label="Difficulty" value={score(day.difficultyRating)} />
-                    <Mini label="Reported discomfort" value={day.discomfortReported ? 'Yes' : 'No / unreported'} />
+                    <Mini label="Reported discomfort" value={day.hasDiscomfortResponse ? (day.discomfortReported ? 'Yes' : 'No') : 'Not reported'} />
                   </div>
                   {day.painChange !== null && <p className={cn('text-xs font-semibold', day.painChange > 0 ? 'text-amber-800' : 'text-neutral-600')}>Pain change in this session: {day.painChange > 0 ? '+' : ''}{day.painChange} point(s)</p>}
                   <div><h3 className="text-xs font-bold uppercase tracking-wider text-neutral-500">Patient written review</h3><p className="mt-2 whitespace-pre-wrap break-words rounded-lg bg-neutral-50 p-3 text-sm leading-6 text-neutral-800">{day.feedback || 'No written feedback submitted for this day.'}</p></div>
