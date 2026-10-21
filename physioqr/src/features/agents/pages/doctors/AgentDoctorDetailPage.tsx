@@ -12,7 +12,6 @@ import {
   QrCode,
   ShieldCheck,
   Stethoscope,
-  UserCheck,
   Users,
 } from 'lucide-react';
 import apiClient from '@/lib/api-client';
