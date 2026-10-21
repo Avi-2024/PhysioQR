@@ -56,7 +56,7 @@ const summarizeDays = (days) => {
     averagePainBefore: average(paired.map((d) => d.painBefore)),
     averagePainAfter: average(paired.map((d) => d.painAfter)),
     latestReportDay: latestReport?.dayNumber || null,
-    lastActivityAt: days.filter((d) => d.dayStarted || d.dayCompleted || d.feedback).map((d) => d.updatedAt).filter(Boolean).sort().at(-1) || null,
+    lastActivityAt: days.filter((d) => d.dayStarted || d.dayCompleted || d.feedback).map((d) => d.updatedAt).filter(Boolean).sort((a, b) => new Date(a).getTime() - new Date(b).getTime()).at(-1) || null,
   };
 };
 
