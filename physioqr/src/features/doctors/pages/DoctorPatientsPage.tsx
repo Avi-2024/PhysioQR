@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Search } from 'lucide-react';
+import { ArrowUpRight, Search } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import apiClient from '@/lib/api-client';
 import { DataTable, type DataTableColumn } from '@/components/data-display/DataTable';
 import ErrorState from '@/components/feedback/ErrorState';
@@ -24,6 +25,7 @@ type PatientRow = {
 // Renders doctor-owned referred patients from the backend scoped endpoint.
 export default function DoctorPatientsPage() {
   const [search, setSearch] = useState('');
+  const navigate = useNavigate();
   const query = useQuery({ queryKey: ['doctor-patients'], queryFn: async () => (await apiClient.get('/doctors/me/patients')).data });
   const rows = useMemo(() => (Array.isArray(query.data) ? query.data as ApiRecord[] : []).map(mapPatient), [query.data]);
   const filteredRows = rows.filter((row) => !search.trim() || [row.fullName, row.mobile, row.painCategory, row.programName, row.paymentStatus, row.programStatus, row.feeShareStatus].some((value) => value.toLowerCase().includes(search.toLowerCase())));
@@ -37,6 +39,7 @@ export default function DoctorPatientsPage() {
     { key: 'programStatus', header: 'Program Status', render: (row) => <Pill value={row.programStatus || 'not assigned'} /> },
     { key: 'feeShareAmount', header: 'Fee Share', render: (row) => <div><div className="font-semibold text-neutral-900">{formatCurrency(row.feeShareAmount)}</div><Pill value={row.feeShareStatus || 'not created'} /></div> },
     { key: 'createdAt', header: 'Registered', render: (row) => <span className="text-sm text-neutral-600">{dateText(row.createdAt)}</span> },
+    { key: 'progress', header: 'Rehab Tracking', render: (row) => <button type="button" onClick={() => navigate(`/doctor/patients/${encodeURIComponent(row.id)}/progress`)} className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-100">View progress <ArrowUpRight className="h-3.5 w-3.5" /></button> },
   ];
 
   if (query.isError) return <ErrorState title="Patients could not load" message="Check doctor login and backend availability." onRetry={() => query.refetch()} />;
@@ -46,7 +49,7 @@ export default function DoctorPatientsPage() {
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h1 className="text-xl sm:text-2xl font-bold text-neutral-900">Referred Patients</h1>
-          <p className="text-sm text-neutral-500">Referral, payment, program, and fee-share status for patients attributed to your QR code.</p>
+          <p className="text-sm text-neutral-500">Referral, payment, programme status, and detailed day-wise rehab feedback for your referred patients.</p>
         </div>
       </div>
 
