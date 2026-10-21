@@ -4,7 +4,7 @@ const User = require('../models/User.model');
 const Doctor = require('../models/Doctor.model');
 const ClinicVisit = require('../models/ClinicVisit.model');
 const Patient = require('../models/Patient.model');
-const { Payment } = require('../models/Payment.model');
+const { getPatientCountsByDoctor, countDoctorsWithPatients } = require('../services/agentPatientCounts.service');
 const notificationService = require('../services/notification.service');
 const { writeAuditLog } = require('../utils/auditLogger');
 const { buildSearchFilter, buildSort, paginateModel } = require('../utils/queryHelpers');
@@ -249,7 +249,6 @@ const getMyDashboard = asyncHandler(async (req, res) => {
   const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
   const agentDoctorIds = (await Doctor.find({ agent: agent._id }, '_id').lean()).map((doctor) => doctor._id);
-  const verifiedPaymentStatuses = ['successful', 'manually_verified', 'partially_refunded', 'refunded'];
 
   const [
     totalDoctors,
@@ -259,8 +258,6 @@ const getMyDashboard = asyncHandler(async (req, res) => {
     activeDoctors,
     monthlyOnboarded,
     totalPatients,
-    paidPatientIds,
-    revenueResult,
     pendingFollowUps,
     upcomingFollowUps,
     recentVisits,
@@ -275,18 +272,6 @@ const getMyDashboard = asyncHandler(async (req, res) => {
     Doctor.countDocuments({ agent: agent._id, status: 'approved', qrCodeActive: true }),
     Doctor.countDocuments({ agent: agent._id, createdAt: { $gte: monthStart, $lt: nextMonthStart } }),
     Patient.countDocuments({ referringDoctor: { $in: agentDoctorIds } }),
-    Payment.distinct('patient', { doctor: { $in: agentDoctorIds }, status: { $in: verifiedPaymentStatuses } }),
-    Payment.aggregate([
-      { $match: { doctor: { $in: agentDoctorIds }, status: { $in: verifiedPaymentStatuses } } },
-      {
-        $group: {
-          _id: null,
-          paid: { $sum: { $ifNull: ['$paidAmount', 0] } },
-          refunded: { $sum: { $ifNull: ['$refundAmount', 0] } },
-        },
-      },
-      { $project: { _id: 0, total: { $max: [{ $subtract: ['$paid', '$refunded'] }, 0] } } },
-    ]),
     ClinicVisit.countDocuments({ agent: agent._id, followUpStatus: 'scheduled', followUpDate: { $lte: now } }),
     ClinicVisit.countDocuments({ agent: agent._id, followUpStatus: 'scheduled', followUpDate: { $gt: now } }),
     ClinicVisit.find({ agent: agent._id })
@@ -311,6 +296,8 @@ const getMyDashboard = asyncHandler(async (req, res) => {
       .lean(),
   ]);
 
+  const doctorPatientCounts = await getPatientCountsByDoctor(agentDoctorIds);
+  const doctorsWithPatients = countDoctorsWithPatients(doctorPatientCounts);
   const monthlyTarget = Number.isFinite(agent.monthlyOnboardingTarget) ? agent.monthlyOnboardingTarget : null;
   const targetAchievementPercentage = monthlyTarget && monthlyTarget > 0
     ? Math.min(100, Math.round((monthlyOnboarded / monthlyTarget) * 100))
@@ -332,8 +319,7 @@ const getMyDashboard = asyncHandler(async (req, res) => {
     monthlyTarget,
     targetAchievementPercentage,
     totalPatients,
-    totalPaidPatients: paidPatientIds.length,
-    revenueGenerated: revenueResult[0]?.total || 0,
+    doctorsWithPatients,
     pendingFollowUps,
     upcomingFollowUps,
     todaysVisits,
