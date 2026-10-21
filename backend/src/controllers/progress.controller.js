@@ -276,6 +276,22 @@ const getProgramProgressSummary = asyncHandler(async (req, res) => {
   const program = await Program.findById(patientProgram.program);
   const progress = await ProgramProgress.find({ patientProgram: patientProgram._id }).sort({ dayNumber: 1 });
 
+  // Share only days that the patient can actually open. Historical days stay
+  // accessible, and manual unlocks must not be inferred from currentDay.
+  const durationDays = Number(program?.durationDays || 0);
+  const openedDayNumbers = new Set(progress.filter((day) => day.dayUnlocked).map((day) => day.dayNumber));
+  const startMs = patientProgram.startDate ? new Date(patientProgram.startDate).getTime() : NaN;
+  const elapsedDays = Number.isFinite(startMs) ? Math.max(0, Math.floor((Date.now() - startMs) / 86400000)) : 0;
+  const unlockedDays = Array.from({ length: Math.min(365, Math.max(0, durationDays)) }, (_, index) => index + 1)
+    .filter((day) => {
+      if (day === 1) return true;
+      if (patientProgram.unlockMethod === 'all_at_once') return true;
+      if (patientProgram.unlockMethod === 'every_24_hours') return Number.isFinite(startMs) && day <= elapsedDays + 1;
+      if (patientProgram.unlockMethod === 'after_completion') return day <= patientProgram.currentDay;
+      if (patientProgram.unlockMethod === 'manual') return openedDayNumbers.has(day);
+      return false;
+    });
+
   const completedDays = progress.filter((day) => day.dayCompleted).length;
   const openedDays = progress.filter((day) => day.dayStarted).length;
   const skippedExercises = progress.reduce((total, day) => total + day.exercises.filter((exercise) => exercise.skipped).length, 0);
@@ -284,6 +300,7 @@ const getProgramProgressSummary = asyncHandler(async (req, res) => {
   res.json({
     patientProgram,
     durationDays: program?.durationDays || null,
+    unlockedDays,
     currentDay: patientProgram.currentDay,
     completionPercentage: patientProgram.completionPercentage,
     completedDays,
