@@ -80,3 +80,8 @@ jobs:
         env:
           NODE_ENV: test
         run: npm run test:doctor-patient-progress
+
+      - name: Run patient video readiness checks
+        env:
+          NODE_ENV: test
+        run: node --test tests/patientVideoStatus.test.js
