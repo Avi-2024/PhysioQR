@@ -15,6 +15,7 @@ import apiClient from '@/lib/api-client';
 import ErrorState from '@/components/feedback/ErrorState';
 import { cn } from '@/lib/cn';
 import { getExerciseYouTubeId, getVideoAvailabilityMessage, type PatientVideoAvailability } from '@/lib/exercise-video';
+import { getPatientDayTileState, patientDayTileLabel } from '@/lib/patient-session';
 
 type ApiRecord = Record<string, unknown>;
 type ActiveProgram = {
@@ -95,6 +96,8 @@ export default function PatientProgrammePage() {
   const program = data.program || {};
   const currentDay = Number(day?.dayNumber || enrollment?.currentDay || 1);
   const videoMessage = getVideoAvailabilityMessage(day?.videoAvailability);
+  const todayHasContent = Boolean(day?.id && allExercises.length);
+  const todayReadyVideos = Number(day?.videoAvailability?.ready || 0);
   const patientAge = patient.age ?? ageFromDate(patient.dateOfBirth);
   const clinicLocation = [doctor.clinicAddress, doctor.city, doctor.state, doctor.postalCode].filter(Boolean).join(', ');
 
@@ -113,7 +116,7 @@ export default function PatientProgrammePage() {
   };
 
   return (
-    <div className="mx-auto max-w-4xl space-y-4 text-neutral-900 print:max-w-none print:space-y-0">
+    <div className="mx-auto max-w-5xl space-y-5 text-neutral-900 print:max-w-none print:space-y-0">
       {activePrograms.length > 1 && (
         <section className="rounded-2xl border border-neutral-200/80 bg-white p-4 shadow-sm print:hidden sm:p-5">
           <div>
@@ -150,7 +153,7 @@ export default function PatientProgrammePage() {
                   </div>
                   <span className={cn('mt-2 flex items-center gap-1.5 text-[10px] font-bold', contentReady ? 'text-emerald-700' : 'text-amber-700')}>
                     <Video className="h-3 w-3" />
-                    {contentReady ? `${videoCount} video${videoCount === 1 ? '' : 's'} ready` : 'Content not configured'}
+                    {videoCount > 0 ? `${videoCount} video${videoCount === 1 ? '' : 's'} ready` : contentReady ? 'Exercise guidance · videos pending' : 'No exercises assigned'}
                   </span>
                 </button>
               );
@@ -159,30 +162,13 @@ export default function PatientProgrammePage() {
         </section>
       )}
 
-      {enrollmentIdForHistory && (
-        <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm print:hidden sm:p-5">
-          <h2 className="text-base font-bold text-neutral-900">Your unlocked days</h2>
-          <p className="mt-1 text-xs leading-5 text-neutral-500">Watch yesterday’s videos again or revisit any day you have already unlocked. Future days remain locked.</p>
-          {daysQuery.isLoading && <p className="mt-3 text-sm text-neutral-500">Loading unlocked days…</p>}
-          {daysQuery.isError && <p role="alert" className="mt-3 text-sm text-amber-700">Day history is unavailable. <button type="button" className="underline" onClick={() => daysQuery.refetch()}>Try again</button></p>}
-          {daysQuery.isSuccess && (
-            <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {Array.from({ length: Math.min(365, Math.max(0, Number(daysQuery.data?.durationDays || program.durationDays || 0))) }, (_, index) => index + 1).map((dayNumber) => {
-                const unlocked = Boolean(daysQuery.data?.unlockedDays?.includes(dayNumber));
-                const completed = Boolean(daysQuery.data?.progress?.some((item) => item.dayNumber === dayNumber && item.dayCompleted));
-                return <button key={dayNumber} type="button" disabled={!unlocked} onClick={() => navigate(`/patient/programme/day/${dayNumber}?enrollment=${encodeURIComponent(enrollmentIdForHistory)}`)} className={cn('flex min-h-12 items-center justify-between rounded-xl border px-3 py-2 text-left text-sm font-semibold', unlocked ? 'border-emerald-200 bg-emerald-50 text-emerald-900 hover:bg-emerald-100' : 'cursor-not-allowed border-neutral-200 bg-neutral-50 text-neutral-400')} aria-label={`Day ${dayNumber} ${unlocked ? completed ? 'completed, replay videos' : 'unlocked, view videos' : 'locked'}`}><span>Day {dayNumber}</span>{unlocked ? completed ? <CheckCircle2 className="h-4 w-4" /> : <Play className="h-4 w-4" /> : <LockKeyhole className="h-4 w-4" />}</button>;
-              })}
-            </div>
-          )}
-        </section>
-      )}
 
       <section className="overflow-hidden rounded-2xl border border-neutral-200 bg-white print:rounded-none print:border-0">
         <header className="border-b border-neutral-100 px-4 py-4 sm:px-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-medium text-neutral-500">My rehabilitation plan</p>
-              <h1 className="mt-1 text-xl font-semibold tracking-tight text-neutral-900">Today's exercises</h1>
+              <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">Today's session</p>
+              <h1 className="mt-1 text-xl font-black tracking-tight text-neutral-900 sm:text-2xl">Today's exercises</h1>
               <p className="mt-1 text-xs text-neutral-500">
                 {patient.fullName || 'Patient'}{doctor.fullName ? ' · ' + doctor.fullName : ''}
               </p>
@@ -227,8 +213,8 @@ export default function PatientProgrammePage() {
         <div className="p-5 sm:p-6">
           <div>
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs font-semibold text-emerald-800">Day {currentDay} of {program.durationDays || '—'}</p>
-              <span className="text-xs font-medium text-neutral-500">{exercises.length} exercises</span>
+              <p className="text-sm font-bold text-emerald-800">Day {currentDay} of {program.durationDays || '—'}</p>
+              <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-800">{exercises.length} exercises · {todayReadyVideos} videos</span>
             </div>
             <h2 className="mt-2 text-lg font-semibold leading-snug tracking-tight text-neutral-950 sm:text-xl">
               {day?.title || patientProgrammeName(program.name)}
@@ -256,10 +242,11 @@ export default function PatientProgrammePage() {
           )}
           <div className="mt-5 space-y-4">
             {exercises.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-neutral-300 bg-neutral-50/70 px-4 py-10 text-center">
+              <div className="rounded-2xl border border-amber-200 bg-amber-50/50 px-5 py-7 text-center">
                 <Video className="mx-auto h-7 w-7 text-neutral-300" />
-                <p className="mt-3 text-sm font-bold text-neutral-700">No exercises configured for this day</p>
-                <p className="mt-1 text-xs text-neutral-500">Your clinical team can add exercise content to this prescription.</p>
+                <p className="mt-3 text-base font-bold text-neutral-900">Day {currentDay} is awaiting exercises</p>
+                <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-neutral-600">Your care team hasn't assigned exercises for today. You can revisit earlier unlocked days while they prepare this session.</p>
+                <button type="button" onClick={() => navigate('/patient/support')} className="mt-4 inline-flex min-h-11 items-center rounded-xl border border-amber-300 bg-white px-4 text-sm font-bold text-amber-900 hover:bg-amber-50">Contact care team <ChevronRight className="ml-2 h-4 w-4" /></button>
               </div>
             ) : exercises.map((entry, index) => {
               const exercise = entry.exercise || {};
@@ -329,16 +316,82 @@ export default function PatientProgrammePage() {
             <p className="max-w-sm text-xs leading-5 text-neutral-500">
               Stop if a movement increases pain. Record how your session went.
             </p>
-            {day?.id && allExercises.length > 0 ? (
+            {todayHasContent ? (
               <button type="button"
                 onClick={() => navigate(`/patient/programme/day/${currentDay}?enrollment=${enrollment?.id || ''}`)}
                 className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white transition hover:bg-emerald-800">
-                <CalendarDays className="h-4 w-4" /> Start daily session <ChevronRight className="h-4 w-4" />
+                <CalendarDays className="h-4 w-4" /> {todayReadyVideos > 0 ? 'Open today’s session' : 'Review day guidance'} <ChevronRight className="h-4 w-4" />
               </button>
-            ) : <p className="text-sm text-amber-800">Daily session is not configured yet</p>}
+            ) : <p className="text-sm font-semibold text-amber-800">This session cannot start until exercises are assigned.</p>}
           </div>
         </div>
       </section>
+
+      {enrollmentIdForHistory && (
+        <section aria-label="Rehabilitation day history" className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm print:hidden sm:p-6">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">Your session library</p>
+              <h2 className="mt-1 text-xl font-black text-neutral-950">Revisit your unlocked days</h2>
+              <p className="mt-1 max-w-xl text-sm leading-6 text-neutral-600">
+                Replay previous exercises whenever you need a refresher. Days available ahead of schedule are not marked as completed.
+              </p>
+            </div>
+            {daysQuery.isSuccess && (
+              <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-800">
+                {daysQuery.data?.unlockedDays?.length || 0} days available
+              </span>
+            )}
+          </div>
+          {daysQuery.isLoading && <p className="mt-4 text-sm text-neutral-500">Loading your unlocked sessions…</p>}
+          {daysQuery.isError && (
+            <p role="alert" className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+              Day history is unavailable. <button type="button" className="font-bold underline" onClick={() => daysQuery.refetch()}>Try again</button>
+            </p>
+          )}
+          {daysQuery.isSuccess && (
+            <div className="mt-5 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
+              {Array.from({ length: Math.min(365, Math.max(0, Number(daysQuery.data?.durationDays || program.durationDays || 0))) }, (_, index) => index + 1).map((dayNumber) => {
+                const unlocked = Boolean(daysQuery.data?.unlockedDays?.includes(dayNumber));
+                const completed = Boolean(daysQuery.data?.progress?.some((item) => item.dayNumber === dayNumber && item.dayCompleted));
+                const state = getPatientDayTileState({ dayNumber, currentDay, unlocked, completed, currentDayHasContent: todayHasContent });
+                const disabled = state === 'locked' || state === 'needs_content';
+                const isCompleted = state === 'completed';
+                const isToday = state === 'today';
+                const isAhead = state === 'available_early';
+                return (
+                  <button
+                    key={dayNumber}
+                    type="button"
+                    disabled={disabled}
+                    aria-current={dayNumber === currentDay ? 'step' : undefined}
+                    aria-label={`Day ${dayNumber}: ${patientDayTileLabel[state]}`}
+                    onClick={() => navigate(`/patient/programme/day/${dayNumber}?enrollment=${encodeURIComponent(enrollmentIdForHistory)}`)}
+                    className={cn(
+                      'flex min-h-[76px] flex-col items-start justify-between gap-2 rounded-xl border px-3.5 py-3 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700',
+                      isCompleted ? 'border-emerald-200 bg-emerald-50 text-emerald-950 hover:bg-emerald-100'
+                        : isToday ? 'border-emerald-500 bg-white text-emerald-950 ring-1 ring-emerald-200 hover:bg-emerald-50'
+                        : isAhead ? 'border-sky-200 bg-sky-50 text-sky-950 hover:bg-sky-100'
+                        : state === 'revisit' ? 'border-neutral-200 bg-white text-neutral-900 hover:bg-neutral-50'
+                        : state === 'needs_content' ? 'cursor-not-allowed border-amber-200 bg-amber-50 text-amber-900'
+                        : 'cursor-not-allowed border-neutral-200 bg-neutral-50 text-neutral-400',
+                    )}
+                  >
+                    <span className="flex w-full items-center justify-between gap-2">
+                      <span className="text-sm font-extrabold">Day {dayNumber}</span>
+                      {isCompleted ? <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+                        : disabled ? <LockKeyhole className="h-4 w-4" aria-hidden="true" />
+                        : <Play className="h-4 w-4" aria-hidden="true" />}
+                    </span>
+                    <span className="text-xs font-semibold">{patientDayTileLabel[state]}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      )}
+
     </div>
   );
 }

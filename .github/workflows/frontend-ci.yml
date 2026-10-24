@@ -44,5 +44,8 @@ jobs:
       - name: Patient exercise video playback regression tests
         run: npm run test -- --run src/lib/exercise-video.test.ts
 
+      - name: Patient dashboard and session-state regressions
+        run: npm run test -- --run src/lib/patient-session.test.ts src/features/patients/pages/PatientDashboardPage.test.tsx
+
       - name: Production build
         run: npm run build
