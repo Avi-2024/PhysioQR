@@ -6,6 +6,7 @@ import { withSuspense } from './route-utils';
 
 const DoctorDashboardPage = lazy(() => import('@/features/doctors/pages/dashboard/DoctorDashboardPage'));
 const DoctorPatientsPage = lazy(() => import('@/features/doctors/pages/patients/DoctorPatientsPage'));
+const DoctorPatientProgressPage = lazy(() => import('@/features/doctors/pages/patients/DoctorPatientProgressPage'));
 const DoctorQRReferralPage = lazy(() => import('@/features/doctors/pages/referrals/DoctorQRReferralPage'));
 const DoctorEarningsPage = lazy(() => import('@/features/doctors/pages/earnings/DoctorEarningsPage'));
 const DoctorWalletPage = lazy(() => import('@/features/doctors/pages/wallet/DoctorWalletPage'));
@@ -27,6 +28,7 @@ export const doctorRoutes: RouteObject = {
     { index: true, element: <Navigate to="/doctor/dashboard" replace /> },
     { path: 'dashboard', element: withSuspense(<DoctorDashboardPage />) },
     { path: 'patients', element: withSuspense(<DoctorPatientsPage />) },
+    { path: 'patients/:patientId/progress', element: withSuspense(<DoctorPatientProgressPage />) },
     { path: 'qr-referral', element: withSuspense(<DoctorQRReferralPage />) },
     { path: 'earnings', element: withSuspense(<DoctorEarningsPage />) },
     { path: 'wallet', element: withSuspense(<DoctorWalletPage />) },

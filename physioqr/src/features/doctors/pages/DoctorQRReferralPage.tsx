@@ -88,9 +88,7 @@ function ReferralPoster({
           <p className="mt-2 break-all font-mono text-xs leading-5 text-neutral-800">{referralLink}</p>
         </div>
       </div>
-      <div className="border-t border-neutral-100 px-6 py-4 text-center text-xs text-neutral-500">
-        Powered by PhysioQR · Doctor-guided rehabilitation
-      </div>
+      
     </article>
   );
 }

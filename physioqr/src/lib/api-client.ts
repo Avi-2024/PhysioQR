@@ -1,11 +1,10 @@
 import axios from 'axios';
 import { getAccessToken, setAccessToken, clearTokens } from './auth-storage';
 
-// Respect explicitly configured API URLs. Without one, local Vite development
-// must call the local Express backend instead of an older deployed API.
-const viteEnv = (import.meta as unknown as { env?: { VITE_API_BASE_URL?: string; DEV?: boolean } }).env;
-const BASE_URL = viteEnv?.VITE_API_BASE_URL ||
-  (viteEnv?.DEV ? 'http://localhost:5000/api' : 'https://physio-qr-23qh.vercel.app/api');
+const BASE_URL =
+  (import.meta as unknown as { env?: Record<string, string> })
+    .env?.VITE_API_BASE_URL ||
+  'http://localhost:5000/api';
 
 export const apiClient = axios.create({
   baseURL: BASE_URL,

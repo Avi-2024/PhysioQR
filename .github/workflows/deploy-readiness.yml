@@ -76,7 +76,7 @@ jobs:
           NODE_ENV: test
         run: npm run test:direct-patient-pricing
 
-      - name: Run agent referral-count regression tests
+      - name: Run doctor patient progress access and summary tests
         env:
           NODE_ENV: test
-        run: npm run test:agent-patient-counts
+        run: npm run test:doctor-patient-progress

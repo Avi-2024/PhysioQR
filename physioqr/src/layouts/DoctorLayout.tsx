@@ -47,9 +47,7 @@ export function DoctorLayout() {
       <aside className="hidden lg:flex w-64 bg-neutral-900 text-white flex-col fixed inset-y-0 z-30">
         <div className="h-20 flex items-center gap-4 px-6 border-b border-neutral-800">
           <Logo width={56} height={56}  />
-          <div>
-            <h1 className="font-bold text-white leading-none text-lg">Doctor Portal</h1>
-          </div>
+          
         </div>
 
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
@@ -98,7 +96,7 @@ export function DoctorLayout() {
               <div className="flex items-center gap-3 min-w-0">
                 <Logo width={48} height={48}  />
                 <div className="min-w-0">
-                  <h1 className="font-bold text-white leading-none text-base truncate">Doctor Portal</h1>
+                  
                 </div>
               </div>
               <button onClick={() => setMobileOpen(false)} className="p-2 rounded-lg text-neutral-300 hover:bg-neutral-800 hover:text-white" aria-label="Close menu">
