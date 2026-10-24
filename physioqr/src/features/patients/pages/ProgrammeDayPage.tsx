@@ -229,6 +229,9 @@ export default function ProgrammeDayPage() {
                 </div>
 
                 <div className="flex flex-col p-5 sm:p-6">
+                  {youtubeId && (
+                    <a href={`https://www.youtube.com/watch?v=${youtubeId}`} target="_blank" rel="noopener noreferrer" className="mb-3 inline-flex text-xs font-semibold text-emerald-700 hover:underline">Video not playing? Open on YouTube</a>
+                  )}
                   <div>
                     <p className="text-sm leading-6 text-neutral-600">
                       {text(exercise.description, 'Follow the prescribed exercise instructions carefully.')}
