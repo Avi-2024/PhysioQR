@@ -15,7 +15,7 @@ import {
 import apiClient from '@/lib/api-client';
 import ErrorState from '@/components/feedback/ErrorState';
 import { cn } from '@/lib/cn';
-import { getExerciseYouTubeId } from '@/lib/exercise-video';
+import { getExerciseYouTubeId, getVideoAvailabilityMessage, type PatientVideoAvailability } from '@/lib/exercise-video';
 
 type ApiRecord = Record<string, unknown>;
 
@@ -47,6 +47,7 @@ export default function ProgrammeDayPage() {
   });
 
   const payload = asRecord(dayQuery.data);
+  const videoMessage = getVideoAvailabilityMessage(asRecord(payload.videoAvailability) as PatientVideoAvailability);
   const programDay = asRecord(payload.programDay);
   const progress = asRecord(payload.progress);
   const exercises = useMemo(() => {
@@ -162,6 +163,9 @@ export default function ProgrammeDayPage() {
         </div>
       )}
 
+      {!dayQuery.isLoading && exercises.length > 0 && videoMessage && (
+        <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">Day {day}: {videoMessage}</p>
+      )}
       {!dayQuery.isLoading && exercises.length === 0 && (
         <div className="rounded-2xl border border-neutral-200 bg-white p-7 text-center shadow-sm">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-neutral-100 text-neutral-500">
