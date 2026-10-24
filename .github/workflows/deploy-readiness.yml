@@ -75,3 +75,8 @@ jobs:
         env:
           NODE_ENV: test
         run: npm run test:direct-patient-pricing
+
+      - name: Run doctor patient progress access and summary tests
+        env:
+          NODE_ENV: test
+        run: npm run test:doctor-patient-progress
