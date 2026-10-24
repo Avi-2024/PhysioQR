@@ -130,7 +130,7 @@ export default function ProgrammeDayPage() {
           <div className="min-w-0 flex-1">
             <div className="inline-flex items-center gap-1.5 rounded-full bg-white/80 px-3 py-1 text-[10px] font-extrabold uppercase tracking-[0.08em] text-primary-700">
               <Sparkles className="h-3 w-3" />
-              Today&apos;s session
+              Day {day} session
             </div>
             <h1 className="mt-3 text-2xl font-black tracking-tight text-neutral-950 sm:text-3xl">
               Day {day}: {text(programDay.title, 'Recovery Session')}
@@ -157,7 +157,7 @@ export default function ProgrammeDayPage() {
 
       {dayQuery.isLoading && (
         <div className="rounded-2xl border border-neutral-200 bg-white p-6 text-sm text-neutral-500 shadow-sm">
-          Loading today&apos;s exercises...
+          Loading exercises for Day {day}...
         </div>
       )}
 
