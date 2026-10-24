@@ -297,6 +297,7 @@ export default function PatientProgrammePage() {
                     </div>
                     <div className="p-4 sm:p-5">
                       <h3 className="text-base font-semibold text-neutral-950">{title}</h3>
+                       {youtubeId && <a href={`https://www.youtube.com/watch?v=${youtubeId}`} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block text-xs font-semibold text-emerald-700 hover:underline">Video not playing? Open on YouTube</a>}
                       <p className="mt-2 text-sm leading-6 text-neutral-600">
                         {text(exercise.description, 'Move slowly and stay within a comfortable range.')}
                       </p>
