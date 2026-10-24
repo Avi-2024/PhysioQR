@@ -30,3 +30,22 @@ export function getExerciseYouTubeId(exercise: { youtubeVideoId?: unknown; video
   if (videoUrl && !urlId) return '';
   return urlId || savedId;
 }
+
+export type PatientVideoAvailability = {
+  total?: number;
+  ready?: number;
+  awaitingClinicalReview?: number;
+  demoOnly?: number;
+  missing?: number;
+  invalidLink?: number;
+};
+
+// Patient-safe reasons; never link directly to an unreviewed demonstration.
+export function getVideoAvailabilityMessage(status?: PatientVideoAvailability): string {
+  if (!status || (status.ready || 0) > 0) return '';
+  if ((status.total || 0) === 0) return 'The care team has not assigned any exercises for this day.';
+  if ((status.awaitingClinicalReview || 0) > 0) return 'Today\'s exercise video is awaiting clinical review. Please contact your care team.';
+  if ((status.demoOnly || 0) > 0) return 'Only testing/demo videos are linked for this day. Your care team must add approved exercise videos.';
+  if ((status.invalidLink || 0) > 0) return 'The linked exercise video cannot be played because its YouTube URL needs correction. Please contact your care team.';
+  return 'Your care team has not linked an approved exercise video for this day.';
+}
