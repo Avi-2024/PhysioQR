@@ -420,11 +420,6 @@ function text(value: unknown, fallback = '') {
   return value === undefined || value === null || value === '' ? fallback : String(value);
 }
 
-function extractYoutubeId(url: string) {
-  const match = url.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/|live\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
-  return match?.[1] || '';
-}
-
 function errorMessage(error: unknown) {
   const response = asRecord(asRecord(error).response);
   const data = asRecord(response.data);
