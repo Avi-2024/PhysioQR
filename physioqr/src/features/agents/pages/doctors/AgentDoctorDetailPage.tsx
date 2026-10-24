@@ -12,7 +12,6 @@ import {
   QrCode,
   ShieldCheck,
   Stethoscope,
-  UserCheck,
   Users,
 } from 'lucide-react';
 import apiClient from '@/lib/api-client';
@@ -165,12 +164,11 @@ export default function AgentDoctorDetailPage() {
         )}
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Metric icon={Stethoscope} label="Doctor status" value={label(doctor.status)} loading={query.isLoading} />
         <Metric icon={ShieldCheck} label="KYC status" value={label(kycStatus)} loading={query.isLoading} />
         <Metric icon={QrCode} label="QR status" value={doctor.qrCodeActive ? 'Active' : 'Not active'} loading={query.isLoading} />
-        <Metric icon={Users} label="Patient registrations" value={number(performance.patientRegistrations)} loading={query.isLoading} />
-        <Metric icon={UserCheck} label="Paid patients" value={number(performance.paidPatients)} loading={query.isLoading} />
+        <Metric icon={Users} label="Connected patients" value={number(performance.connectedPatients)} loading={query.isLoading} />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">

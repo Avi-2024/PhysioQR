@@ -16,7 +16,6 @@ import {
 import apiClient from '@/lib/api-client';
 import ErrorState from '@/components/feedback/ErrorState';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { formatCurrency } from '@/lib/formatters';
 
 type ApiRecord = Record<string, unknown>;
 
@@ -87,16 +86,16 @@ export default function AgentDashboardPage() {
         />
         <MetricCard
           loading={dashboardQuery.isLoading}
-          label="Patients Generated"
+          label="Connected Patients"
           value={number(dashboard.totalPatients)}
-          helper={`${number(dashboard.totalPaidPatients)} paid patients`}
+          helper="Registered patients referred by your doctors"
           icon={Users}
         />
         <MetricCard
           loading={dashboardQuery.isLoading}
-          label="Revenue Generated"
-          value={formatCurrency(number(dashboard.revenueGenerated))}
-          helper="Net verified collections"
+          label="Doctors With Patients"
+          value={number(dashboard.doctorsWithPatients)}
+          helper="Your doctors with at least one connected patient"
           icon={TrendingUp}
         />
       </section>

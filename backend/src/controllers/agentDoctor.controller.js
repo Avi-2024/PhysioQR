@@ -6,6 +6,7 @@ const Program = require('../models/Program.model');
 const ClinicVisit = require('../models/ClinicVisit.model');
 const Patient = require('../models/Patient.model');
 const { Payment } = require('../models/Payment.model');
+const { getPatientCountsByDoctor } = require('../services/agentPatientCounts.service');
 const { uploadDoctorKycDocument } = require('../services/storage.service');
 const { provisionApprovedDoctor } = require('../services/doctorApproval.service');
 const { writeAuditLog } = require('../utils/auditLogger');
@@ -300,7 +301,11 @@ const getMyDoctors = asyncHandler(async (req, res) => {
     .populate('preferredProgram', 'programCode name durationDays')
     .sort({ createdAt: -1 })
     .lean();
-  res.json(doctors);
+  const counts = await getPatientCountsByDoctor(doctors.map((doctor) => doctor._id));
+  res.json(doctors.map((doctor) => ({
+    ...doctor,
+    connectedPatients: counts.get(String(doctor._id)) || 0,
+  })));
 });
 
 const getMyDoctorById = asyncHandler(async (req, res) => {
@@ -314,9 +319,8 @@ const getMyDoctorById = asyncHandler(async (req, res) => {
 
   if (!doctor) return res.status(404).json({ message: 'Doctor not found' });
 
-  const [patientCount, paidPatientIds, recentVisits] = await Promise.all([
+  const [patientCount, recentVisits] = await Promise.all([
     Patient.countDocuments({ referringDoctor: doctor._id }),
-    Payment.distinct('patient', { doctor: doctor._id, status: { $in: VERIFIED_PAYMENT_STATUSES } }),
     ClinicVisit.find({ agent: agent._id, doctor: doctor._id })
       .select('visitDate visitTime clinicName clinicLocation outcome doctorInterestLevel followUpDate followUpStatus nextAction')
       .sort({ visitDate: -1, createdAt: -1 })
@@ -327,7 +331,7 @@ const getMyDoctorById = asyncHandler(async (req, res) => {
   res.json({
     doctor,
     referralUrl: doctor.qrCodeActive ? buildReferralUrl(doctor) : null,
-    performance: { patientRegistrations: patientCount, paidPatients: paidPatientIds.length },
+    performance: { patientRegistrations: patientCount, connectedPatients: patientCount },
     recentVisits,
   });
 });

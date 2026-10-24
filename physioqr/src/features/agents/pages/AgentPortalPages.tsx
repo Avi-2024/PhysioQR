@@ -290,7 +290,6 @@ export function AgentPerformancePage() {
   const visits = extractItems(visitsQuery.data).map(mapVisit);
   const followUps = extractItems(followUpsQuery.data).map(mapVisit);
   const approvalRate = doctors.length ? Math.round((doctors.filter((doctor) => doctor.status === 'approved').length / doctors.length) * 100) : 0;
-  const paidConversion = Number(dashboard.totalPatients || 0) ? Math.round((Number(dashboard.totalPaidPatients || 0) / Number(dashboard.totalPatients || 1)) * 100) : 0;
   const followUpCompletion = visits.length ? Math.round((visits.filter((visit) => visit.followUpStatus === 'completed').length / visits.length) * 100) : 0;
 
   if (dashboardQuery.isError || doctorsQuery.isError || visitsQuery.isError) {
@@ -298,12 +297,12 @@ export function AgentPerformancePage() {
   }
 
   return (
-    <AgentWorkspace eyebrow="PERFORMANCE REPORTS" title="Performance" description="Doctor onboarding, patient generation, paid conversion, and follow-up execution for your field region.">
+    <AgentWorkspace eyebrow="PERFORMANCE REPORTS" title="Performance" description="Doctor onboarding, connected patient registrations, and follow-up execution for your field region.">
       <KpiGrid
         items={[
-          ['Revenue generated', formatCurrency(Number(dashboard.revenueGenerated || 0)), TrendingUp, 'bg-violet-50 text-violet-700'],
+          ['Connected patients', Number(dashboard.totalPatients || 0), Users, 'bg-violet-50 text-violet-700'],
           ['Approval rate', `${approvalRate}%`, ShieldCheck, 'bg-emerald-50 text-emerald-700'],
-          ['Paid conversion', `${paidConversion}%`, UserCheck, 'bg-sky-50 text-sky-700'],
+          ['Doctors with patients', Number(dashboard.doctorsWithPatients || 0), UserCheck, 'bg-sky-50 text-sky-700'],
           ['Follow-up completion', `${followUpCompletion}%`, CheckCircle2, 'bg-teal-50 text-teal-700'],
         ]}
       />
@@ -313,7 +312,7 @@ export function AgentPerformancePage() {
           <div className="mt-5 space-y-4">
             <ProgressRow label="Approved doctors" value={doctors.filter((doctor) => doctor.status === 'approved').length} total={Math.max(doctors.length, 1)} />
             <ProgressRow label="Pending review" value={doctors.filter((doctor) => ['submitted', 'under_review', 'documents_required'].includes(doctor.status)).length} total={Math.max(doctors.length, 1)} />
-            <ProgressRow label="Paid patient conversion" value={Number(dashboard.totalPaidPatients || 0)} total={Math.max(Number(dashboard.totalPatients || 0), 1)} />
+            <ProgressRow label="Doctors with patients" value={Number(dashboard.doctorsWithPatients || 0)} total={Math.max(doctors.length, 1)} />
             <ProgressRow label="Follow-ups completed" value={visits.filter((visit) => visit.followUpStatus === 'completed').length} total={Math.max(visits.length, 1)} />
           </div>
         </section>
