@@ -11,7 +11,7 @@ import {
   Stethoscope,
   VideoOff,
 } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import apiClient from '@/lib/api-client';
 import PatientProgrammePage from '@/features/patients/pages/program/PatientProgrammePage';
 import { getPatientSessionState } from '@/lib/patient-session';
@@ -32,12 +32,14 @@ type PrescriptionHome = {
 
 export default function PatientDashboardPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const requestedEnrollmentId = searchParams.get('enrollment') || '';
   // Share the exact same prescription query as the exercise panel below.
   // /patients/me/program may choose a different active enrolment and must
   // never claim that today's exercises are ready.
   const query = useQuery<PrescriptionHome>({
-    queryKey: ['patient-prescription', ''],
-    queryFn: () => apiClient.get('/patients/me/prescription').then((response) => response.data),
+    queryKey: ['patient-prescription', requestedEnrollmentId],
+    queryFn: () => apiClient.get('/patients/me/prescription', { params: requestedEnrollmentId ? { enrollmentId: requestedEnrollmentId } : {} }).then((response) => response.data),
     retry: false,
   });
 
