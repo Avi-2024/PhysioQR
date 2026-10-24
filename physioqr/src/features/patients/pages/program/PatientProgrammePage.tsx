@@ -328,17 +328,64 @@ export default function PatientProgrammePage() {
       </section>
 
       {enrollmentIdForHistory && (
-        <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm print:hidden sm:p-5">
-          <h2 className="text-base font-bold text-neutral-900">Your unlocked days</h2>
-          <p className="mt-1 text-xs leading-5 text-neutral-500">Watch yesterday’s videos again or revisit any day you have already unlocked. Future days remain locked.</p>
-          {daysQuery.isLoading && <p className="mt-3 text-sm text-neutral-500">Loading unlocked days…</p>}
-          {daysQuery.isError && <p role="alert" className="mt-3 text-sm text-amber-700">Day history is unavailable. <button type="button" className="underline" onClick={() => daysQuery.refetch()}>Try again</button></p>}
+        <section aria-label="Rehabilitation day history" className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm print:hidden sm:p-6">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">Your session library</p>
+              <h2 className="mt-1 text-xl font-black text-neutral-950">Revisit your unlocked days</h2>
+              <p className="mt-1 max-w-xl text-sm leading-6 text-neutral-600">
+                Replay previous exercises whenever you need a refresher. Days available ahead of schedule are not marked as completed.
+              </p>
+            </div>
+            {daysQuery.isSuccess && (
+              <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-800">
+                {daysQuery.data?.unlockedDays?.length || 0} days available
+              </span>
+            )}
+          </div>
+          {daysQuery.isLoading && <p className="mt-4 text-sm text-neutral-500">Loading your unlocked sessions…</p>}
+          {daysQuery.isError && (
+            <p role="alert" className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+              Day history is unavailable. <button type="button" className="font-bold underline" onClick={() => daysQuery.refetch()}>Try again</button>
+            </p>
+          )}
           {daysQuery.isSuccess && (
-            <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div className="mt-5 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
               {Array.from({ length: Math.min(365, Math.max(0, Number(daysQuery.data?.durationDays || program.durationDays || 0))) }, (_, index) => index + 1).map((dayNumber) => {
                 const unlocked = Boolean(daysQuery.data?.unlockedDays?.includes(dayNumber));
                 const completed = Boolean(daysQuery.data?.progress?.some((item) => item.dayNumber === dayNumber && item.dayCompleted));
-                return <button key={dayNumber} type="button" disabled={!unlocked} onClick={() => navigate(`/patient/programme/day/${dayNumber}?enrollment=${encodeURIComponent(enrollmentIdForHistory)}`)} className={cn('flex min-h-12 items-center justify-between rounded-xl border px-3 py-2 text-left text-sm font-semibold', unlocked ? 'border-emerald-200 bg-emerald-50 text-emerald-900 hover:bg-emerald-100' : 'cursor-not-allowed border-neutral-200 bg-neutral-50 text-neutral-400')} aria-label={`Day ${dayNumber} ${unlocked ? completed ? 'completed, replay videos' : 'unlocked, view videos' : 'locked'}`}><span>Day {dayNumber}</span>{unlocked ? completed ? <CheckCircle2 className="h-4 w-4" /> : <Play className="h-4 w-4" /> : <LockKeyhole className="h-4 w-4" />}</button>;
+                const state = getPatientDayTileState({ dayNumber, currentDay, unlocked, completed, currentDayHasContent: todayHasContent });
+                const disabled = state === 'locked' || state === 'needs_content';
+                const isCompleted = state === 'completed';
+                const isToday = state === 'today';
+                const isAhead = state === 'available_early';
+                return (
+                  <button
+                    key={dayNumber}
+                    type="button"
+                    disabled={disabled}
+                    aria-current={dayNumber === currentDay ? 'step' : undefined}
+                    aria-label={`Day ${dayNumber}: ${patientDayTileLabel[state]}`}
+                    onClick={() => navigate(`/patient/programme/day/${dayNumber}?enrollment=${encodeURIComponent(enrollmentIdForHistory)}`)}
+                    className={cn(
+                      'flex min-h-[76px] flex-col items-start justify-between gap-2 rounded-xl border px-3.5 py-3 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700',
+                      isCompleted ? 'border-emerald-200 bg-emerald-50 text-emerald-950 hover:bg-emerald-100'
+                        : isToday ? 'border-emerald-500 bg-white text-emerald-950 ring-1 ring-emerald-200 hover:bg-emerald-50'
+                        : isAhead ? 'border-sky-200 bg-sky-50 text-sky-950 hover:bg-sky-100'
+                        : state === 'revisit' ? 'border-neutral-200 bg-white text-neutral-900 hover:bg-neutral-50'
+                        : state === 'needs_content' ? 'cursor-not-allowed border-amber-200 bg-amber-50 text-amber-900'
+                        : 'cursor-not-allowed border-neutral-200 bg-neutral-50 text-neutral-400',
+                    )}
+                  >
+                    <span className="flex w-full items-center justify-between gap-2">
+                      <span className="text-sm font-extrabold">Day {dayNumber}</span>
+                      {isCompleted ? <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+                        : disabled ? <LockKeyhole className="h-4 w-4" aria-hidden="true" />
+                        : <Play className="h-4 w-4" aria-hidden="true" />}
+                    </span>
+                    <span className="text-xs font-semibold">{patientDayTileLabel[state]}</span>
+                  </button>
+                );
               })}
             </div>
           )}
