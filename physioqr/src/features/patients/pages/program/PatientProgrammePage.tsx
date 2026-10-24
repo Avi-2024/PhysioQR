@@ -14,6 +14,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import apiClient from '@/lib/api-client';
 import ErrorState from '@/components/feedback/ErrorState';
 import { cn } from '@/lib/cn';
+import { getExerciseYouTubeId, getVideoAvailabilityMessage, type PatientVideoAvailability } from '@/lib/exercise-video';
 
 type ApiRecord = Record<string, unknown>;
 type ActiveProgram = {
@@ -27,6 +28,7 @@ type ActiveProgram = {
     videoCount?: number;
     contentReady?: boolean;
     videoReady?: boolean;
+    videoAvailability?: PatientVideoAvailability;
   };
 };
 type Prescription = {
@@ -40,7 +42,7 @@ type Prescription = {
   patient?: { patientId?: string; fullName?: string; mobile?: string; age?: number; dateOfBirth?: string; gender?: string };
   doctor?: { doctorId?: string; fullName?: string; qualification?: string; specialization?: string; clinicName?: string; clinicAddress?: string; city?: string; state?: string; postalCode?: string; clinicContact?: string };
   program?: { programCode?: string; name?: string; nameHindi?: string; description?: string; instructions?: string; precautions?: string; durationDays?: number };
-  day?: { id?: string; dayNumber?: number; title?: string; focus?: string; exercises?: Array<{ displayOrder?: number; exercise?: ApiRecord | null }> };
+  day?: { id?: string; dayNumber?: number; title?: string; focus?: string; exercises?: Array<{ displayOrder?: number; exercise?: ApiRecord | null }>; videoAvailability?: PatientVideoAvailability };
 };
 
 export default function PatientProgrammePage() {
@@ -92,6 +94,7 @@ export default function PatientProgrammePage() {
   const doctor = data.doctor || {};
   const program = data.program || {};
   const currentDay = Number(day?.dayNumber || enrollment?.currentDay || 1);
+  const videoMessage = getVideoAvailabilityMessage(day?.videoAvailability);
   const patientAge = patient.age ?? ageFromDate(patient.dateOfBirth);
   const clinicLocation = [doctor.clinicAddress, doctor.city, doctor.state, doctor.postalCode].filter(Boolean).join(', ');
 
@@ -246,6 +249,11 @@ export default function PatientProgrammePage() {
               </div>
             )}
           </div>
+          {allExercises.length > 0 && videoMessage && (
+            <div role="status" className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
+              <strong>Today's videos unavailable.</strong> {videoMessage}
+            </div>
+          )}
           <div className="mt-5 space-y-4">
             {exercises.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-neutral-300 bg-neutral-50/70 px-4 py-10 text-center">
@@ -256,7 +264,7 @@ export default function PatientProgrammePage() {
             ) : exercises.map((entry, index) => {
               const exercise = entry.exercise || {};
               const id = text(exercise._id || exercise.id);
-              const youtubeId = text(exercise.youtubeVideoId) || extractYoutubeId(text(exercise.videoUrl));
+              const youtubeId = getExerciseYouTubeId(exercise);
               const title = language === 'hi' ? text(exercise.nameHindi, text(exercise.name, 'Exercise')) : text(exercise.name, 'Exercise');
               const thumbnail = text(exercise.thumbnail) || (youtubeId ? `https://i.ytimg.com/vi/${youtubeId}/hqdefault.jpg` : '');
 
@@ -273,7 +281,7 @@ export default function PatientProgrammePage() {
                           className="absolute inset-0 h-full w-full object-cover" />
                       ) : (
                         <div className="absolute inset-0 flex items-center justify-center gap-2 text-xs text-white/80">
-                          <Video className="h-4 w-4" /> Video not available
+                          <Video className="h-4 w-4" /> Video not available — contact your care team
                         </div>
                       )}
                       {playingId !== id && youtubeId && (
@@ -289,6 +297,7 @@ export default function PatientProgrammePage() {
                     </div>
                     <div className="p-4 sm:p-5">
                       <h3 className="text-base font-semibold text-neutral-950">{title}</h3>
+                       {youtubeId && <a href={`https://www.youtube.com/watch?v=${youtubeId}`} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block text-xs font-semibold text-emerald-700 hover:underline">Video not playing? Open on YouTube</a>}
                       <p className="mt-2 text-sm leading-6 text-neutral-600">
                         {text(exercise.description, 'Move slowly and stay within a comfortable range.')}
                       </p>
@@ -371,11 +380,6 @@ function dateText(value?: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '—';
   return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-}
-
-function extractYoutubeId(url: string) {
-  const match = url.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
-  return match?.[1] || '';
 }
 
 function requestError(error: unknown) {

@@ -15,6 +15,7 @@ import {
 import apiClient from '@/lib/api-client';
 import ErrorState from '@/components/feedback/ErrorState';
 import { cn } from '@/lib/cn';
+import { getExerciseYouTubeId, getVideoAvailabilityMessage, type PatientVideoAvailability } from '@/lib/exercise-video';
 
 type ApiRecord = Record<string, unknown>;
 
@@ -46,6 +47,7 @@ export default function ProgrammeDayPage() {
   });
 
   const payload = asRecord(dayQuery.data);
+  const videoMessage = getVideoAvailabilityMessage(asRecord(payload.videoAvailability) as PatientVideoAvailability);
   const programDay = asRecord(payload.programDay);
   const progress = asRecord(payload.progress);
   const exercises = useMemo(() => {
@@ -161,6 +163,9 @@ export default function ProgrammeDayPage() {
         </div>
       )}
 
+      {!dayQuery.isLoading && exercises.length > 0 && videoMessage && (
+        <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">Day {day}: {videoMessage}</p>
+      )}
       {!dayQuery.isLoading && exercises.length === 0 && (
         <div className="rounded-2xl border border-neutral-200 bg-white p-7 text-center shadow-sm">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-neutral-100 text-neutral-500">
@@ -177,7 +182,7 @@ export default function ProgrammeDayPage() {
         {exercises.map((exercise, index) => {
           const id = text(exercise._id || exercise.id);
           const state = progressExercises.find((item) => text(item.exercise) === id) || {};
-          const youtubeId = text(exercise.youtubeVideoId) || extractYoutubeId(text(exercise.videoUrl));
+          const youtubeId = getExerciseYouTubeId(exercise);
           const completed = Boolean(state.markedCompleted);
           const skipped = Boolean(state.skipped);
 
@@ -224,6 +229,9 @@ export default function ProgrammeDayPage() {
                 </div>
 
                 <div className="flex flex-col p-5 sm:p-6">
+                  {youtubeId && (
+                    <a href={`https://www.youtube.com/watch?v=${youtubeId}`} target="_blank" rel="noopener noreferrer" className="mb-3 inline-flex text-xs font-semibold text-emerald-700 hover:underline">Video not playing? Open on YouTube</a>
+                  )}
                   <div>
                     <p className="text-sm leading-6 text-neutral-600">
                       {text(exercise.description, 'Follow the prescribed exercise instructions carefully.')}
@@ -417,11 +425,6 @@ function asRecord(value: unknown): ApiRecord {
 
 function text(value: unknown, fallback = '') {
   return value === undefined || value === null || value === '' ? fallback : String(value);
-}
-
-function extractYoutubeId(url: string) {
-  const match = url.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/|live\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
-  return match?.[1] || '';
 }
 
 function errorMessage(error: unknown) {

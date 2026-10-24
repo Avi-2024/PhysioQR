@@ -6,6 +6,7 @@ const { writeAuditLog } = require('../utils/auditLogger');
 const asyncHandler = require('../utils/asyncHandler');
 const { withDayDosageInProgramme } = require('../services/dayExerciseDosage.service');
 const { patientSafeDay } = require('../services/demoExerciseVideo.service');
+const { summarizeDayVideoStatus } = require('../services/patientVideoStatus.service');
 const { isReleasedForPatient } = require('../services/patientProgrammePublication.service');
 
 const EXERCISE_EVENTS = ['video_started', 'video_completed', 'marked_completed', 'skipped'];
@@ -243,7 +244,8 @@ const getDayContent = asyncHandler(async (req, res) => {
   await progress.save();
 
   const preparedDay = withDayDosageInProgramme(programDay);
-  res.json({ day, isUnlocked: true, programDay: req.user.role === 'admin' ? preparedDay : patientSafeDay(preparedDay), progress });
+  const videoAvailability = summarizeDayVideoStatus((preparedDay.exercises || []).filter((entry) => entry.exercise && entry.exercise.isActive !== false));
+  res.json({ day, isUnlocked: true, programDay: req.user.role === 'admin' ? preparedDay : patientSafeDay(preparedDay), videoAvailability, progress });
 });
 
 // POST /api/progress/:patientProgramId/day/:dayNumber/exercises/:exerciseId/event

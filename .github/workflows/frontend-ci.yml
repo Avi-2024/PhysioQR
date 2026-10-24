@@ -41,5 +41,8 @@ jobs:
       - name: Direct-patient fee input regression tests
         run: npm run test -- --run src/features/admin/pages/settings/AdminSettingsPage.test.tsx
 
+      - name: Patient exercise video playback regression tests
+        run: npm run test -- --run src/lib/exercise-video.test.ts
+
       - name: Production build
         run: npm run build

@@ -4,7 +4,8 @@ const PatientAssessment = require('../models/PatientAssessment.model');
 const { ProgramDay } = require('../models/Exercise.model');
 const asyncHandler = require('../utils/asyncHandler');
 const { withDayDosage } = require('../services/dayExerciseDosage.service');
-const { isDemoExerciseVideo, patientSafeExercise } = require('../services/demoExerciseVideo.service');
+const { patientSafeExercise } = require('../services/demoExerciseVideo.service');
+const { summarizeDayVideoStatus } = require('../services/patientVideoStatus.service');
 const { isReleasedForPatient } = require('../services/patientProgrammePublication.service');
 
 const enrollmentPopulate = [
@@ -59,15 +60,14 @@ const getMyPrescription = asyncHandler(async (req, res) => {
       isActive: true,
       'exercises.0': { $exists: true },
     })
-      .populate('exercises.exercise', '_id isActive videoUrl youtubeVideoId isDemoVideo')
+      .populate('exercises.exercise', '_id isActive videoUrl youtubeVideoId isDemoVideo videoCandidateReviewPending')
       .lean();
 
     const activeExercises = (contentDay?.exercises || []).filter(
       (entry) => entry?.exercise && entry.exercise.isActive !== false,
     );
-    const videoCount = activeExercises.filter(
-      (entry) => !isDemoExerciseVideo(entry.exercise) && (String(entry.exercise.videoUrl || '').trim() || String(entry.exercise.youtubeVideoId || '').trim()),
-    ).length;
+    const videoAvailability = summarizeDayVideoStatus(activeExercises);
+    const videoCount = videoAvailability.ready;
 
     activeProgrammeSummaries.push({
       enrollmentId: item._id,
@@ -82,6 +82,7 @@ const getMyPrescription = asyncHandler(async (req, res) => {
         videoCount,
         contentReady: activeExercises.length > 0,
         videoReady: videoCount > 0,
+        videoAvailability,
       },
     });
   }
@@ -123,6 +124,9 @@ const getMyPrescription = asyncHandler(async (req, res) => {
     .map(withDayDosage)
     .map((entry) => ({ ...entry, exercise: patientSafeExercise(entry.exercise) }));
 
+  const videoAvailability = summarizeDayVideoStatus(
+    (programDay?.exercises || []).filter((entry) => entry.exercise && entry.exercise.isActive !== false),
+  );
   const languages = [...new Set(exerciseEntries.map((entry) => entry.exercise?.language).filter(Boolean))];
   const frontendBase = String(process.env.FRONTEND_URL || '').split(',')[0].trim().replace(/\/$/, '');
   const prescriptionUrl = frontendBase ? `${frontendBase}/patient/programme?enrollment=${enrollment._id}` : '';
@@ -151,10 +155,12 @@ const getMyPrescription = asyncHandler(async (req, res) => {
       title: programDay.title,
       focus: programDay.focus,
       exercises: exerciseEntries,
+      videoAvailability,
     } : {
       dayNumber: currentDay,
       title: '',
       exercises: [],
+      videoAvailability,
     },
     availableLanguages: languages.length ? languages : ['en'],
   });
