@@ -15,6 +15,7 @@ import {
 import apiClient from '@/lib/api-client';
 import ErrorState from '@/components/feedback/ErrorState';
 import { cn } from '@/lib/cn';
+import { getExerciseYouTubeId } from '@/lib/exercise-video';
 
 type ApiRecord = Record<string, unknown>;
 
@@ -177,7 +178,7 @@ export default function ProgrammeDayPage() {
         {exercises.map((exercise, index) => {
           const id = text(exercise._id || exercise.id);
           const state = progressExercises.find((item) => text(item.exercise) === id) || {};
-          const youtubeId = text(exercise.youtubeVideoId) || extractYoutubeId(text(exercise.videoUrl));
+          const youtubeId = getExerciseYouTubeId(exercise);
           const completed = Boolean(state.markedCompleted);
           const skipped = Boolean(state.skipped);
 
