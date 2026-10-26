@@ -39,7 +39,8 @@
     "migrate:rehab-content": "node scripts/migrateProgramContent.js",
     "audit:rehab-content": "node scripts/auditRehabContent.js",
     "inspect:rehab-db": "node scripts/inspectRehabDb.js",
-    "test:doctor-patient-progress": "node --test tests/doctorPatientProgressSummary.test.js tests/doctorPatientProgressAccess.test.js"
+    "test:doctor-patient-progress": "node --test tests/doctorPatientProgressSummary.test.js tests/doctorPatientProgressAccess.test.js",
+    "test:complimentary-programme": "node --test tests/adminComplimentaryProgrammeEligibility.test.js tests/adminComplimentaryProgrammeAssignment.test.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1109.0",
