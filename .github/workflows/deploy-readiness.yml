@@ -85,3 +85,8 @@ jobs:
         env:
           NODE_ENV: test
         run: node --test tests/patientVideoStatus.test.js
+
+      - name: Test complimentary programme clinical and no-charge safeguards
+        env:
+          NODE_ENV: test
+        run: npm run test:complimentary-programme

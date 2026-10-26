@@ -28,6 +28,16 @@ const patientProgramSchema = new mongoose.Schema({
     default: 'every_24_hours',
   },
 
+  // Free additional entitlement granted by Admin after a separate clinical gate.
+  // Does not represent a Payment or change the original commercial attribution.
+  complimentaryAssignment: {
+    source: { type: String, enum: ['admin'] },
+    grantedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    grantedAt: Date,
+    clinicalAssessment: { type: mongoose.Schema.Types.ObjectId, ref: 'PatientAssessment' },
+    clinicalNote: String,
+  },
+
   pauseCount: { type: Number, default: 0 },
   pausedAt: Date,
   pauseReason: String,
