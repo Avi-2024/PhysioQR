@@ -10,6 +10,7 @@ const { getReferrals, getReferralById } = require('../controllers/admin/referral
 const { getClinicVisits, getClinicVisitById } = require('../controllers/admin/clinic-visits.controller');
 const { getPatients, getPatientById, updatePatientStatus, deletePatient } = require('../controllers/admin/patients.controller');
 const { updateDirectPatientFee } = require('../controllers/admin/patient-fee.controller');
+const { listAssignableProgrammes, assignComplimentaryProgramme } = require('../controllers/admin/complimentary-programmes.controller');
 const { getAssessmentQuestions, getAssessmentQuestionById, createAssessmentQuestion, updateAssessmentQuestion, deactivateAssessmentQuestion, reactivateAssessmentQuestion } = require('../controllers/admin/assessment-questions.controller');
 const { getPainCategories, getPainCategoryById, createPainCategory, updatePainCategory, setPainCategoryStatus } = require('../controllers/admin/pain-categories.controller');
 const { getPrograms, getProgramById, createProgram, updateProgram, setProgramStatus, recordProgrammeClinicalApproval } = require('../controllers/admin/programs.controller');
