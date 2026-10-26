@@ -50,6 +50,14 @@ router.get('/clinics', getClinics); router.get('/clinics/:id', getClinicById);
 router.patch('/clinics/:id', validateSchema({ body: { clinicName:{type:'string',max:160}, clinicAddress:{type:'string',max:500}, city:{type:'string',max:100}, state:{type:'string',max:100}, postalCode:{type:'string',max:20}, clinicContact:{type:'string',max:30}, clinicEmail:{type:'string',max:160}, clinicWorkingHours:{type:'string',max:200}, googleMapsLink:{type:'string',max:1000}, clinicBranches:{type:'number',min:1,max:1000} } }), updateClinic);
 router.get('/referrals', getReferrals); router.get('/referrals/:id', getReferralById);
 router.get('/patients', getPatients); router.get('/patients/:id', getPatientById);
+router.get('/patients/:id/programmes/eligible', listAssignableProgrammes);
+router.post('/patients/:id/programmes/complimentary',
+  validateSchema({ params: { id: { type: 'string', min: 7, max: 40, required: true } },
+    body: { programId: { type: 'objectId', required: true },
+      clinicalNote: { type: 'string', min: 10, max: 1000, required: true },
+      confirmFree: { type: 'boolean', required: true } } }),
+  (req, res, next) => req.body.confirmFree === true ? next() : res.status(400).json({ message: 'Confirm free programme assignment first' }),
+  assignComplimentaryProgramme);
 router.patch('/patients/:id/status', validateSchema({ body:{ status:{type:'enum',values:['active','inactive','blocked'],required:true}, reason:{type:'string',max:500,required:true} } }), updatePatientStatus);
 router.patch('/patients/:id/direct-fee', validateSchema({ params:{id:{type:'string',min:7,max:40,required:true}}, body:{fee:{type:'number',min:1,max:1000000,required:true},reason:{type:'string',max:500,required:true}} }), updateDirectPatientFee);
 router.delete('/patients/:id', validateSchema({ body:{ confirmation:{type:'string',max:40,required:true}, reason:{type:'string',max:500,required:true} } }), deletePatient);
