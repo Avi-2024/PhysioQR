@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { CheckCircle2, Gift, PlusCircle, ShieldCheck } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Gift, PlusCircle, ShieldCheck, X } from 'lucide-react';
 import apiClient from '@/lib/api-client';
 
 type EligibleProgramme = {
@@ -15,6 +16,8 @@ type Eligibility = {
   reason?: string;
   programmes: EligibleProgramme[];
 };
+type AssignmentToast = { kind: 'success' | 'error'; title: string; message: string };
+
 type Props = {
   patientId: string;
   onAssigned: () => Promise<unknown>;
@@ -24,8 +27,13 @@ export default function AdminComplimentaryProgrammeCard({ patientId, onAssigned 
   const [programmeId, setProgrammeId] = useState('');
   const [clinicalNote, setClinicalNote] = useState('');
   const [confirmed, setConfirmed] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
-  const [errorMessage, setErrorMessage] = useState('');
+  const [toast, setToast] = useState<AssignmentToast | null>(null);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timeout = window.setTimeout(() => setToast(null), 5000);
+    return () => window.clearTimeout(timeout);
+  }, [toast]);
 
   const eligibility = useQuery<Eligibility>({
     queryKey: ['admin-complimentary-programmes', patientId],
@@ -43,14 +51,21 @@ export default function AdminComplimentaryProgrammeCard({ patientId, onAssigned 
       setProgrammeId('');
       setClinicalNote('');
       setConfirmed(false);
-      setErrorMessage('');
-      setSuccessMessage('Additional programme assigned at ₹0. The patient can now access it in their programme list.');
-      await eligibility.refetch();
-      await onAssigned();
+      setToast({
+        kind: 'success',
+        title: 'Programme assigned successfully',
+        message: 'Additional rehabilitation programme added free (₹0). Previous progress is preserved.',
+      });
+      // The successful assignment must not be reported as failed merely because
+      // a follow-up dashboard refresh is unavailable.
+      await Promise.allSettled([eligibility.refetch(), onAssigned()]);
     },
     onError: (error: any) => {
-      setSuccessMessage('');
-      setErrorMessage(error?.response?.data?.message || 'Could not assign this programme. Verify clinical eligibility and published videos.');
+      setToast({
+        kind: 'error',
+        title: 'Programme could not be assigned',
+        message: error?.response?.data?.message || 'Check clinical eligibility and approved programme videos, then try again.',
+      });
     },
   });
 
@@ -83,7 +98,7 @@ export default function AdminComplimentaryProgrammeCard({ patientId, onAssigned 
         {options.length > 0 && <>
           <label className="block">
             <span className="text-sm font-semibold text-neutral-800">Select programme</span>
-            <select value={programmeId} onChange={(event) => { setProgrammeId(event.target.value); setSuccessMessage(''); setErrorMessage(''); }}
+            <select value={programmeId} onChange={(event) => { setProgrammeId(event.target.value); setToast(null); }}
               className="mt-2 min-h-11 w-full rounded-xl border border-neutral-300 bg-white px-3 text-sm focus:border-emerald-600">
               <option value="">Choose approved programme</option>
               {options.map((item) => <option key={item._id} value={item._id}>{item.name} · {item.durationDays} days</option>)}
@@ -104,17 +119,37 @@ export default function AdminComplimentaryProgrammeCard({ patientId, onAssigned 
               className="mt-1 h-4 w-4 accent-emerald-700" />
             <span className="text-sm leading-6 text-neutral-700">Confirm this is a <strong>free additional programme (₹0)</strong>. Previous programmes and patient progress will remain unchanged.</span>
           </label>
-          {errorMessage && <p role="alert" className="text-sm font-semibold text-rose-700">{errorMessage}</p>}
           <button type="button" disabled={!canSubmit} onClick={() => assignment.mutate()}
             className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 text-sm font-bold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50">
             <PlusCircle className="h-4 w-4" aria-hidden="true" />
             {assignment.isPending ? 'Assigning…' : 'Assign programme free'}
           </button>
         </>}
-        {successMessage && <p role="status" className="flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold leading-6 text-emerald-800">
-          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" /> {successMessage}
-        </p>}
       </div>
+      {toast && createPortal(
+        <div
+          role={toast.kind === 'error' ? 'alert' : 'status'}
+          aria-atomic="true"
+          className={`fixed right-4 top-4 z-[100] w-[calc(100vw-2rem)] max-w-sm rounded-xl border bg-white p-4 shadow-xl sm:right-6 sm:top-6 ${
+            toast.kind === 'success' ? 'border-emerald-200' : 'border-rose-200'
+          }`}
+        >
+          <div className="flex items-start gap-3">
+            {toast.kind === 'success'
+              ? <CheckCircle2 aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
+              : <AlertCircle aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-rose-600" />}
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold text-neutral-950">{toast.title}</p>
+              <p className="mt-1 text-sm leading-5 text-neutral-600">{toast.message}</p>
+            </div>
+            <button type="button" aria-label="Dismiss notification" onClick={() => setToast(null)}
+              className="rounded-md p-1 text-neutral-500 hover:bg-neutral-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600">
+              <X className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
+        </div>,
+        document.body,
+      )}
     </section>
   );
 }
