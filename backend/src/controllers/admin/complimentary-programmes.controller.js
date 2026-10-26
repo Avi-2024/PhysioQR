@@ -7,6 +7,8 @@ const asyncHandler = require('../../utils/asyncHandler');
 const { writeAuditLog } = require('../../utils/auditLogger');
 const { assessProgrammeEligibility } = require('../../services/adminComplimentaryProgramme.service');
 const { ensureApprovedRelease } = require('../../services/programmeReleaseGate.service');
+const { ProgramDay } = require('../../models/Exercise.model');
+const { summarizeDayVideoStatus } = require('../../services/patientVideoStatus.service');
 
 const isObjectId = (value) => /^[a-f\d]{24}$/i.test(String(value));
 const findPatient = (identifier) => Patient.findOne({
@@ -16,6 +18,10 @@ const findPatient = (identifier) => Patient.findOne({
   ],
 });
 const verifiedStatuses = ['successful', 'manually_verified'];
+
+const dayOneVideoReady = (day) => Boolean(day && summarizeDayVideoStatus(
+  (day.exercises || []).filter((item) => item.exercise && item.exercise.isActive !== false),
+).ready > 0);
 
 const patientEligibility = async (patient) => {
   if (patient.status !== 'active' || !patient.mobileVerified || !patient.consentAccepted) {
@@ -47,12 +53,21 @@ const listAssignableProgrammes = asyncHandler(async (req, res) => {
     Program.find({ isActive: true }).select('_id name programCode durationDays painCategory isActive clinicalApprovalRequired clinicalApproval').sort({ name: 1 }).lean(),
   ]);
   const enrolledProgrammeIds = enrolled.map((item) => item.program);
-  const eligible = programmes
+  const candidates = programmes
     .map((programme) => ({
       programme,
       decision: assessProgrammeEligibility({ programme, assessments, enrolledProgrammeIds }),
     }))
-    .filter((item) => item.decision.eligible)
+    .filter((item) => item.decision.eligible);
+
+  const days = candidates.length ? await ProgramDay.find({
+    program: { $in: candidates.map((item) => item.programme._id) },
+    dayNumber: 1,
+    isActive: true,
+  }).populate('exercises.exercise', '_id isActive videoUrl youtubeVideoId isDemoVideo videoCandidateReviewPending').lean() : [];
+
+  const eligible = candidates.filter(({ programme }) => days.some((day) =>
+    String(day.program) === String(programme._id) && dayOneVideoReady(day)))
     .map(({ programme, decision }) => ({
       _id: programme._id,
       name: programme.name,
@@ -90,6 +105,11 @@ const assignComplimentaryProgramme = asyncHandler(async (req, res) => {
     return res.status(409).json({ code: 'CLINICAL_PROGRAMME_NOT_ELIGIBLE', message: decision.reason });
   }
   await ensureApprovedRelease(programme);
+  const dayOne = await ProgramDay.findOne({ program: programme._id, dayNumber: 1, isActive: true })
+    .populate('exercises.exercise', '_id isActive videoUrl youtubeVideoId isDemoVideo videoCandidateReviewPending').lean();
+  if (!dayOneVideoReady(dayOne)) {
+    return res.status(409).json({ code: 'PROGRAMME_DAY_ONE_UNAVAILABLE', message: 'Day 1 needs a published, approved exercise video before this programme can be assigned' });
+  }
 
   const clinicalNote = String(req.body.clinicalNote || '').trim();
   const now = new Date();
