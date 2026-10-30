@@ -71,41 +71,43 @@ const request = () => {
 
 test.beforeEach(() => {
   patient = { _id: PATIENT_ID, fullName: 'Patient Example', mobile: '9999999999', referringDoctor: null };
-  fee = 1800;
+  fee = 1800; // old settings must never affect registration checkout
   feeSource = 'admin_default';
 });
 
-test('direct patient receives programme, admin default price and direct checkout mode', async () => {
+test('direct patient quote uses the fixed INR 300 registration amount', async () => {
   const { req, res, outcome } = request();
   await getPurchaseQuote(req, res);
   assert.equal(outcome().status, 200);
   assert.equal(outcome().response.purchaseMode, 'direct');
   assert.equal(outcome().response.program.id, PROGRAM_ID);
   assert.equal(outcome().response.doctor, null);
-  assert.equal(outcome().response.pricing.originalAmount, 1800);
-  assert.equal(outcome().response.pricing.source, 'admin_default');
+  assert.deepEqual(outcome().response.pricing, {
+    originalAmount: 300, discountAmount: 0, taxAmount: 0,
+    finalAmount: 300, currency: 'INR',
+    source: 'fixed_registration_fee', feeAuthority: 'physioqr',
+  });
 });
 
-test('patient-level fee source is preserved in direct quote', async () => {
+test('patient-specific legacy override cannot change the quote', async () => {
   fee = 2100;
   feeSource = 'patient_override';
   const { req, res, outcome } = request();
   await getPurchaseQuote(req, res);
-  assert.equal(outcome().response.pricing.originalAmount, 2100);
-  assert.equal(outcome().response.pricing.source, 'patient_override');
+  assert.equal(outcome().response.pricing.originalAmount, 300);
+  assert.equal(outcome().response.pricing.source, 'fixed_registration_fee');
 });
 
-test('no configured fee blocks payment with an actionable message', async () => {
+test('no configured admin fee still produces the INR 300 fixed quote', async () => {
   fee = 0;
   feeSource = 'not_configured';
   const { req, res, outcome } = request();
   await getPurchaseQuote(req, res);
-  assert.equal(outcome().status, 400);
-  assert.equal(outcome().response.code, 'PATIENT_FEE_NOT_CONFIGURED');
-  assert.match(outcome().response.message, /default direct-patient fee/);
+  assert.equal(outcome().status, 200);
+  assert.equal(outcome().response.pricing.finalAmount, 300);
 });
 
-test('referred patient keeps doctor pricing, not admin pricing', async () => {
+test('referred patient pays INR 300 regardless of doctor-specific pricing', async () => {
   patient.referringDoctor = {
     _id: '507f1f77bcf86cd799439014',
     fullName: 'Doctor Example',
@@ -116,6 +118,6 @@ test('referred patient keeps doctor pricing, not admin pricing', async () => {
   await getPurchaseQuote(req, res);
   assert.equal(outcome().status, 200);
   assert.equal(outcome().response.purchaseMode, 'doctor_referral');
-  assert.equal(outcome().response.pricing.originalAmount, 3200);
-  assert.equal(outcome().response.pricing.source, 'doctor_patient_fee');
+  assert.equal(outcome().response.pricing.originalAmount, 300);
+  assert.equal(outcome().response.pricing.source, 'fixed_registration_fee');
 });
