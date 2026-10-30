@@ -45,9 +45,11 @@ const exerciseIdsForSurgeryProgramme = async (surgery) => {
   });
 };
 
-const surgeryFilter = (surgeryId, programExerciseIds = []) => ({
+const surgeryFilter = (surgeryId, programExerciseIds = [], bodyRegionId) => ({
   $or: [
-    { surgeryTypes: surgeryId },
+    // Explicit tags must still match this condition's body region.
+    { surgeryTypes: surgeryId, ...(bodyRegionId ? { painCategory: bodyRegionId } : {}) },
+    // Clinically scheduled programme exercises may be cross-category/general.
     ...(programExerciseIds.length ? [{ _id: { $in: programExerciseIds } }] : []),
   ],
 });
