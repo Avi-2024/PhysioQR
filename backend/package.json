@@ -42,7 +42,8 @@
     "test:doctor-patient-progress": "node --test tests/doctorPatientProgressSummary.test.js tests/doctorPatientProgressAccess.test.js",
     "test:complimentary-programme": "node --test tests/adminComplimentaryProgrammeEligibility.test.js tests/adminComplimentaryProgrammeAssignment.test.js",
     "test:agent-operational": "node --test tests/agentPatientCounts.test.js tests/agentDoctorVisits.test.js tests/agentDoctorVisibility.test.js",
-    "test:doctor-recovery-overview": "node --test tests/doctorRecoveryOverviewSummary.test.js tests/doctorRecoveryOverviewAccess.test.js"
+    "test:doctor-recovery-overview": "node --test tests/doctorRecoveryOverviewSummary.test.js tests/doctorRecoveryOverviewAccess.test.js",
+    "test:fixed-split": "node --test tests/fixedRevenueSplit.test.js tests/fixedSplitRegistration.test.js tests/fixedSplitAdmin.test.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1109.0",
