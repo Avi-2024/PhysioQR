@@ -112,12 +112,6 @@ export default function AgentDoctorDetailPage() {
     anchor.remove();
   };
 
-  const revenueModel = text(doctor.revenueModel, 'split');
-  const patientPrice = doctor.requestedPatientFee ?? doctor.approvedPatientFee;
-  const commissionType = text(doctor.requestedFeeShareType || doctor.feeShareType, 'percentage');
-  const commissionValue = commissionType === 'fixed'
-    ? doctor.requestedFixedFeeShareAmount ?? doctor.fixedFeeShareAmount
-    : doctor.requestedFeeSharePercentage ?? doctor.feeSharePercentage;
   const statusReason = text(doctor.rejectionReason || doctor.suspensionReason);
   const kycStatus = text(doctor.kycStatus, 'pending');
 
@@ -164,11 +158,12 @@ export default function AgentDoctorDetailPage() {
         )}
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <Metric icon={Stethoscope} label="Doctor status" value={label(doctor.status)} loading={query.isLoading} />
         <Metric icon={ShieldCheck} label="KYC status" value={label(kycStatus)} loading={query.isLoading} />
         <Metric icon={QrCode} label="QR status" value={doctor.qrCodeActive ? 'Active' : 'Not active'} loading={query.isLoading} />
-        <Metric icon={Users} label="Connected patients" value={number(performance.connectedPatients)} loading={query.isLoading} />
+        <Metric icon={Users} label="Referred patients" value={number(performance.connectedPatients)} loading={query.isLoading} />
+        <Metric icon={CalendarClock} label="Clinic visits" value={number(performance.clinicVisits)} loading={query.isLoading} />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
@@ -212,41 +207,6 @@ export default function AgentDoctorDetailPage() {
                 <Info label="Doctor preference" value={text(preferredProgram.name) ? 'Configured' : 'Not configured'} />
               </div>
             )}
-          </section>
-
-          <section className="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm sm:p-6">
-            <h2 className="font-bold text-neutral-900">Payment Setup</h2>
-            <p className="mt-1 text-xs text-neutral-500">
-              Patient payment is collected through Razorpay and becomes authoritative only after backend verification.
-            </p>
-
-            {query.isLoading ? (
-              <Skeleton className="mt-4 h-40" />
-            ) : (
-              <div className="mt-5 grid gap-x-8 gap-y-5 sm:grid-cols-2">
-                <Info label="Payment model" value={paymentModelLabel(revenueModel)} />
-                <Info label="Patient price" value={money(patientPrice)} />
-
-                {revenueModel === 'split' ? (
-                  <>
-                    <Info label="Doctor commission type" value={commissionType === 'fixed' ? 'Fixed Amount' : 'Percentage'} />
-                    <Info
-                      label="Doctor commission"
-                      value={commissionType === 'fixed' ? money(commissionValue) : percentage(commissionValue)}
-                    />
-                  </>
-                ) : (
-                  <>
-                    <Info label="Doctor share from patient payment" value="₹0" />
-                    <Info label="PhysioQR share" value="Full verified patient payment" />
-                  </>
-                )}
-              </div>
-            )}
-
-            <div className="mt-5 rounded-lg bg-neutral-50 p-3 text-xs leading-5 text-neutral-600">
-              Successful verified Razorpay payment automatically creates the payment record, activates the patient program and generates the invoice. Agent does not manually approve payments.
-            </div>
           </section>
 
           <section className="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm sm:p-6">
@@ -441,7 +401,7 @@ export default function AgentDoctorDetailPage() {
       </div>
 
       <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
-        Agent can view and manage the complete operational doctor profile, selected rehab program, QR, KYC and onboarding commercial setup. PAN, bank account, payout credentials, wallet balances and confidential patient medical information remain protected.
+        Agent can view assigned doctor information, visits, referred-patient totals, QR and KYC status. Pricing and commission updates are handled by Admin after onboarding; confidential patient medical data is not displayed.
       </div>
     </div>
   );
@@ -515,19 +475,8 @@ function label(value: unknown) {
   return text(value, '-').replace(/_/g, ' ');
 }
 
-function paymentModelLabel(value: unknown) {
-  return text(value) === 'platform_fee' ? 'Platform Fee' : 'Split Model';
-}
 
-function money(value: unknown) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? `₹${parsed.toLocaleString('en-IN')}` : '-';
-}
 
-function percentage(value: unknown) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? `${parsed}%` : '-';
-}
 
 function durationText(value: unknown) {
   const days = numberOrNull(value);
