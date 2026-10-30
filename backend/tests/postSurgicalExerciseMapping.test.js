@@ -89,10 +89,13 @@ test('programme must be active and explicitly associated with surgery rather tha
 });
 
 test('condition selector joins explicit condition tags with exercises in surgical programmes', () => {
-  assert.deepEqual(surgeryFilter(SURGERY, [EXERCISE]), {
-    $or: [{ surgeryTypes: SURGERY }, { _id: { $in: [EXERCISE] } }],
+  assert.deepEqual(surgeryFilter(SURGERY, [EXERCISE], REGION), {
+    $or: [{ surgeryTypes: SURGERY, painCategory: REGION }, { _id: { $in: [EXERCISE] } }],
   });
-  assert.deepEqual(surgeryFilter(SURGERY), { $or: [{ surgeryTypes: SURGERY }] });
-  const raw = JSON.stringify(surgeryFilter(SURGERY, []));
-  assert.ok(!raw.includes('painCategory'), 'Never implicitly show all generic knee exercises for ACL surgery');
+  assert.deepEqual(surgeryFilter(SURGERY, [], REGION), {
+    $or: [{ surgeryTypes: SURGERY, painCategory: REGION }],
+  });
+  const raw = JSON.stringify(surgeryFilter(SURGERY, [], REGION));
+  assert.ok(!raw.includes('post_operative') && !raw.includes('all'),
+    'Never implicitly show all general body-region exercises for ACL surgery');
 });
