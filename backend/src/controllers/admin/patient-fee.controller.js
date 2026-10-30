@@ -2,7 +2,6 @@ const Patient = require('../../models/Patient.model');
 const { Payment } = require('../../models/Payment.model');
 const { writeAuditLog } = require('../../utils/auditLogger');
 const asyncHandler = require('../../utils/asyncHandler');
-const { isWebsiteDirectPatient } = require('../../services/directPatientPricing.service');
 
 const FINANCIAL_STATUSES = [
   'successful', 'manually_verified', 'partially_refunded', 'refunded',
@@ -29,9 +28,6 @@ const updateDirectPatientFee = asyncHandler(async (req, res) => {
   if (!patient) return res.status(404).json({ message: 'Patient not found' });
   if (patient.referringDoctor) {
     return res.status(409).json({ message: 'This patient is linked to a Doctor. Patient fee is controlled by the referring Doctor.' });
-  }
-  if (isWebsiteDirectPatient(patient)) {
-    return res.status(409).json({ message: 'Website direct registration fee is fixed at ₹300 and cannot be overridden.' });
   }
 
   const paid = await Payment.exists({ patient: patient._id, status: { $in: FINANCIAL_STATUSES } });
