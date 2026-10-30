@@ -99,7 +99,7 @@ export default function PatientRegistrationPageV3() {
       });
     },
     onSuccess: () => navigate('/payment-success'),
-    onError: () => navigate('/payment-failed'),
+    onError: (paymentError) => setError(mutationError(paymentError)),
   });
 
   const nextStep=()=>setStep((current)=>Math.min(current+1,6)); const prevStep=()=>setStep((current)=>Math.max(current-1,1)); const patientId=text(patient.id||patient._id);
