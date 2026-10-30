@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Pencil, Plus, QrCode, Search, ShieldCheck, Stethoscope, Users, XCircle } from 'lucide-react';
+import { CalendarCheck, Pencil, Plus, QrCode, Search, ShieldCheck, Stethoscope, Users } from 'lucide-react';
 import apiClient from '@/lib/api-client';
 import { DataTable, type DataTableColumn } from '@/components/data-display/DataTable';
 import ErrorState from '@/components/feedback/ErrorState';
@@ -18,6 +18,7 @@ type DoctorRow = {
   status: string;
   qrCodeActive: boolean;
   connectedPatients: number;
+  clinicVisits: number;
   createdAt: string;
 };
 
@@ -72,9 +73,14 @@ export default function AgentDoctorsPage() {
       render: (row) => <span className="text-sm text-neutral-700">{row.mobile}</span>,
     },
     {
+      key: 'clinicVisits',
+      header: 'Clinic Visits',
+      render: (row) => <span className="font-bold text-sky-700 tabular-nums">{row.clinicVisits}</span>,
+    },
+    {
       key: 'connectedPatients',
-      header: 'Connected Patients',
-      render: (row) => <span className="font-bold text-emerald-700">{row.connectedPatients}</span>,
+      header: 'Referred Patients',
+      render: (row) => <span className="font-bold text-emerald-700 tabular-nums">{row.connectedPatients}</span>,
     },
     {
       key: 'status',
@@ -167,7 +173,7 @@ export default function AgentDoctorsPage() {
         <Kpi icon={Stethoscope} label="Total doctors" value={rows.length} />
         <Kpi icon={ShieldCheck} label="Approved" value={rows.filter((row) => row.status === 'approved').length} />
         <Kpi icon={Users} label="Connected patients" value={rows.reduce((total, row) => total + row.connectedPatients, 0)} />
-        <Kpi icon={XCircle} label="Rejected / suspended" value={rows.filter((row) => ['rejected', 'suspended'].includes(row.status)).length} />
+        <Kpi icon={CalendarCheck} label="Doctor-linked visits" value={rows.reduce((total, row) => total + row.clinicVisits, 0)} />
       </div>
 
       <section className="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm">
@@ -207,7 +213,7 @@ export default function AgentDoctorsPage() {
       </section>
 
       <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4 text-xs text-neutral-600">
-        Agent access is operational only. Banking, payout, detailed fee-share and confidential patient medical information are not displayed.
+        Per-doctor visits count only visits linked to that doctor. Unlinked clinic visits are included in the overall visit total, but not attributed to any doctor.
       </div>
     </div>
   );
@@ -246,6 +252,7 @@ function mapDoctor(record: ApiRecord): DoctorRow {
     status: text(record.status, 'draft'),
     qrCodeActive: Boolean(record.qrCodeActive),
     connectedPatients: Math.max(0, Number(record.connectedPatients) || 0),
+    clinicVisits: Math.max(0, Number(record.clinicVisits) || 0),
     createdAt: text(record.createdAt),
   };
 }
