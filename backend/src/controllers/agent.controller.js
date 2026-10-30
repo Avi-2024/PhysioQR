@@ -258,6 +258,7 @@ const getMyDashboard = asyncHandler(async (req, res) => {
     activeDoctors,
     monthlyOnboarded,
     totalPatients,
+    totalClinicVisits,
     pendingFollowUps,
     upcomingFollowUps,
     recentVisits,
@@ -272,6 +273,7 @@ const getMyDashboard = asyncHandler(async (req, res) => {
     Doctor.countDocuments({ agent: agent._id, status: 'approved', qrCodeActive: true }),
     Doctor.countDocuments({ agent: agent._id, createdAt: { $gte: monthStart, $lt: nextMonthStart } }),
     Patient.countDocuments({ referringDoctor: { $in: agentDoctorIds } }),
+    ClinicVisit.countDocuments({ agent: agent._id }),
     ClinicVisit.countDocuments({ agent: agent._id, followUpStatus: 'scheduled', followUpDate: { $lte: now } }),
     ClinicVisit.countDocuments({ agent: agent._id, followUpStatus: 'scheduled', followUpDate: { $gt: now } }),
     ClinicVisit.find({ agent: agent._id })
@@ -319,6 +321,7 @@ const getMyDashboard = asyncHandler(async (req, res) => {
     monthlyTarget,
     targetAchievementPercentage,
     totalPatients,
+    totalClinicVisits,
     doctorsWithPatients,
     pendingFollowUps,
     upcomingFollowUps,
