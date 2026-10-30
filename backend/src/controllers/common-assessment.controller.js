@@ -11,6 +11,10 @@ const { isRegionVisibleForCase, isSurgeryVisible } = require('../services/assess
 const { patientQuestionTypeFilter } = require('../services/patientAssessmentQuestions.service');
 const { decidePatientAssessmentClearance } = require('../services/patientAssessmentClearance.service');
 const { effectiveRedFlagSeverity } = require('../services/assessmentFlagSeverity.service');
+const {
+  validateAssessmentDocument, uploadAssessmentDocument, deleteAssessmentDocument,
+  publicAssessmentDocuments,
+} = require('../services/assessmentDocuments.service');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const ALLOWED_SIDES = ['right', 'left', 'both', 'not_applicable'];
@@ -214,8 +218,22 @@ const submitCommonAssessment = asyncHandler(async (req, res) => {
     surgeryTypeId,
     surgeryDate,
     side,
-    answers,
+    answers: submittedAnswers,
   } = req.body;
+  let answers = submittedAnswers;
+  if (typeof answers === 'string') {
+    try { answers = JSON.parse(answers); }
+    catch (_) { return res.status(400).json({ message: 'Invalid assessment answers JSON' }); }
+  }
+  const files = [
+    ...(req.files?.doctorPrescription || []).map((file) => ({ documentType: 'doctor_prescription', file })),
+    ...(req.files?.investigationReport || []).map((file) => ({ documentType: 'investigation_report', file })),
+  ];
+  if (files.length && req.user.role !== 'patient') {
+    return res.status(403).json({ message: 'Only patients may attach documents to an assessment' });
+  }
+  // Validate every upload before allocating storage or saving clinical data.
+  for (const item of files) validateAssessmentDocument(item.file, item.documentType);
 
   if (req.user.role === 'patient' && req.user._id.toString() !== patientId) {
     return res.status(403).json({ message: 'Cannot submit assessment for another patient' });
@@ -274,7 +292,13 @@ const submitCommonAssessment = asyncHandler(async (req, res) => {
     ? Math.max(0, Math.floor((Date.now() - context.surgeryDate.getTime()) / DAY_MS))
     : undefined;
 
-  const assessment = await PatientAssessment.create({
+  const uploadedDocuments = [];
+  let assessment;
+  try {
+    for (const { file, documentType } of files) {
+      uploadedDocuments.push(await uploadAssessmentDocument({ patientId, documentType, file }));
+    }
+    assessment = await PatientAssessment.create({
     patient: patientId,
     caseType: context.caseType._id,
     painCategory: context.bodyRegion._id,
@@ -291,7 +315,13 @@ const submitCommonAssessment = asyncHandler(async (req, res) => {
     criticalFlagCount: clearance.criticalFlagCount,
     routineFlagCount: clearance.routineFlagCount,
     status: clearance.status,
+    ...(uploadedDocuments.length ? { assessmentDocuments: uploadedDocuments } : {}),
   });
+  } catch (error) {
+    // Best-effort cleanup if storage succeeds but assessment persistence fails.
+    await Promise.allSettled(uploadedDocuments.map(deleteAssessmentDocument));
+    throw error;
+  }
 
   if (reviewRequired) {
     await notifyAssessmentReview(assessment, hasRedFlag);
@@ -311,8 +341,10 @@ const submitCommonAssessment = asyncHandler(async (req, res) => {
     });
   }
 
+  const safeAssessment = assessment.toObject ? assessment.toObject() : { ...assessment };
+  delete safeAssessment.assessmentDocuments;
   res.status(201).json({
-    assessment,
+    assessment: { ...safeAssessment, documents: publicAssessmentDocuments(assessment.assessmentDocuments || []) },
     caseType: context.caseType,
     painCategory: context.bodyRegion,
     surgeryType: context.surgeryType,
