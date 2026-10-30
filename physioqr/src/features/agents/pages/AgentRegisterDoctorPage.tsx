@@ -149,7 +149,7 @@ export default function AgentRegisterDoctorPage() {
         <div className="my-6 border-t border-neutral-200" />
         <div>
           <h2 className="text-base font-bold text-neutral-900">Payment Setup</h2>
-          <p className="mt-1 text-xs text-neutral-500">Set the payment model and patient price. Doctor commission applies only to Split Model.</p>
+          <p className="mt-1 text-xs text-neutral-500">Patient registration is fixed at ₹300 for every referral. The proposed commercial patient price below is legacy profile information and does not change new registration checkout.</p>
         </div>
 
         <div className="mt-4 grid gap-4 sm:grid-cols-2">

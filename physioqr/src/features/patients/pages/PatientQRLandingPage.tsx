@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ShieldCheck, CheckCircle2, PlayCircle, ArrowRight } from 'lucide-react';
+import { PATIENT_REGISTRATION_FEE_INR } from '@/config/patient-pricing';
 
 export default function PatientQRLandingPage() {
   const navigate = useNavigate();
@@ -37,6 +38,8 @@ export default function PatientQRLandingPage() {
             <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-success-400 flex-shrink-0" /> Track daily pain & progress with doctor</li>
           </ul>
         </div>
+
+        <p className="rounded-xl border border-white/20 bg-white/10 p-4 text-center text-sm font-semibold">One-time registration & rehabilitation access: ₹{PATIENT_REGISTRATION_FEE_INR}. Pay only after clinical clearance.</p>
 
         <button
           onClick={() => navigate(`/register?doctor=${doctorCode}`)}

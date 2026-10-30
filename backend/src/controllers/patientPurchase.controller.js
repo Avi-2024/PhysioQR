@@ -3,13 +3,12 @@ const PatientAssessment = require('../models/PatientAssessment.model');
 const Program = require('../models/Program.model');
 const asyncHandler = require('../utils/asyncHandler');
 const { requiresClinicalProgrammeSelection } = require('../services/patientAssessmentClearance.service');
-const { resolveDirectPatientFee } = require('../services/directPatientPricing.service');
+const { PATIENT_REGISTRATION_FEE_INR } = require('../config/patientRegistrationFee');
 
 const normalizeIds = (values = []) => [...new Set((values || []).map((value) => String(value)).filter(Boolean))];
 
 // GET /api/patients/me/purchase-quote
-// Programme selection is clinical. Pricing is commercial and comes only from
-// the Doctor (referred patient) or Admin (direct patient).
+// Programme selection is clinical; the onboarding payment amount is always INR 300.
 const getPurchaseQuote = asyncHandler(async (req, res) => {
   const patientId = req.user._id;
   const [patient, assessment] = await Promise.all([
@@ -85,19 +84,7 @@ const getPurchaseQuote = asyncHandler(async (req, res) => {
   }
 
   const purchaseMode = doctor ? 'doctor_referral' : 'direct';
-  const directPricing = doctor ? null : await resolveDirectPatientFee(patient);
-  const amount = doctor
-    ? Number(doctor.approvedPatientFee || 0)
-    : directPricing.amount;
-
-  if (amount <= 0) {
-    return res.status(400).json({
-      code: 'PATIENT_FEE_NOT_CONFIGURED',
-      message: doctor
-        ? 'The referring Doctor has not configured the patient fee yet.'
-        : 'Admin has not configured a default direct-patient fee or patient-specific fee yet.',
-    });
-  }
+  const amount = PATIENT_REGISTRATION_FEE_INR;
 
   const mapProgram = (program) => ({
     id: program._id,
@@ -137,8 +124,8 @@ const getPurchaseQuote = asyncHandler(async (req, res) => {
       taxAmount: 0,
       finalAmount: amount,
       currency: 'INR',
-      source: doctor ? 'doctor_patient_fee' : directPricing.source,
-      feeAuthority: doctor ? 'doctor' : 'admin',
+      source: 'fixed_registration_fee',
+      feeAuthority: 'physioqr',
     },
     assignment: { source: assignmentSource, programmeCount: programs.length },
   });
