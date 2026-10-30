@@ -4,6 +4,7 @@ const Module = require('node:module');
 
 // No live MongoDB or patient records are used by these pricing tests.
 let configuredAmount;
+let configuredWebsiteAmount;
 let settingsReads = 0;
 const mockSettings = {
   findOne: (query) => {
@@ -12,7 +13,7 @@ const mockSettings = {
     return {
       lean: async () => configuredAmount === undefined
         ? null
-        : { value: { directPatientDefaultFee: configuredAmount } },
+        : { value: { directPatientDefaultFee: configuredAmount, websiteDirectRegistrationFee: configuredWebsiteAmount } },
     };
   },
 };
@@ -31,6 +32,7 @@ try {
 
 test.beforeEach(() => {
   configuredAmount = undefined;
+  configuredWebsiteAmount = undefined;
   settingsReads = 0;
 });
 
@@ -71,17 +73,25 @@ test('an existing positive patient override works even when the default is disab
   assert.equal(settingsReads, 0);
 });
 
-test('homepage direct patient pays the Admin default when it has been configured', async () => {
+test('website-direct patient pays ₹300 even when the legacy Admin default is different', async () => {
   configuredAmount = 1899;
-  const price = await resolveDirectPatientFee({
-    referralSource: 'direct', referringDoctor: null,
-  });
-  assert.deepEqual(price, { amount: 1899, source: 'admin_default' });
+  const price = await resolveDirectPatientFee({ referralSource: 'direct', referringDoctor: null });
+  assert.deepEqual(price, { amount: 300, source: 'website_direct_default' });
   assert.equal(settingsReads, 1);
 });
 
-test('Admin patient-specific override takes priority for a website-direct patient', async () => {
+test('Admin can change the separate website fee without modifying legacy default', async () => {
   configuredAmount = 1899;
+  configuredWebsiteAmount = 750;
+  const websitePrice = await resolveDirectPatientFee({ referralSource: 'direct', referringDoctor: null });
+  assert.deepEqual(websitePrice, { amount: 750, source: 'website_direct_admin' });
+  const legacyPrice = await resolveDirectPatientFee({ referralSource: 'legacy_direct', referringDoctor: null });
+  assert.deepEqual(legacyPrice, { amount: 1899, source: 'admin_default' });
+});
+
+test('Admin per-patient override still takes priority over website fee', async () => {
+  configuredAmount = 1899;
+  configuredWebsiteAmount = 750;
   const price = await resolveDirectPatientFee({
     referralSource: 'direct', referringDoctor: null, directPatientFee: 1500,
   });
@@ -89,10 +99,11 @@ test('Admin patient-specific override takes priority for a website-direct patien
   assert.equal(settingsReads, 0);
 });
 
-test('website direct registration defaults to ₹300 when Admin fee is missing or set to zero', async () => {
+test('website direct registration defaults to ₹300 when separate setting is absent', async () => {
+  configuredAmount = 0;
   let price = await resolveDirectPatientFee({ referralSource: 'direct', referringDoctor: null });
   assert.deepEqual(price, { amount: 300, source: 'website_direct_default' });
-  configuredAmount = 0;
+  configuredWebsiteAmount = 0;
   price = await resolveDirectPatientFee({ referralSource: 'direct', referringDoctor: null });
   assert.deepEqual(price, { amount: 300, source: 'website_direct_default' });
 });
