@@ -28,7 +28,7 @@ const getRevenueModels = asyncHandler(async (req, res) => {
 
   const effectiveItems = items.map((doctor) => doctor.revenueModel === 'split'
     ? { ...doctor, feeShareType: 'percentage', feeSharePercentage: DOCTOR_SPLIT_PERCENT, feeShareCalculationBasis: 'gross', fixedFeeShareAmount: null }
-    : doctor);
+    : { ...doctor, feeShareType: 'percentage', feeSharePercentage: 0, fixedFeeShareAmount: null });
   res.json({ items: effectiveItems, meta: { page, limit, total, totalPages: Math.ceil(total / limit) || 1 }, summary: { splitCount, platformFeeCount, configured: splitCount + platformFeeCount } });
 });
 
