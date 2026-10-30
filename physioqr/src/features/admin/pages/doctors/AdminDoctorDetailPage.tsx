@@ -217,11 +217,10 @@ export default function AdminDoctorDetailPage() {
       if (action === 'approve') {
         return apiClient.post(`/doctors/${id}/approve`, {
           approvedPatientFee: Number(form.get('approvedPatientFee') || doctor.approvedPatientFee || doctor.requestedPatientFee || 0),
-          feeSharePercentage: Number(form.get('feeSharePercentage') || doctor.feeSharePercentage || 0),
+          feeSharePercentage: String(form.get('revenueModel') || doctor.revenueModel || 'split') === 'split' ? 50 : 0,
           feeShareHoldingDays: Number(form.get('feeShareHoldingDays') || doctor.feeShareHoldingDays || 15),
           revenueModel: String(form.get('revenueModel') || doctor.revenueModel || 'split'),
-          feeShareType: String(form.get('feeShareType') || doctor.feeShareType || 'percentage'),
-          fixedFeeShareAmount: Number(form.get('fixedFeeShareAmount') || doctor.fixedFeeShareAmount || 0),
+          feeShareType: 'percentage',
         });
       }
       if (action === 'request-documents') return apiClient.post(`/doctors/${id}/request-documents`, { reason });
@@ -354,7 +353,7 @@ export default function AdminDoctorDetailPage() {
               <InfoItem label="Revenue model" value={humanize(doctor.revenueModel)} />
               <InfoItem label="Approved patient fee" value={money(doctor.approvedPatientFee)} />
               <InfoItem label="Requested patient fee" value={money(doctor.requestedPatientFee)} />
-              <InfoItem label="Fee share" value={doctor.feeShareType === 'fixed' ? money(doctor.fixedFeeShareAmount) : doctor.feeSharePercentage !== undefined ? `${doctor.feeSharePercentage}%` : '—'} />
+              <InfoItem label="Fee share" value={doctor.revenueModel === 'split' ? '50% Doctor / 50% PhysioQR' : 'No doctor share'} />
               <InfoItem label="Holding period" value={doctor.feeShareHoldingDays !== undefined ? `${doctor.feeShareHoldingDays} days` : '—'} />
               <InfoItem label="Payout cycle" value={text(doctor.payoutCycle)} />
             </InfoCard>
@@ -394,7 +393,7 @@ export default function AdminDoctorDetailPage() {
 
       <Modal isOpen={Boolean(action)} onClose={() => !mutation.isPending && setAction(null)} title={action ? humanize(action) : undefined} size="lg">
         <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); mutation.mutate(new FormData(event.currentTarget)); }}>
-          {action === 'approve' && <><div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">Approval creates/enables the doctor login, creates the wallet and automatically generates an active referral QR on the backend.</div><div className="grid gap-4 sm:grid-cols-2"><Field name="approvedPatientFee" label="Approved patient fee" type="number" defaultValue={doctor.approvedPatientFee ?? doctor.requestedPatientFee ?? 0} /><Field name="feeSharePercentage" label="Fee share %" type="number" defaultValue={doctor.feeSharePercentage ?? 0} /><Field name="feeShareHoldingDays" label="Holding days" type="number" defaultValue={doctor.feeShareHoldingDays ?? 15} /><SelectField name="revenueModel" label="Revenue model" defaultValue={doctor.revenueModel ?? 'split'} options={[['split', 'Split'], ['platform_fee', 'Platform fee']]} /><SelectField name="feeShareType" label="Fee share type" defaultValue={doctor.feeShareType ?? 'percentage'} options={[['percentage', 'Percentage'], ['fixed', 'Fixed'], ['slab', 'Slab']]} /><Field name="fixedFeeShareAmount" label="Fixed share amount" type="number" defaultValue={doctor.fixedFeeShareAmount ?? 0} /></div></>}
+          {action === 'approve' && <><div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">Approval creates/enables the doctor login, creates the wallet and automatically generates an active referral QR on the backend.</div><div className="grid gap-4 sm:grid-cols-2"><Field name="approvedPatientFee" label="Approved patient fee" type="number" defaultValue={doctor.approvedPatientFee ?? doctor.requestedPatientFee ?? 0} /><Field name="feeShareHoldingDays" label="Holding days" type="number" defaultValue={doctor.feeShareHoldingDays ?? 15} /><SelectField name="revenueModel" label="Revenue model" defaultValue={doctor.revenueModel ?? 'split'} options={[['split', 'Split'], ['platform_fee', 'Platform fee']]} /><div className="text-sm text-blue-900 sm:col-span-2">Split Model always pays 50% to the doctor and 50% to PhysioQR. These terms are fixed.</div></div></>}
           {action === 'kyc-bank' && <div className="grid gap-4 sm:grid-cols-2"><SelectField name="kycStatus" label="KYC status" defaultValue={doctor.kycStatus ?? 'pending'} options={[['pending', 'Pending'], ['submitted', 'Submitted'], ['approved', 'Approved'], ['rejected', 'Rejected']]} /><SelectField name="bankVerified" label="Bank verified" defaultValue={doctor.bankVerified ? 'true' : 'false'} options={[['false', 'No'], ['true', 'Yes']]} /><Field name="bankAccountHolder" label="Account holder" defaultValue={doctor.bankAccountHolder ?? ''} /><Field name="bankName" label="Bank name" defaultValue={doctor.bankName ?? ''} /><Field name="branchName" label="Branch" defaultValue={doctor.branchName ?? ''} /><Field name="ifscCode" label="IFSC" defaultValue={doctor.ifscCode ?? ''} /><Field name="upiId" label="UPI ID" defaultValue={doctor.upiId ?? ''} /><Field name="bankAccountNumber" label="Replace account number" placeholder="Leave blank to keep current" /></div>}
           {['request-documents', 'reject', 'suspend', 'reactivate-doctor'].includes(action ?? '') && <label className="block"><span className="text-sm font-semibold text-neutral-700">Reason / admin note <span className="text-rose-500">*</span></span><textarea name="reason" required className="mt-2 min-h-28 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100" placeholder="Enter a clear reason for the audit trail" /></label>}
           {action === 'reactivate-doctor' && <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-4 text-sm text-neutral-700">Reactivation restores the doctor to <strong>Approved</strong>, enables portal login, and re-enables the existing referral QR when one already exists.</div>}
