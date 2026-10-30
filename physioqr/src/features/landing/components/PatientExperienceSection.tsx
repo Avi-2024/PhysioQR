@@ -1,7 +1,6 @@
 import React from 'react';
 import { PlayCircle, Lock, ArrowRight } from 'lucide-react';
 import { UserRole } from '../types/landing.types';
-import { PATIENT_REGISTRATION_FEE_INR } from '@/config/patient-pricing';
 
 interface PatientExperienceProps {
   onOpenPortal: (role?: UserRole) => void;
@@ -20,8 +19,6 @@ export function PatientExperienceSection({ onOpenPortal }: PatientExperienceProp
             <p className="rc-subheading" style={{ marginBottom: '24px' }}>
               From everyday pain to post-surgery recovery, PhysioQR keeps each rehabilitation day focused on the exercises and guidance recommended for you.
             </p>
-
-            <p className="mb-6 text-sm font-bold text-teal-800">One-time patient registration & rehabilitation access: ₹{PATIENT_REGISTRATION_FEE_INR}. Payment is only collected after clinical clearance.</p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '32px' }}>
               {[

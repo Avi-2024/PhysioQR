@@ -3,7 +3,6 @@ import { ArrowLeft, CreditCard, LoaderCircle, ShieldCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '@/lib/api-client';
 import { formatCurrency } from '@/lib/formatters';
-import { PATIENT_REGISTRATION_FEE_INR } from '@/config/patient-pricing';
 
 type ApiRecord = Record<string, unknown>;
 declare global { interface Window { Razorpay?: new (options:Record<string,unknown>) => { open:()=>void } } }
@@ -38,7 +37,6 @@ export default function PatientContinuePaymentPage() {
   const purchaseMode = text(quote.purchaseMode, 'doctor_referral');
   const isDirect = purchaseMode === 'direct';
   const payable = Number(pricing.finalAmount || 0);
-  const feeMatches = payable === PATIENT_REGISTRATION_FEE_INR;
   const patientId = text(patient.id || patient._id);
   const programId = text(primaryProgram.id || primaryProgram._id);
   const doctorId = text(doctor.id || doctor._id);
@@ -52,7 +50,6 @@ export default function PatientContinuePaymentPage() {
 
   const paymentMutation = useMutation({
     mutationFn: async () => {
-      if (!feeMatches) throw new Error('Patient fee mismatch. Please refresh before payment.');
       const endpoint = isDirect ? '/payments/direct/create-order' : '/payments/create-order';
       const orderResponse = await apiClient.post(endpoint, {
         patientId,
@@ -61,9 +58,6 @@ export default function PatientContinuePaymentPage() {
         idempotencyKey: `patient-${patientId}-${programId}-${Date.now()}`,
       });
       const order = asRecord(orderResponse.data);
-      if (Number(order.amount) !== PATIENT_REGISTRATION_FEE_INR * 100 || Number(order.finalAmount) !== PATIENT_REGISTRATION_FEE_INR) {
-        throw new Error('The gateway order does not match the fixed ₹300 fee. No payment was opened.');
-      }
       const mockOrder = text(order.gatewayProvider) === 'mock' || text(order.orderId).startsWith('order_mock_');
       if (!mockOrder) {
         if (!order.key) throw new Error('Razorpay checkout key is not configured.');
@@ -90,7 +84,7 @@ export default function PatientContinuePaymentPage() {
   }
   if (!canContinue) return <Message title="Payment is not available yet" body="Complete the required onboarding steps before payment." action="Back to dashboard" onAction={() => navigate('/patient/dashboard')} />;
 
-  const paymentReady = Boolean(feeMatches && programId && (isDirect || doctorId));
+  const paymentReady = Boolean(payable && programId && (isDirect || doctorId));
 
   return (
     <div className="mx-auto max-w-3xl py-6 sm:py-10">
@@ -115,15 +109,14 @@ export default function PatientContinuePaymentPage() {
                     ))}
                   </div>
                   <p className="mt-4 text-sm text-neutral-600">
-                    Fixed patient registration fee: <span className="font-semibold text-neutral-900">₹{PATIENT_REGISTRATION_FEE_INR} (PhysioQR)</span>
+                    Fee decided by: <span className="font-semibold text-neutral-900">{isDirect ? 'PhysioQR Admin' : text(doctor.fullName, 'Referring Doctor')}</span>
                   </p>
-                  <p className="mt-1 text-xs leading-5 text-neutral-500">This one-time fee covers your approved rehabilitation access. No separate programme charge.</p>
+                  <p className="mt-1 text-xs leading-5 text-neutral-500">The fee is for the patient rehabilitation access. Individual programmes do not have separate prices.</p>
                 </div>
                 <div className="shrink-0 sm:text-right"><p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Patient fee</p><p className="mt-1 text-2xl font-bold text-primary-700">{formatCurrency(payable)}</p><p className="mt-1 text-xs text-neutral-500">Covers all approved programmes</p></div>
               </div>
             </div>
             <div className="mt-5 flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0"/><span>Rehabilitation access unlocks only after the backend verifies payment and activates every approved programme.</span></div>
-            {quoteQuery.isSuccess && !feeMatches && <div role="alert" className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">The quoted amount does not match the fixed ₹300 fee. Please refresh before payment.</div>}
             {paymentMutation.isError && <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm font-medium text-rose-700">{requestError(paymentMutation.error)}</div>}
             <button type="button" disabled={paymentMutation.isPending || !paymentReady} onClick={() => paymentMutation.mutate()} className="mt-6 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-primary-600 px-5 text-sm font-bold text-white hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60">{paymentMutation.isPending ? <><LoaderCircle className="h-4 w-4 animate-spin"/>Processing...</> : <><CreditCard className="h-4 w-4"/>Pay {formatCurrency(payable)} & Activate {programs.length > 1 ? `${programs.length} Programmes` : 'Programme'}</>}</button>
           </>

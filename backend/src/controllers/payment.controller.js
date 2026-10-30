@@ -12,7 +12,6 @@ const { DoctorWallet, WalletTransaction } = require('../models/Wallet.model');
 const { FeeShare } = require('../models/FeeShare.model');
 const { calculateFeeShare } = require('../utils/feeCalculator');
 const { SPLIT_DOCTOR_PERCENTAGE } = require('../utils/splitModel');
-const { PATIENT_REGISTRATION_FEE_INR, isCurrentRegistrationOrder } = require('../config/patientRegistrationFee');
 const { generateInvoiceNumber } = require('../utils/idGenerator');
 const { writeAuditLog } = require('../utils/auditLogger');
 const { getNextSequence } = require('../services/sequence.service');
@@ -60,13 +59,22 @@ const verifyWebhookSignature = ({ rawBody, signature }) => {
 };
 
 const resolveOrderPricing = async ({ doctor, programId, couponCode }) => {
-  const originalAmount = PATIENT_REGISTRATION_FEE_INR;
-  // Registration access has a fixed fee. Coupons cannot change this amount.
-  if (couponCode) throw paymentError('Coupons cannot be applied to the fixed ₹300 patient registration fee');
-  const discountAmount = 0;
-  const appliedCoupon = null;
-  const finalAmount = PATIENT_REGISTRATION_FEE_INR;
+  let originalAmount = doctor.approvedPatientFee || 0;
+  let discountAmount = 0;
+  let appliedCoupon = null;
 
+  if (doctor.revenueModel === 'platform_fee' && doctor.approvedPatientFee) originalAmount = doctor.approvedPatientFee;
+
+  if (couponCode) {
+    const coupon = await Coupon.findOne({ couponCode: couponCode.toUpperCase(), isActive: true });
+    if (coupon && (!coupon.expiryDate || coupon.expiryDate > new Date()) && coupon.usedCount < (coupon.usageLimit || Infinity)) {
+      if (coupon.discountType === 'fixed') discountAmount = Math.min(coupon.discountValue, originalAmount);
+      else discountAmount = Math.min((originalAmount * coupon.discountValue) / 100, coupon.maxDiscount || Infinity);
+      appliedCoupon = coupon;
+    }
+  }
+
+  const finalAmount = Math.max(originalAmount - discountAmount, 0);
   return {
     originalAmount,
     discountAmount,
@@ -430,7 +438,6 @@ const createOrder = asyncHandler(async (req, res) => {
   if (idempotencyKey) {
     const existing = await Order.findOne({ idempotencyKey, patient: patientId });
     if (existing) {
-      if (!isCurrentRegistrationOrder(existing)) return res.status(409).json({ message: 'This payment order uses an outdated fee. Start a new ₹300 checkout.' });
       return res.json({ orderId: existing.gatewayOrderId, amount: Math.round(existing.finalAmount * 100), currency: existing.currency, key: isMockGateway() ? null : process.env.RAZORPAY_KEY_ID, gatewayProvider: isMockGateway() ? 'mock' : 'razorpay', originalAmount: existing.originalAmount, discountAmount: existing.discountAmount, finalAmount: existing.finalAmount, idempotent: true });
     }
   }
@@ -477,7 +484,6 @@ const createOrder = asyncHandler(async (req, res) => {
     if (error?.code === 11000 && idempotencyKey) {
       const existing = await Order.findOne({ idempotencyKey, patient: patientId });
       if (existing) {
-        if (!isCurrentRegistrationOrder(existing)) return res.status(409).json({ message: 'This payment order uses an outdated fee. Start a new ₹300 checkout.' });
         return res.json({ orderId: existing.gatewayOrderId, amount: Math.round(existing.finalAmount * 100), currency: existing.currency, key: isMockGateway() ? null : process.env.RAZORPAY_KEY_ID, gatewayProvider: isMockGateway() ? 'mock' : 'razorpay', originalAmount: existing.originalAmount, discountAmount: existing.discountAmount, finalAmount: existing.finalAmount, idempotent: true });
       }
     }

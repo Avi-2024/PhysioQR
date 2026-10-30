@@ -76,11 +76,6 @@ jobs:
           NODE_ENV: test
         run: npm run test:revenue-split
 
-      - name: Test fixed INR 300 patient checkout amounts
-        env:
-          NODE_ENV: test
-        run: npm run test:patient-registration-fee
-
       - name: Run direct-patient pricing regression tests
         env:
           NODE_ENV: test

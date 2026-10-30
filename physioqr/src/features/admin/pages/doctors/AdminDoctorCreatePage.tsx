@@ -148,7 +148,7 @@ export default function AdminDoctorCreatePage() {
           <Field label="Number of branches"><input name="clinicBranches" type="number" min="0" className="input" /></Field>
           <Field label="Clinic address"><input name="clinicAddress" maxLength={500} className="input" /></Field>
           <Field label="Google Maps link"><input name="googleMapsLink" type="url" maxLength={1000} className="input" /></Field>
-          <Field label="Legacy proposed patient fee (registration always ₹300)"><input name="requestedPatientFee" type="number" min="0" className="input" /></Field>
+          <Field label="Requested patient fee"><input name="requestedPatientFee" type="number" min="0" className="input" /></Field>
           <Field label="Requested revenue model"><select name="revenueModel" defaultValue="split" className="input"><option value="split">Split</option><option value="platform_fee">Platform fee</option></select></Field>
         </div>
         <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">Split Model always uses a fixed 50% Doctor / 50% PhysioQR share. Bank details, KYC, approved patient fees and payout settings are managed separately after registration.</div>
