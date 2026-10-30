@@ -81,6 +81,11 @@ jobs:
           NODE_ENV: test
         run: npm run test:doctor-patient-progress
 
+      - name: Run doctor recovery overview security and report tests
+        env:
+          NODE_ENV: test
+        run: npm run test:doctor-recovery-overview
+
       - name: Run patient video readiness checks
         env:
           NODE_ENV: test
