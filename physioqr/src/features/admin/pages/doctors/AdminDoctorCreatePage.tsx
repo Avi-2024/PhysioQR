@@ -151,7 +151,7 @@ export default function AdminDoctorCreatePage() {
           <Field label="Requested patient fee"><input name="requestedPatientFee" type="number" min="0" className="input" /></Field>
           <Field label="Requested revenue model"><select name="revenueModel" defaultValue="split" className="input"><option value="split">Split</option><option value="platform_fee">Platform fee</option></select></Field>
         </div>
-        <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">Bank account, PAN, KYC documents, approved fee, fee-share percentage/type and payout settings are intentionally not collected here. They belong to reviewed admin workflows after the profile exists.</div>
+        <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">Split Model always uses a fixed 50% Doctor / 50% PhysioQR share. Bank details, KYC, approved patient fees and payout settings are managed separately after registration.</div>
       </Section>
 
       <div className="flex justify-end gap-3">
