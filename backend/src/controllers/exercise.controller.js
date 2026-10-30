@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
 const { Exercise, ProgramDay } = require('../models/Exercise.model');
 const PainCategory = require('../models/PainCategory.model');
+const SurgeryType = require('../models/SurgeryType.model');
+const { lookupSurgery, exerciseIdsForSurgeryProgramme, surgeryFilter } = require('../services/surgicalExerciseMapping.service');
 const { writeAuditLog } = require('../utils/auditLogger');
 const asyncHandler = require('../utils/asyncHandler');
 const { extractYouTubeVideoId } = require('../utils/youtubeVideoUrl');
@@ -22,6 +24,7 @@ const normalizeExercisePayload = (body = {}) => {
     if (body[field] !== undefined) payload[field] = cleanString(body[field]);
   });
   if (body.painCategory !== undefined) payload.painCategory = body.painCategory || null;
+  if (body.surgeryTypes !== undefined) payload.surgeryTypes = body.surgeryTypes;
   if (body.language !== undefined) payload.language = body.language || 'en';
   if (body.repetitions !== undefined && body.repetitions !== '') payload.repetitions = Number(body.repetitions);
   if (body.sets !== undefined && body.sets !== '') payload.sets = Number(body.sets);
@@ -46,7 +49,7 @@ const normalizeExercisePayload = (body = {}) => {
   return payload;
 };
 
-const validateExercisePayload = async (payload, { partial = false } = {}) => {
+const validateExercisePayload = async (payload, { partial = false, existingCategory = null, existingSurgeryTypes = [] } = {}) => {
   if (!partial && !payload.name) return 'Exercise name is required';
   if (payload.name !== undefined && !payload.name) return 'Exercise name is required';
   if (payload.language && !LANGUAGES.includes(payload.language)) return 'Language must be en or hi';
@@ -58,8 +61,36 @@ const validateExercisePayload = async (payload, { partial = false } = {}) => {
     const category = await PainCategory.findOne({ _id: payload.painCategory, isActive: true }).select('_id').lean();
     if (!category) return 'Pain category not found or inactive';
   }
+  const conditionIds = payload.surgeryTypes === undefined ? existingSurgeryTypes.map(String) : payload.surgeryTypes;
+  if (!Array.isArray(conditionIds) || conditionIds.length > 30 ||
+      !conditionIds.every((id) => typeof id === 'string' && mongoose.isValidObjectId(id))) {
+    return 'Surgical conditions must be an array of valid surgery IDs';
+  }
+  if (conditionIds.length !== new Set(conditionIds.map((id) => id.toLowerCase())).size) {
+    return 'Surgical condition IDs must not repeat';
+  }
+  if (conditionIds.length) {
+    const effectiveCategory = payload.painCategory !== undefined ? payload.painCategory : existingCategory;
+    if (!effectiveCategory) return 'Choose a body region before mapping post-surgical conditions';
+    const surgeries = await SurgeryType.find({ _id: { $in: conditionIds }, isActive: true })
+      .select('_id bodyRegion').lean();
+    if (surgeries.length !== conditionIds.length ||
+        surgeries.some((surgery) => String(surgery.bodyRegion) !== String(effectiveCategory))) {
+      return 'Selected surgical conditions must be active and belong to the exercise body region';
+    }
+  }
   return null;
 };
+
+const getSurgicalConditions = asyncHandler(async (_req, res) => {
+  const conditions = await SurgeryType.find({ isActive: true })
+    .populate('bodyRegion', '_id name isActive')
+    .sort({ displayOrder: 1, name: 1 }).lean();
+  res.json(conditions.filter((item) => item.bodyRegion?.isActive).map((item) => ({
+    _id: item._id, code: item.code, name: item.name,
+    bodyRegion: { _id: item.bodyRegion._id, name: item.bodyRegion.name },
+  })));
+});
 
 const usageForExercises = async (exerciseIds) => {
   if (!exerciseIds.length) return new Map();
@@ -92,6 +123,17 @@ const getExercises = asyncHandler(async (req, res) => {
   }
   const category = req.query.categoryId || req.query.category;
   if (category) filter.painCategory = category;
+  if (req.query.surgeryTypeId) {
+    const surgery = await lookupSurgery(String(req.query.surgeryTypeId));
+    if (category && String(category) !== String(surgery.bodyRegion)) {
+      return res.status(400).json({ message: 'Selected surgery is not mapped to the chosen body region' });
+    }
+    const programmeExercises = await exerciseIdsForSurgeryProgramme(surgery);
+    // Restrict by the existing category plus the explicit condition association.
+    // Never show generic region exercises as surgical recommendations.
+    filter.painCategory = surgery.bodyRegion;
+    filter.$and = [...(filter.$and || []), surgeryFilter(surgery._id, programmeExercises)];
+  }
   if (req.query.language) filter.language = req.query.language;
   if (req.query.status === 'active') filter.isActive = true;
   if (req.query.status === 'inactive') filter.isActive = false;
@@ -99,7 +141,7 @@ const getExercises = asyncHandler(async (req, res) => {
   if (req.query.video === 'without') filter.$and = [{ $or: [{ videoUrl: null }, { videoUrl: '' }, { videoUrl: { $exists: false } }] }];
 
   const [items, total, totalAll, active, inactive, withVideo, demoVideos] = await Promise.all([
-    Exercise.find(filter).populate('painCategory', 'name nameHindi isActive').sort({ isActive: -1, displayOrder: 1, createdAt: -1 }).skip(skip).limit(limit).lean(),
+    Exercise.find(filter).populate('painCategory', 'name nameHindi isActive').populate('surgeryTypes', 'code name').sort({ isActive: -1, displayOrder: 1, createdAt: -1 }).skip(skip).limit(limit).lean(),
     Exercise.countDocuments(filter),
     Exercise.countDocuments(),
     Exercise.countDocuments({ isActive: true }),
@@ -126,7 +168,8 @@ const createExercise = asyncHandler(async (req, res) => {
 
 const getExerciseById = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid exercise id' });
-  const exercise = await Exercise.findById(req.params.id).populate('painCategory', 'name nameHindi description isActive').lean();
+  const exercise = await Exercise.findById(req.params.id).populate('painCategory', 'name nameHindi description isActive')
+    .populate('surgeryTypes', 'code name bodyRegion isActive').lean();
   if (!exercise || (req.user.role !== 'admin' && (
     exercise.isActive === false || privateSeedPattern.test(String(exercise.seedKey || ''))
   ))) return res.status(404).json({ message: 'Exercise not found' });
@@ -145,7 +188,9 @@ const updateExercise = asyncHandler(async (req, res) => {
   const exercise = await Exercise.findById(req.params.id);
   if (!exercise) return res.status(404).json({ message: 'Exercise not found' });
   const payload = normalizeExercisePayload(req.body);
-  const validationError = await validateExercisePayload(payload, { partial: true });
+  const validationError = await validateExercisePayload(payload, { partial: true,
+    existingCategory: exercise.painCategory, existingSurgeryTypes: exercise.surgeryTypes || [],
+  });
   if (validationError) return res.status(400).json({ message: validationError });
   const previousValue = exercise.toObject();
   // Editing the title, prescription, or URL cannot silently approve a video
@@ -297,4 +342,4 @@ const deleteExercise = asyncHandler(async (req, res) => {
   res.json({ message: 'Exercise deactivated' });
 });
 
-module.exports = { getExercises, createExercise, getExerciseById, updateExercise, setExerciseStatus, bulkSetExerciseStatus, manageDemoExerciseVideos, assignKneeDraftVideoCandidates, deleteExercise };
+module.exports = { getExercises, getSurgicalConditions, createExercise, getExerciseById, updateExercise, setExerciseStatus, bulkSetExerciseStatus, manageDemoExerciseVideos, assignKneeDraftVideoCandidates, deleteExercise };
