@@ -53,5 +53,8 @@ jobs:
       - name: Doctor dashboard patient recovery UI regression tests
         run: npm run test -- --run src/features/doctors/pages/dashboard/DoctorRecoveryOverviewPanel.test.tsx
 
+      - name: Doctor 50:50 registration UI and payload regression tests
+        run: npm run test -- --run src/features/agents/pages/AgentRegisterDoctorPage.test.tsx
+
       - name: Production build
         run: npm run build
