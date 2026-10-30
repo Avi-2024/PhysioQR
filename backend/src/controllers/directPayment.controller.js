@@ -14,6 +14,7 @@ const { activateProgrammeBundle } = require('../services/programBundle.service')
 const fraudService = require('../services/fraud.service');
 const asyncHandler = require('../utils/asyncHandler');
 const { resolveDirectPatientFee } = require('../services/directPatientPricing.service');
+const { PATIENT_REGISTRATION_FEE_INR, isCurrentRegistrationOrder } = require('../config/patientRegistrationFee');
 const { requiresClinicalProgrammeSelection } = require('../services/patientAssessmentClearance.service');
 
 let razorpayClient;
@@ -48,38 +49,26 @@ const verifyWebhookSignature = ({ rawBody, signature }) => {
 };
 
 const resolveDirectPricing = async ({ patient, programIds, couponCode }) => {
+  if (couponCode) throw paymentError('Coupons cannot be applied to the fixed ₹300 patient registration fee');
   const resolvedFee = await resolveDirectPatientFee(patient);
-  const originalAmount = resolvedFee.amount;
-  if (originalAmount <= 0) throw paymentError('Admin has not configured a default direct-patient fee or patient-specific fee yet.', 409);
-
-  let discountAmount = 0;
-  let appliedCoupon = null;
-  if (couponCode) {
-    const coupon = await Coupon.findOne({ couponCode: couponCode.toUpperCase(), isActive: true });
-    if (coupon && (!coupon.expiryDate || coupon.expiryDate > new Date()) && coupon.usedCount < (coupon.usageLimit || Infinity)) {
-      discountAmount = coupon.discountType === 'fixed'
-        ? Math.min(coupon.discountValue, originalAmount)
-        : Math.min((originalAmount * coupon.discountValue) / 100, coupon.maxDiscount || Infinity);
-      appliedCoupon = coupon;
-    }
-  }
-
-  const finalAmount = Math.max(originalAmount - discountAmount, 0);
+  const originalAmount = PATIENT_REGISTRATION_FEE_INR;
+  const discountAmount = 0;
+  const finalAmount = PATIENT_REGISTRATION_FEE_INR;
   return {
     originalAmount,
     discountAmount,
     finalAmount,
-    appliedCoupon,
+    appliedCoupon: null,
     pricingSnapshot: {
       programs: programIds,
       purchaseMode: 'direct',
       revenueModel: 'platform_direct',
-      feeAuthority: 'admin',
+      feeAuthority: 'physioqr',
       adminPatientFee: originalAmount,
       directFeeSource: resolvedFee.source,
       doctorFeeShare: 0,
       platformShare: finalAmount,
-      couponCode: appliedCoupon?.couponCode || null,
+      couponCode: null,
     },
   };
 };
@@ -255,7 +244,10 @@ const createDirectOrder = asyncHandler(async (req, res) => {
 
   if (idempotencyKey) {
     const existing = await Order.findOne({ idempotencyKey, patient: patientId, doctor: null });
-    if (existing) return res.json({ orderId: existing.gatewayOrderId, amount: Math.round(existing.finalAmount * 100), currency: existing.currency, key: isMockGateway() ? null : process.env.RAZORPAY_KEY_ID, gatewayProvider: isMockGateway() ? 'mock' : 'razorpay', originalAmount: existing.originalAmount, discountAmount: existing.discountAmount, finalAmount: existing.finalAmount, purchaseMode: 'direct', idempotent: true });
+    if (existing) {
+      if (!isCurrentRegistrationOrder(existing)) return res.status(409).json({ message: 'This payment order uses an outdated fee. Start a new ₹300 checkout.' });
+      return res.json({ orderId: existing.gatewayOrderId, amount: Math.round(existing.finalAmount * 100), currency: existing.currency, key: isMockGateway() ? null : process.env.RAZORPAY_KEY_ID, gatewayProvider: isMockGateway() ? 'mock' : 'razorpay', originalAmount: existing.originalAmount, discountAmount: existing.discountAmount, finalAmount: existing.finalAmount, purchaseMode: 'direct', idempotent: true });
+    }
   }
 
   const patient = await Patient.findById(patientId);
