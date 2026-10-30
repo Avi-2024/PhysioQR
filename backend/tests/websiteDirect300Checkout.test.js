@@ -6,7 +6,7 @@ const Module = require('node:module');
 const PATIENT_ID = '507f1f77bcf86cd799439011';
 const PROGRAM_ID = '507f1f77bcf86cd799439012';
 const REGION_ID = '507f1f77bcf86cd799439013';
-let patient, savedOrder, gatewayDefaultReads, configuredAmount;
+let patient, savedOrder, gatewayDefaultReads, configuredAmount, configuredWebsiteAmount;
 
 const mockModels = {
   '../models/Patient.model': { findById: async () => patient },
@@ -34,7 +34,7 @@ const mockModels = {
     findOne: () => ({
       lean: async () => {
         gatewayDefaultReads++;
-        return { value: { directPatientDefaultFee: configuredAmount } };
+        return { value: { directPatientDefaultFee: configuredAmount, websiteDirectRegistrationFee: configuredWebsiteAmount } };
       },
     }),
   },
@@ -77,12 +77,13 @@ test.beforeEach(() => {
   process.env.NODE_ENV = 'test';
   process.env.PAYMENT_GATEWAY_MODE = 'mock';
   patient = { _id: PATIENT_ID, mobileVerified: true, consentAccepted: true, referralSource: 'direct', referringDoctor: null, directPatientFee: undefined };
-  configuredAmount = 0;
+  configuredAmount = 1800;
+  configuredWebsiteAmount = undefined;
   savedOrder = null;
   gatewayDefaultReads = 0;
 });
 
-test('homepage direct payment defaults to ₹300 (30000 paise) when Admin fee is unset', async () => {
+test('homepage direct payment defaults to ₹300 (30000 paise) even with legacy Admin fee', async () => {
   const { req, res, outcome } = request();
   await createDirectOrder(req, res);
   assert.equal(outcome().status, 200);
@@ -98,17 +99,17 @@ test('homepage direct payment defaults to ₹300 (30000 paise) when Admin fee is
 });
 
 test('Admin Finance setting changes website-direct Razorpay amount', async () => {
-  configuredAmount = 750;
+  configuredWebsiteAmount = 750;
   const { req, res, outcome } = request();
   await createDirectOrder(req, res);
   assert.equal(outcome().status, 200);
   assert.equal(outcome().result.amount, 75000);
   assert.equal(savedOrder.finalAmount, 750);
-  assert.equal(savedOrder.pricingSnapshot.directFeeSource, 'admin_default');
+  assert.equal(savedOrder.pricingSnapshot.directFeeSource, 'website_direct_admin');
 });
 
 test('Admin patient-specific override remains effective before payment', async () => {
-  configuredAmount = 750;
+  configuredWebsiteAmount = 750;
   patient.directPatientFee = 950;
   const { req, res, outcome } = request();
   await createDirectOrder(req, res);
@@ -141,6 +142,7 @@ test('other non-website direct patients still use configured Admin default', asy
   patient.referralSource = 'legacy_direct';
   patient.directPatientFee = undefined;
   configuredAmount = 1800;
+  configuredWebsiteAmount = 750;
   const { req, res, outcome } = request();
   await createDirectOrder(req, res);
   assert.equal(outcome().status, 200);
