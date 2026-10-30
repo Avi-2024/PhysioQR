@@ -81,6 +81,11 @@ jobs:
           NODE_ENV: test
         run: npm run test:assessment-documents
 
+      - name: Verify post-surgical exercise mapping
+        env:
+          NODE_ENV: test
+        run: npm run test:post-surgical-exercises
+
       - name: Run direct-patient pricing regression tests
         env:
           NODE_ENV: test
