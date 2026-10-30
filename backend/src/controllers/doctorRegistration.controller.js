@@ -6,6 +6,7 @@ const Program = require('../models/Program.model');
 const { provisionApprovedDoctor } = require('../services/doctorApproval.service');
 const { writeAuditLog } = require('../utils/auditLogger');
 const asyncHandler = require('../utils/asyncHandler');
+const { assertSplitTerms, normalizeRevenueConfiguration } = require('../utils/splitModel');
 
 const REGISTRATION_FIELDS = [
   'fullName', 'mobile', 'whatsapp', 'email', 'gender', 'dateOfBirth', 'profilePhoto',
@@ -46,7 +47,6 @@ const AGENT_REQUIRED_FIELDS = [
   'requestedPatientFee',
 ];
 const REVENUE_MODELS = ['split', 'platform_fee'];
-const REQUESTED_FEE_SHARE_TYPES = ['percentage', 'fixed'];
 
 function pickRegistrationFields(body = {}, fields = REGISTRATION_FIELDS) {
   const payload = {};
@@ -61,10 +61,6 @@ function validateAgentRegistration(payload) {
     if (payload[field] === undefined || payload[field] === null || String(payload[field]).trim() === '') {
       return `${field} is required`;
     }
-  }
-
-  if (payload.revenueModel === 'split' && !payload.requestedFeeShareType) {
-    return 'requestedFeeShareType is required for Split Model';
   }
 
   return null;
@@ -86,23 +82,10 @@ function validateCommercialProposal(payload) {
     return null;
   }
 
-  if (payload.requestedFeeShareType && !REQUESTED_FEE_SHARE_TYPES.includes(payload.requestedFeeShareType)) {
-    return 'Commission type must be percentage or fixed';
-  }
-
-  if (payload.requestedFeeShareType === 'percentage') {
-    const percentage = Number(payload.requestedFeeSharePercentage);
-    if (!Number.isFinite(percentage) || percentage < 0 || percentage > 100) return 'Commission percentage must be between 0 and 100';
-    payload.requestedFeeSharePercentage = percentage;
-    delete payload.requestedFixedFeeShareAmount;
-  }
-
-  if (payload.requestedFeeShareType === 'fixed') {
-    const amount = Number(payload.requestedFixedFeeShareAmount);
-    if (!Number.isFinite(amount) || amount < 0 || amount > 100000) return 'Fixed commission must be between 0 and 100000';
-    if (payload.requestedPatientFee !== undefined && amount > payload.requestedPatientFee) return 'Fixed commission cannot exceed the patient price';
-    payload.requestedFixedFeeShareAmount = amount;
-    delete payload.requestedFeeSharePercentage;
+  try {
+    assertSplitTerms(payload);
+  } catch (error) {
+    return error.message;
   }
 
   return null;
@@ -110,27 +93,7 @@ function validateCommercialProposal(payload) {
 
 function applyCommercialProposalDefaults(payload) {
   if (payload.requestedPatientFee !== undefined) payload.approvedPatientFee = payload.requestedPatientFee;
-
-  if (payload.revenueModel === 'platform_fee') {
-    payload.feeShareType = 'percentage';
-    payload.feeSharePercentage = 0;
-    delete payload.fixedFeeShareAmount;
-    delete payload.requestedFeeShareType;
-    delete payload.requestedFeeSharePercentage;
-    delete payload.requestedFixedFeeShareAmount;
-    return;
-  }
-
-  if (payload.requestedFeeShareType === 'percentage') {
-    payload.feeShareType = 'percentage';
-    payload.feeSharePercentage = payload.requestedFeeSharePercentage;
-    delete payload.fixedFeeShareAmount;
-  }
-  if (payload.requestedFeeShareType === 'fixed') {
-    payload.feeShareType = 'fixed';
-    payload.fixedFeeShareAmount = payload.requestedFixedFeeShareAmount;
-    delete payload.feeSharePercentage;
-  }
+  normalizeRevenueConfiguration(payload);
 }
 
 function loginIdentifierFilter(payload) {
