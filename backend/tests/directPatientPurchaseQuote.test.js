@@ -138,10 +138,10 @@ test('website-direct purchase quote reflects the current Admin-controlled ₹300
 test('website direct quote updates when Admin changes the default', async () => {
   patient.referralSource = 'direct';
   fee = 750;
-  feeSource = 'admin_default';
+  feeSource = 'website_direct_admin';
   const { req, res, outcome } = request();
   await getPurchaseQuote(req, res);
   assert.equal(outcome().response.pricing.originalAmount, 750);
   assert.equal(outcome().response.pricing.finalAmount, 750);
-  assert.equal(outcome().response.pricing.source, 'admin_default');
+  assert.equal(outcome().response.pricing.source, 'website_direct_admin');
 });
