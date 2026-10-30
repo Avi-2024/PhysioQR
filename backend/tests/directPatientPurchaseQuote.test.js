@@ -44,7 +44,7 @@ const mocks = {
   '../models/Program.model': mockProgram,
   '../utils/asyncHandler': (fn) => fn,
   '../services/patientAssessmentClearance.service': { requiresClinicalProgrammeSelection: () => false },
-  '../services/directPatientPricing.service': { resolveDirectPatientFee: async () => ({ amount: fee, source: feeSource }) },
+  '../services/directPatientPricing.service': { resolveDirectPatientFee: async (item) => item.referralSource === 'direct' && !item.referringDoctor ? { amount: 300, source: 'website_direct_fixed' } : { amount: fee, source: feeSource } },
 };
 
 const originalLoad = Module._load;
@@ -118,4 +118,19 @@ test('referred patient keeps doctor pricing, not admin pricing', async () => {
   assert.equal(outcome().response.purchaseMode, 'doctor_referral');
   assert.equal(outcome().response.pricing.originalAmount, 3200);
   assert.equal(outcome().response.pricing.source, 'doctor_patient_fee');
+});
+
+test('website-direct purchase quote displays fixed ₹300 and platform pricing source', async () => {
+  patient.referralSource = 'direct';
+  fee = 1500;
+  feeSource = 'patient_override';
+  const { req, res, outcome } = request();
+  await getPurchaseQuote(req, res);
+  assert.equal(outcome().status, 200);
+  assert.equal(outcome().response.purchaseMode, 'direct');
+  assert.equal(outcome().response.pricing.originalAmount, 300);
+  assert.equal(outcome().response.pricing.finalAmount, 300);
+  assert.equal(outcome().response.pricing.source, 'website_direct_fixed');
+  assert.equal(outcome().response.pricing.feeAuthority, 'platform');
+  assert.equal(outcome().response.doctor, null);
 });
