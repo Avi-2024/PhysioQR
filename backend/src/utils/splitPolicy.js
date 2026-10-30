@@ -4,7 +4,17 @@ const DOCTOR_SPLIT_PERCENT = 50;
 const PHYSIOQR_SPLIT_PERCENT = 50;
 
 const applyFixedSplitConfiguration = (doctor) => {
-  if (!doctor || (doctor.revenueModel && doctor.revenueModel !== 'split')) return doctor;
+  if (!doctor) return doctor;
+  if (doctor.revenueModel === 'platform_fee') {
+    doctor.feeShareType = 'percentage';
+    doctor.feeSharePercentage = 0;
+    doctor.requestedFeeShareType = undefined;
+    doctor.requestedFeeSharePercentage = undefined;
+    doctor.fixedFeeShareAmount = undefined;
+    doctor.requestedFixedFeeShareAmount = undefined;
+    doctor.feeShareSlabs = [];
+    return doctor;
+  }
   doctor.feeShareType = 'percentage';
   doctor.feeSharePercentage = DOCTOR_SPLIT_PERCENT;
   doctor.feeShareCalculationBasis = 'gross';
