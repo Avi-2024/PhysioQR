@@ -1,4 +1,4 @@
-const QRCode = require('qrcode');
+const { createReferralQr, getActiveReferralQr } = require('../services/doctorReferralQr.service');
 const Doctor = require('../models/Doctor.model');
 const User = require('../models/User.model');
 const Patient = require('../models/Patient.model');
@@ -168,8 +168,7 @@ const approveDoctor = asyncHandler(async (req, res) => {
   if (fixedFeeShareAmount) doctor.fixedFeeShareAmount = fixedFeeShareAmount;
 
   // Auto-generate QR code on approval (SRS §6)
-  const referralUrl = `${process.env.APP_URL}/register?doctor=${doctor.doctorId}`;
-  const qrCodeDataUrl = await QRCode.toDataURL(referralUrl);
+  const { qrCodeUrl: qrCodeDataUrl } = await createReferralQr(doctor);
   doctor.referralCode = doctor.doctorId;
   doctor.qrCodeUrl = qrCodeDataUrl;
   doctor.qrCodeActive = true;
@@ -291,8 +290,7 @@ const generateQrCode = asyncHandler(async (req, res) => {
   if (!doctor) return res.status(404).json({ message: 'Doctor not found' });
   if (doctor.status !== 'approved') return res.status(400).json({ message: 'Doctor must be approved first' });
 
-  const referralUrl = `${process.env.APP_URL}/register?doctor=${doctor.doctorId}`;
-  const qrCodeDataUrl = await QRCode.toDataURL(referralUrl);
+  const { referralUrl, qrCodeUrl: qrCodeDataUrl } = await createReferralQr(doctor);
 
   doctor.referralCode = doctor.doctorId;
   doctor.qrCodeUrl = qrCodeDataUrl;
@@ -319,12 +317,10 @@ const reactivateQrCode = asyncHandler(async (req, res) => {
   if (!doctor) return res.status(404).json({ message: 'Doctor not found' });
   if (doctor.status !== 'approved') return res.status(400).json({ message: 'Doctor must be approved to activate QR' });
 
+  const { qrCodeUrl } = await createReferralQr(doctor);
+  doctor.referralCode = doctor.doctorId;
+  doctor.qrCodeUrl = qrCodeUrl;
   doctor.qrCodeActive = true;
-  if (!doctor.qrCodeUrl) {
-    const referralUrl = `${process.env.APP_URL}/register?doctor=${doctor.doctorId}`;
-    doctor.referralCode = doctor.doctorId;
-    doctor.qrCodeUrl = await QRCode.toDataURL(referralUrl);
-  }
   await doctor.save();
 
   await writeAuditLog({ req, action: 'qr_code_reactivated', module: 'Doctor', recordId: doctor._id });
@@ -550,9 +546,10 @@ const getMyQrStats = asyncHandler(async (req, res) => {
   const totalRegistrations = await QrScan.countDocuments({ doctor: doctor._id, registrationDate: { $exists: true } });
   const totalPaid = await QrScan.countDocuments({ doctor: doctor._id, paymentStatus: 'paid' });
 
+  const qrPresentation = await getActiveReferralQr(doctor);
+  res.set('Cache-Control', 'private, no-store');
   res.json({
-    qrCodeUrl: doctor.qrCodeUrl,
-    referralUrl: `${process.env.APP_URL}/register?doctor=${doctor.doctorId}`,
+    ...qrPresentation,
     totalScans,
     totalRegistrations,
     totalPaid,
