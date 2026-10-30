@@ -5,6 +5,7 @@ const Refund = require('../../models/Refund.model');
 const { writeAuditLog } = require('../../utils/auditLogger');
 const { buildSearchFilter, getPagination } = require('../../utils/queryHelpers');
 const asyncHandler = require('../../utils/asyncHandler');
+const { applyFixedSplitConfiguration, DOCTOR_SPLIT_PERCENT } = require('../../utils/splitPolicy');
 
 const VERIFIED_PAYMENT_STATUSES = ['successful', 'manually_verified'];
 const HISTORICALLY_VERIFIED_STATUSES = ['refunded', 'partially_refunded', 'disputed', 'chargeback'];
@@ -25,7 +26,10 @@ const getRevenueModels = asyncHandler(async (req, res) => {
     Doctor.countDocuments({ revenueModel: 'platform_fee' }),
   ]);
 
-  res.json({ items, meta: { page, limit, total, totalPages: Math.ceil(total / limit) || 1 }, summary: { splitCount, platformFeeCount, configured: splitCount + platformFeeCount } });
+  const effectiveItems = items.map((doctor) => doctor.revenueModel === 'split'
+    ? { ...doctor, feeShareType: 'percentage', feeSharePercentage: DOCTOR_SPLIT_PERCENT, feeShareCalculationBasis: 'gross', fixedFeeShareAmount: null }
+    : doctor);
+  res.json({ items: effectiveItems, meta: { page, limit, total, totalPages: Math.ceil(total / limit) || 1 }, summary: { splitCount, platformFeeCount, configured: splitCount + platformFeeCount } });
 });
 
 const updateRevenueModel = asyncHandler(async (req, res) => {
@@ -38,6 +42,7 @@ const updateRevenueModel = asyncHandler(async (req, res) => {
   const updates = {};
   for (const key of allowed) if (req.body[key] !== undefined) updates[key] = req.body[key];
   Object.assign(doctor, updates);
+  applyFixedSplitConfiguration(doctor);
   await doctor.save();
   await writeAuditLog({ req, action: 'doctor_revenue_model_updated', module: 'Doctor', recordId: doctor._id, previousValue, newValue: updates, reason: req.body.reason });
   res.json({ message: 'Revenue model updated', doctor });
