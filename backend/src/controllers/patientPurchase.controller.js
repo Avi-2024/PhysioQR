@@ -138,7 +138,7 @@ const getPurchaseQuote = asyncHandler(async (req, res) => {
       finalAmount: amount,
       currency: 'INR',
       source: doctor ? 'doctor_patient_fee' : directPricing.source,
-      feeAuthority: doctor ? 'doctor' : 'admin',
+      feeAuthority: doctor ? 'doctor' : (directPricing.source === 'website_direct_fixed' ? 'platform' : 'admin'),
     },
     assignment: { source: assignmentSource, programmeCount: programs.length },
   });
