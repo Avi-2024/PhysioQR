@@ -75,7 +75,7 @@ test('admin revenue-model changes cannot restore legacy percentage/slab or alter
   assert.deepEqual(doctor.feeShareSlabs, []);
   assert.equal(doctor.feeShareCalculationBasis, 'gross');
   assert.equal(doctor.fixedFeeShareAmount, undefined);
-  assert.equal(audit.newValue.feeSharePercentage, undefined, 'audit should not imply 99% was applied');
+  assert.equal(audit.newValue.feeSharePercentage, 50, 'audit must record the actual 50% value');
 });
 
 test('admin approval cannot override fixed 50:50 with a fixed commission', async () => {
