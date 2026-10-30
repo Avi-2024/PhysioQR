@@ -46,6 +46,8 @@ export default function DoctorDashboardPage() {
         </button>
       </div>
 
+      <DoctorRecoveryOverviewPanel />
+
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <MetricCard loading={qrQuery.isLoading} icon={QrCode} label="Total QR Scans" value={Number(qr.totalScans || 0)} tone="text-primary-600" />
         <MetricCard loading={summaryQuery.isLoading} icon={Users} label="Patient Registrations" value={Number(totals.referredPatients || 0)} tone="text-purple-600" />
@@ -57,8 +59,6 @@ export default function DoctorDashboardPage() {
         <MetricCard loading={summaryQuery.isLoading} icon={ArrowUpRight} label="Withdrawal Requested" value={formatCurrency(Number(totals.withdrawalRequested || 0))} tone="text-orange-600" />
         <MetricCard loading={summaryQuery.isLoading} icon={Banknote} label="Paid Fee Share" value={formatCurrency(Number(totals.paidFeeShare || 0))} tone="text-emerald-700" />
       </div>
-
-      <DoctorRecoveryOverviewPanel />
 
       {isSplitModel && (
         <div className="bg-gradient-to-r from-primary-900 to-neutral-900 text-white rounded-2xl p-5 sm:p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
