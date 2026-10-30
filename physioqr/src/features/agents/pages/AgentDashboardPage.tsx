@@ -79,9 +79,9 @@ export default function AgentDashboardPage() {
         />
         <MetricCard
           loading={dashboardQuery.isLoading}
-          label="Needs Review"
-          value={number(dashboard.pendingApproval)}
-          helper={`${number(dashboard.approved)} approved`}
+          label="Clinic Visits"
+          value={number(dashboard.totalClinicVisits)}
+          helper="Total visits recorded in your agent workspace"
           icon={CalendarClock}
         />
         <MetricCard
