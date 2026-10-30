@@ -6,6 +6,7 @@ import apiClient from '@/lib/api-client';
 import ErrorState from '@/components/feedback/ErrorState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { formatCurrency } from '@/lib/formatters';
+import DoctorRecoveryOverviewPanel from '@/features/doctors/pages/dashboard/DoctorRecoveryOverviewPanel';
 
 type ApiRecord = Record<string, unknown>;
 
@@ -56,6 +57,8 @@ export default function DoctorDashboardPage() {
         <MetricCard loading={summaryQuery.isLoading} icon={ArrowUpRight} label="Withdrawal Requested" value={formatCurrency(Number(totals.withdrawalRequested || 0))} tone="text-orange-600" />
         <MetricCard loading={summaryQuery.isLoading} icon={Banknote} label="Paid Fee Share" value={formatCurrency(Number(totals.paidFeeShare || 0))} tone="text-emerald-700" />
       </div>
+
+      <DoctorRecoveryOverviewPanel />
 
       {isSplitModel && (
         <div className="bg-gradient-to-r from-primary-900 to-neutral-900 text-white rounded-2xl p-5 sm:p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
