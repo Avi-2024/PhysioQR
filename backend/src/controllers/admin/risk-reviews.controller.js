@@ -6,6 +6,7 @@ const notificationService = require('../../services/notification.service');
 const { writeAuditLog } = require('../../utils/auditLogger');
 const { paginateModel } = require('../../utils/queryHelpers');
 const asyncHandler = require('../../utils/asyncHandler');
+const { publicAssessmentDocuments } = require('../../services/assessmentDocuments.service');
 
 const reviewFilter = { $or: [{ hasRedFlag: true }, { requiresPhysioReview: true }] };
 const FINANCIAL_STATUSES = ['successful', 'manually_verified', 'partially_refunded', 'refunded', 'disputed', 'chargeback'];
@@ -58,7 +59,7 @@ const getRiskReviews = asyncHandler(async (req, res) => {
 });
 
 const getRiskReviewById = asyncHandler(async (req, res) => {
-  const assessment = await PatientAssessment.findOne({ _id: req.params.id, ...reviewFilter }).populate(populate).lean();
+  const assessment = await PatientAssessment.findOne({ _id: req.params.id, ...reviewFilter }).select('+assessmentDocuments').populate(populate).lean();
   if (!assessment) return res.status(404).json({ message: 'Clinical review not found' });
 
   let availablePrograms = [];
@@ -69,7 +70,8 @@ const getRiskReviewById = asyncHandler(async (req, res) => {
       .lean();
   }
 
-  res.json({ ...assessment, availablePrograms });
+  const { assessmentDocuments, ...safeAssessment } = assessment;
+  res.json({ ...safeAssessment, documents: publicAssessmentDocuments(assessmentDocuments || []), availablePrograms });
 });
 
 const updateRiskReview = asyncHandler(async (req, res) => {
