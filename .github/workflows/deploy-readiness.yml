@@ -100,3 +100,8 @@ jobs:
         env:
           NODE_ENV: test
         run: npm run test:agent-operational
+
+      - name: Verify immutable 50:50 doctor revenue sharing
+        env:
+          NODE_ENV: test
+        run: npm run test:fixed-split

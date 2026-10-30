@@ -4,6 +4,8 @@
  * SRS §28 — Calculation basis: gross, after_discount, net_after_charges
  */
 
+const { splitPaidAmount } = require('./splitPolicy');
+
 /**
  * Get the eligible amount based on calculation basis.
  */
@@ -80,13 +82,11 @@ const calculateFeeShare = (config) => {
     return { doctorShare: 0, platformShare: paidAmount, eligibleAmount: paidAmount };
   }
 
-  if (feeShareType === 'fixed') {
-    return calculateFixedFeeShare(paidAmount, discountAmount, gatewayCharges, fixedAmount, basis);
-  }
-  if (feeShareType === 'slab') {
-    return calculateSlabFeeShare(paidAmount, discountAmount, gatewayCharges, slabs, totalPaidPatients, basis);
-  }
-  return calculatePercentageFeeShare(paidAmount, discountAmount, gatewayCharges, percentage, basis);
+  // All new Split Model transactions use the paid/collected amount, even
+  // when an older doctor record or an existing order snapshot says otherwise.
+  return splitPaidAmount(paidAmount);
+
+
 };
 
 module.exports = { calculateFeeShare, getEligibleAmount };

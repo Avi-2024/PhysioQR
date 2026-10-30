@@ -38,7 +38,7 @@ export default function DoctorDashboardPage() {
           </h1>
           <p className="text-sm text-neutral-500">
             {text(profile.clinicName, 'Clinic not configured')} | Revenue Model:{' '}
-            <strong className="text-primary-600">{isSplitModel ? `Split Model (${text(summaryDoctor.feeSharePercentage || profile.feeSharePercentage, '0')}%)` : 'Platform Fee Model'}</strong>
+            <strong className="text-primary-600">{isSplitModel ? 'Split Model (50% Doctor / 50% PhysioQR)' : 'Platform Fee Model'}</strong>
           </p>
         </div>
         <button onClick={() => navigate('/doctor/qr-referral')} className="flex min-h-11 w-full sm:w-auto items-center justify-center gap-2 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-semibold text-sm rounded-lg transition-colors">

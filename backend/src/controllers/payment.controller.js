@@ -11,6 +11,7 @@ const QrScan = require('../models/QrScan.model');
 const { DoctorWallet, WalletTransaction } = require('../models/Wallet.model');
 const { FeeShare } = require('../models/FeeShare.model');
 const { calculateFeeShare } = require('../utils/feeCalculator');
+const { DOCTOR_SPLIT_PERCENT } = require('../utils/splitPolicy');
 const { generateInvoiceNumber } = require('../utils/idGenerator');
 const { writeAuditLog } = require('../utils/auditLogger');
 const { getNextSequence } = require('../services/sequence.service');
@@ -84,11 +85,11 @@ const resolveOrderPricing = async ({ doctor, programId, couponCode }) => {
       doctor: doctor._id,
       revenueModel: doctor.revenueModel || 'split',
       approvedPatientFee: doctor.approvedPatientFee,
-      feeShareType: doctor.feeShareType || 'percentage',
-      feeSharePercentage: doctor.feeSharePercentage || 0,
-      fixedFeeShareAmount: doctor.fixedFeeShareAmount || 0,
-      feeShareSlabs: doctor.feeShareSlabs || [],
-      feeShareCalculationBasis: doctor.feeShareCalculationBasis || 'gross',
+      feeShareType: 'percentage',
+      feeSharePercentage: doctor.revenueModel === 'platform_fee' ? 0 : DOCTOR_SPLIT_PERCENT,
+      fixedFeeShareAmount: 0,
+      feeShareSlabs: [],
+      feeShareCalculationBasis: 'gross',
       feeShareHoldingDays: doctor.feeShareHoldingDays || 15,
       couponCode: appliedCoupon?.couponCode || null,
     },
@@ -114,10 +115,10 @@ const createFeeShareAndWalletEntries = async ({ order, payment, doctor, session 
   const pricing = order.pricingSnapshot || {};
   const revenueModel = pricing.revenueModel || doctor.revenueModel || 'split';
   const feeShareType = pricing.feeShareType || doctor.feeShareType || 'percentage';
-  const percentage = pricing.feeSharePercentage ?? doctor.feeSharePercentage ?? 0;
+  const percentage = revenueModel === 'split' ? DOCTOR_SPLIT_PERCENT : 0;
   const fixedAmount = pricing.fixedFeeShareAmount ?? doctor.fixedFeeShareAmount ?? 0;
   const slabs = Array.isArray(pricing.feeShareSlabs) ? pricing.feeShareSlabs : (doctor.feeShareSlabs || []);
-  const basis = pricing.feeShareCalculationBasis || doctor.feeShareCalculationBasis || 'gross';
+  const basis = revenueModel === 'split' ? 'gross' : (pricing.feeShareCalculationBasis || doctor.feeShareCalculationBasis || 'gross');
   const holdingDays = pricing.feeShareHoldingDays ?? doctor.feeShareHoldingDays ?? 15;
 
   const totalPaidPatients = await Payment.countDocuments({ doctor: doctor._id, verifiedAt: { $ne: null } }).session(session);
