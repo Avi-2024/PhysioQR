@@ -36,7 +36,7 @@ describe('Doctor dashboard referred patient recovery monitoring', () => {
     mount();
     const region = await screen.findByRole('region', { name: 'Referred patient recovery updates' });
     expect(within(region).getByText('Recovery updates')).toBeTruthy();
-    expect(within(region).getByText('Patient Test')).toBeTruthy();
+    expect(await within(region).findByText('Patient Test')).toBeTruthy();
     expect(within(region).getByText(/discomfort reported/i)).toBeTruthy();
     expect(within(region).getByText(/stiffness increased/i)).toBeTruthy();
     expect(within(region).getByText(/pain before/i)).toBeTruthy();
