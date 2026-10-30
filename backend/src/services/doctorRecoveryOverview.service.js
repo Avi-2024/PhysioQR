@@ -9,6 +9,15 @@ const buildRecoveryPipeline = ({ patientIds, enrollmentIds, since }) => [
     patient: { $in: patientIds },
     patientProgram: { $in: enrollmentIds },
     updatedAt: { $gte: since },
+    // Merely unlocking a day is not a patient activity/recovery update.
+    $or: [
+      { dayStarted: true },
+      { dayCompleted: true },
+      { painScoreBefore: { $type: 'number' } },
+      { painScoreAfter: { $type: 'number' } },
+      { discomfortReported: { $type: 'bool' } },
+      { feedbackText: { $exists: true, $nin: [null, ''] } },
+    ],
   } },
   { $facet: {
     totals: [{ $group: {
