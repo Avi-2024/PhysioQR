@@ -34,7 +34,7 @@
     "test:patient-auto-clearance": "node --test tests/patientAssessmentClearance.test.js tests/assessmentFlagSeverity.test.js",
     "test:assessment-questions": "node --test tests/patientAssessmentQuestions.test.js",
     "test:admin-patient-fee": "node --test tests/adminDirectPatientFee.test.js",
-    "test:direct-patient-pricing": "node --test tests/adminDirectPatientFee.test.js tests/directPatientPricing.test.js tests/directPatientPurchaseQuote.test.js tests/directPaymentClinicalGate.test.js",
+    "test:direct-patient-pricing": "node --test tests/adminDirectPatientFee.test.js tests/directPatientPricing.test.js tests/directPatientPurchaseQuote.test.js tests/directPaymentClinicalGate.test.js tests/websiteDirect300Checkout.test.js",
     "retire:description-questions": "node scripts/retireOpenEndedAssessmentQuestions.js",
     "worker:notifications": "node scripts/notificationWorker.js",
     "migrate:rehab-content": "node scripts/migrateProgramContent.js",
