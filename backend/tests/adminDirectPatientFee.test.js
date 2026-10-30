@@ -137,13 +137,13 @@ test('payment and referral lock remain enforced', async () => {
   assert.equal(patient.saved, undefined);
 });
 
-test('Admin cannot override ₹300 website direct registration fee', async () => {
+test('Admin may override website direct registration fee before payment', async () => {
   const patient = createPatient({ referralSource: 'direct' });
   patients.set(patient.patientId, patient);
   const { req, res, outcome } = makeRequest('PT00016', 1000);
   await updateDirectPatientFee(req, res);
-  assert.equal(outcome().status, 409);
-  assert.match(outcome().response.message, /₹300/);
-  assert.equal(patient.saved, undefined);
-  assert.equal(auditEvents.length, 0);
+  assert.equal(outcome().status, 200);
+  assert.equal(patient.directPatientFee, 1000);
+  assert.equal(patient.saved, true);
+  assert.equal(auditEvents.length, 1);
 });
