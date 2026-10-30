@@ -6,6 +6,7 @@ const { FeeShare } = require('../../models/FeeShare.model');
 const { DoctorWallet } = require('../../models/Wallet.model');
 const { buildSearchFilter, buildSort, paginateModel } = require('../../utils/queryHelpers');
 const asyncHandler = require('../../utils/asyncHandler');
+const { getActiveReferralQr } = require('../../services/doctorReferralQr.service');
 
 const VERIFIED_PAYMENT_STATUSES = ['successful', 'manually_verified', 'partially_refunded', 'refunded'];
 const isObjectId = (value) => /^[a-f\d]{24}$/i.test(String(value));
@@ -79,8 +80,12 @@ const getDoctorById = asyncHandler(async (req, res) => {
     QrScan.countDocuments({ doctor: doctor._id }),
   ]);
 
+  const qr = await getActiveReferralQr(doctor);
+  res.set('Cache-Control', 'private, no-store');
   res.json({
     ...doctor,
+    qrCodeUrl: qr.qrCodeUrl,
+    referralUrl: qr.referralUrl,
     id: doctor.doctorId || doctor._id,
     metrics: {
       qrScans,
