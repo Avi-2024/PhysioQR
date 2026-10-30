@@ -1,4 +1,5 @@
 const express = require('express');
+const multer = require('multer');
 const router = express.Router();
 const { protect, authorize } = require('../middlewares/auth.middleware');
 const { requireFields, validateEnum } = require('../middlewares/validate.middleware');
@@ -14,6 +15,20 @@ const {
   reviewAssessment,
 } = require('../controllers/assessment.controller');
 const { getCommonQuestions, submitCommonAssessment } = require('../controllers/common-assessment.controller');
+const { getAssessmentDocumentAccess } = require('../controllers/assessment-documents.controller');
+const { MAX_ASSESSMENT_DOCUMENT_SIZE } = require('../services/assessmentDocuments.service');
+
+const optionalDocuments = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_ASSESSMENT_DOCUMENT_SIZE, files: 2, fields: 12, parts: 14 },
+}).fields([
+  { name: 'doctorPrescription', maxCount: 1 },
+  { name: 'investigationReport', maxCount: 1 },
+]);
+const handleOptionalDocuments = (req, res, next) => optionalDocuments(req, res, (err) => {
+  if (err) return res.status(400).json({ message: err.code === 'LIMIT_FILE_SIZE' ? 'Each document must be 10 MB or less' : 'Invalid assessment document upload' });
+  next();
+});
 const { getPathwayOptions, getSurgeryTypes } = require('../controllers/assessment-pathways.controller');
 
 router.get('/pathways', getPathwayOptions);
@@ -37,7 +52,8 @@ router.post(
 router.put('/questions/:id', protect, authorize('admin'), updateQuestion);
 router.delete('/questions/:id', protect, authorize('admin'), deleteQuestion);
 
-router.post('/submit', protect, requireFields('patientId', 'caseTypeId', 'painCategoryId', 'answers'), submitCommonAssessment);
+router.post('/submit', protect, handleOptionalDocuments, requireFields('patientId', 'caseTypeId', 'painCategoryId', 'answers'), submitCommonAssessment);
+router.get('/:id/documents/:documentId/access', protect, authorize('admin', 'patient'), getAssessmentDocumentAccess);
 router.get('/red-flags', protect, authorize('admin'), listRedFlagAssessments);
 router.patch(
   '/:id/review',

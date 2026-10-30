@@ -26,6 +26,22 @@ const patientAssessmentSchema = new mongoose.Schema({
       answer: mongoose.Schema.Types.Mixed,
     },
   ],
+  // Private health documents. Hidden from ordinary patient/clinical list queries.
+  // Documents are never public URLs; access requires an authorization check.
+  assessmentDocuments: {
+    type: [{
+      documentType: { type: String, enum: ['doctor_prescription', 'investigation_report'], required: true },
+      storageProvider: { type: String, enum: ['s3'], required: true },
+      bucket: { type: String, required: true },
+      key: { type: String, required: true },
+      originalName: String,
+      mimeType: String,
+      size: Number,
+      uploadedAt: Date,
+    }],
+    select: false,
+    default: undefined,
+  },
   hasRedFlag: { type: Boolean, default: false },
   // Set explicitly on NEW assessments; missing for historical records.
   clinicalSelectionRequired: Boolean,

@@ -1,7 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
-import { AlertTriangle, ArrowLeft, CalendarDays, CheckCircle2, Clock3, ShieldAlert, Stethoscope, UserRound, XCircle } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, CalendarDays, CheckCircle2, Clock3, FileText, ShieldAlert, Stethoscope, UserRound, XCircle } from 'lucide-react';
 import apiClient from '@/lib/api-client';
 import { formatCurrency } from '@/lib/formatters';
 
@@ -18,6 +18,7 @@ type Detail = {
   reviewType?:'red_flag'|'physio_review'; hasRedFlag?:boolean;
   redFlagDetails?:Array<{questionText?:string;answer?:unknown;reason?:string;safetyMessage?:string}>;
   approvedProgram?:ProgramOption|null; approvedPrograms?:ProgramOption[]; availablePrograms?:ProgramOption[];
+  documents?:Array<{id:string;documentType:string;originalName:string;size?:number;uploadedAt?:string}>;
   status:string; adminReviewNote?:string; reviewedBy?:{email?:string;mobile?:string}; reviewedAt?:string; createdAt:string;
 };
 const pretty=(v?:string)=>String(v||'—').replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase());
@@ -31,6 +32,7 @@ export default function AdminRiskReviewDetailPage(){
  const [note,setNote]=useState('');
  const [programIds,setProgramIds]=useState<string[]>([]);
  const [patientFee,setPatientFee]=useState('');
+ const [documentError,setDocumentError]=useState('');
  const query=useQuery({queryKey:['admin-risk-review',reviewId],enabled:!!reviewId,queryFn:async()=> (await apiClient.get<Detail>(`/admin/risk-reviews/${reviewId}`)).data});
  const mutation=useMutation({
   mutationFn:async()=> (await apiClient.patch(`/admin/risk-reviews/${reviewId}`,{
@@ -50,6 +52,16 @@ export default function AdminRiskReviewDetailPage(){
  const existingFee=isDirect?d.patient?.directPatientFee:d.patient?.referringDoctor?.approvedPatientFee;
  const openDecision=(value:'cleared'|'blocked')=>{setDecision(value);setNote('');setProgramIds(value==='cleared'?existingProgrammeIds:[]);setPatientFee(value==='cleared'&&isDirect&&existingFee?String(existingFee):'');};
  const toggleProgram=(id:string)=>setProgramIds(current=>current.includes(id)?current.filter(value=>value!==id):[...current,id]);
+ const openDocument=async(documentId:string)=>{
+  setDocumentError('');
+  const popup=window.open('about:blank','_blank');
+  if(!popup){setDocumentError('Please allow a new tab to view this medical document.');return;}
+  try{
+   const response=await apiClient.get<{url:string}>(`/assessments/${reviewId}/documents/${documentId}/access`);
+   if(!response.data.url)throw new Error('Document link unavailable');
+   popup.location.replace(response.data.url);
+  }catch{popup.close();setDocumentError('Document could not be opened. Please retry.');}
+ };
  const submit=(e:FormEvent)=>{e.preventDefault();if(!decision||!note.trim())return;if(decision==='cleared'&&!programIds.length)return;if(decision==='cleared'&&isDirect&&!(Number(patientFee)>0))return;mutation.mutate();};
  return <div className="space-y-6">
   <button onClick={()=>navigate('/admin/risk-reviews')} className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-slate-900"><ArrowLeft size={16}/>Clinical Reviews</button>
@@ -60,6 +72,12 @@ export default function AdminRiskReviewDetailPage(){
 
    {isRedFlag ? <section className="rounded-2xl border border-amber-200 bg-amber-50/60 p-5"><div className="flex items-center gap-2"><ShieldAlert size={18} className="text-amber-700"/><h2 className="font-semibold text-slate-950">Triggered safety rules</h2></div><p className="mt-1 text-sm text-slate-600">Review the submitted answers that matched configured red-flag rules before allowing rehabilitation to continue.</p><div className="mt-4 space-y-3">{(d.redFlagDetails||[]).map((flag,i)=><article key={i} className="rounded-xl border border-amber-200 bg-white p-4"><p className="font-medium text-slate-900">{flag.questionText||`Red flag ${i+1}`}</p><dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2"><Info label="Patient answer" value={showAnswer(flag.answer)}/><Info label="Rule" value={pretty(flag.reason)}/></dl>{flag.safetyMessage&&<div className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-800"><strong>Safety message:</strong> {flag.safetyMessage}</div>}</article>)}</div></section> : <section className="rounded-2xl border border-sky-200 bg-sky-50/60 p-5"><div className="flex items-center gap-2"><Clock3 size={18} className="text-sky-700"/><h2 className="font-semibold text-slate-950">Physio review required</h2></div><p className="mt-2 text-sm leading-6 text-slate-700">Review the case, surgery timing and patient context, then choose one or more rehabilitation programmes before clearance.</p></section>}
 
+   {Boolean(d.documents?.length)&&<section className="rounded-2xl border border-slate-200 bg-white p-5">
+     <div className="flex items-center gap-2"><FileText size={18}/><h2 className="font-semibold text-slate-950">Uploaded medical documents</h2></div>
+     <p className="mt-2 text-sm text-slate-600">Private patient uploads. Open only for authorized clinical review.</p>
+     <div className="mt-3 space-y-2">{d.documents?.map(doc=><button type="button" key={doc.id} onClick={()=>openDocument(doc.id)} className="flex w-full items-center justify-between gap-3 rounded-lg border border-slate-200 p-3 text-left text-sm text-emerald-700 hover:bg-emerald-50"><span><strong className="block text-slate-800">{doc.documentType==='doctor_prescription'?'Doctor prescription':'Investigation report'}</strong><span className="block break-all text-xs text-slate-500">{doc.originalName}</span></span><span className="shrink-0">View securely</span></button>)}</div>
+     {documentError&&<p role="alert" className="mt-2 text-sm text-red-700">{documentError}</p>}
+   </section>}
    <section className="rounded-2xl border border-slate-200 bg-white p-5"><div className="flex items-center gap-2"><UserRound size={18}/><h2 className="font-semibold text-slate-950">Patient & commercial context</h2></div><dl className="mt-4 grid gap-4 text-sm sm:grid-cols-2"><Info label="Patient" value={d.patient?.fullName||'—'}/><Info label="Mobile" value={d.patient?.mobile||'—'}/><Info label="Referring doctor" value={d.patient?.referringDoctor?.fullName||'Direct PhysioQR patient'}/><Info label="Fee authority" value={isDirect?'Admin':'Doctor'}/><Info label="Patient fee" value={existingFee?formatCurrency(existingFee):'Not set'}/><Info label="Clinic" value={d.patient?.referringDoctor?.clinicName||'—'}/></dl>{d.patient?._id&&<button onClick={()=>navigate(`/admin/patients/${d.patient?._id}`)} className="mt-4 text-sm font-semibold text-emerald-700">Open patient workspace →</button>}</section>
   </main>
 

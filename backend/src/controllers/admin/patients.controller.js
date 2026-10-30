@@ -14,6 +14,7 @@ const { Payment, Order } = require('../../models/Payment.model');
 const { buildSearchFilter, buildSort, paginateModel } = require('../../utils/queryHelpers');
 const { writeAuditLog } = require('../../utils/auditLogger');
 const asyncHandler = require('../../utils/asyncHandler');
+const { publicAssessmentDocuments } = require('../../services/assessmentDocuments.service');
 
 const isObjectId = (value) => /^[a-f\d]{24}$/i.test(String(value));
 const VERIFIED_PAYMENT_STATUSES = ['successful', 'manually_verified'];
@@ -94,6 +95,7 @@ const getPatientById = asyncHandler(async (req, res) => {
       .sort({ createdAt: -1 })
       .lean(),
     PatientAssessment.find({ patient: patient._id })
+      .select('+assessmentDocuments')
       .populate('painCategory', 'name')
       .sort({ createdAt: -1 })
       .lean(),
@@ -122,7 +124,9 @@ const getPatientById = asyncHandler(async (req, res) => {
     },
     programs,
     payments,
-    assessments,
+    assessments: assessments.map(({ assessmentDocuments, ...assessment }) => ({
+      ...assessment, documents: publicAssessmentDocuments(assessmentDocuments || []),
+    })),
     orders,
   });
 });
