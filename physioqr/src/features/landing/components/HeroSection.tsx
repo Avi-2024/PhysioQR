@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import {
   ArrowRight,
   Check,
@@ -44,6 +45,10 @@ export function HeroSection({ onOpenPortal }: HeroSectionProps) {
                 Start Your Recovery
                 <ArrowRight className="h-4 w-4" />
               </button>
+              <Link to="/register" className="mt-3 inline-flex items-center gap-2 text-sm font-bold text-[#087c70] hover:underline">
+                New patient? Register directly for ₹300
+                <ArrowRight className="h-4 w-4" />
+              </Link>
             </div>
 
             <div className="mt-8 flex flex-wrap gap-x-6 gap-y-3">
