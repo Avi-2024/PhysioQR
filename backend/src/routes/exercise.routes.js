@@ -4,6 +4,7 @@ const { protect, authorize } = require('../middlewares/auth.middleware');
 const { validateSchema } = require('../middlewares/validate.middleware');
 const {
   getExercises,
+  getSurgicalConditions,
   createExercise,
   getExerciseById,
   updateExercise,
@@ -31,11 +32,13 @@ const exerciseBodySchema = {
   safetyInstructions: { type: 'string', max: 5000 },
   commonMistakes: { type: 'string', max: 5000 },
   painCategory: { type: 'objectId' },
+  surgeryTypes: { type: 'array', max: 30 },
   language: { type: 'enum', values: ['en', 'hi'] },
   displayOrder: { type: 'number', min: 0, max: 100000 },
 };
 
 router.get('/', getExercises);
+router.get('/surgical-conditions', authorize('admin'), getSurgicalConditions);
 router.post('/', authorize('admin'), validateSchema({ body: { ...exerciseBodySchema, name: { ...exerciseBodySchema.name, required: true } } }), createExercise);
 // Must precede /:id so the bulk action cannot be mistaken for an exercise ID.
 router.post(
