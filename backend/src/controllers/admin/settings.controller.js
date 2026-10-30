@@ -17,6 +17,7 @@ const DEFAULTS = {
   finance: {
     currency: 'INR',
     directPatientDefaultFee: 0,
+    websiteDirectRegistrationFee: 300,
     paymentsEnabled: true,
     refundsEnabled: true,
     withdrawalsEnabled: true,
@@ -73,6 +74,12 @@ const updateSettingsSection = asyncHandler(async (req, res) => {
     }
     if (section === 'finance' && key === 'currency' && req.body[key] !== 'INR') {
       return res.status(400).json({ message: 'currency must be INR' });
+    }
+    if (section === 'finance' && key === 'websiteDirectRegistrationFee') {
+      const amount = req.body[key];
+      if (!Number.isFinite(amount) || amount <= 0 || amount > 1000000 || Math.abs(amount * 100 - Math.round(amount * 100)) > 1e-6) {
+        return res.status(400).json({ message: 'Website direct registration fee must be greater than ₹0 and no more than ₹10,00,000, with at most two decimal places' });
+      }
     }
     if (section === 'finance' && key === 'directPatientDefaultFee') {
       const amount = req.body[key];

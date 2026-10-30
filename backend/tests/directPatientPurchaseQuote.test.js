@@ -119,3 +119,29 @@ test('referred patient keeps doctor pricing, not admin pricing', async () => {
   assert.equal(outcome().response.pricing.originalAmount, 3200);
   assert.equal(outcome().response.pricing.source, 'doctor_patient_fee');
 });
+
+test('website-direct purchase quote reflects the current Admin-controlled ₹300 default', async () => {
+  patient.referralSource = 'direct';
+  fee = 300;
+  feeSource = 'website_direct_default';
+  const { req, res, outcome } = request();
+  await getPurchaseQuote(req, res);
+  assert.equal(outcome().status, 200);
+  assert.equal(outcome().response.purchaseMode, 'direct');
+  assert.equal(outcome().response.pricing.originalAmount, 300);
+  assert.equal(outcome().response.pricing.finalAmount, 300);
+  assert.equal(outcome().response.pricing.source, 'website_direct_default');
+  assert.equal(outcome().response.pricing.feeAuthority, 'admin');
+  assert.equal(outcome().response.doctor, null);
+});
+
+test('website direct quote updates when Admin changes the default', async () => {
+  patient.referralSource = 'direct';
+  fee = 750;
+  feeSource = 'website_direct_admin';
+  const { req, res, outcome } = request();
+  await getPurchaseQuote(req, res);
+  assert.equal(outcome().response.pricing.originalAmount, 750);
+  assert.equal(outcome().response.pricing.finalAmount, 750);
+  assert.equal(outcome().response.pricing.source, 'website_direct_admin');
+});

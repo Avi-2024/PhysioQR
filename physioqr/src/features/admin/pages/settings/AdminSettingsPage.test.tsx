@@ -13,7 +13,7 @@ const settingsResponse = {
   settings: {
     platform: { supportEmail: '', supportPhone: '', maintenanceMode: false },
     patient: { assessmentRequired: true, redFlagReviewRequired: true },
-    finance: { currency: 'INR', directPatientDefaultFee: 0, paymentsEnabled: true, refundsEnabled: true, withdrawalsEnabled: true },
+    finance: { currency: 'INR', directPatientDefaultFee: 0, websiteDirectRegistrationFee: 300, paymentsEnabled: true, refundsEnabled: true, withdrawalsEnabled: true },
     notifications: { inAppEnabled: true, webPushEnabled: true, emailEnabled: true, smsEnabled: true, whatsappEnabled: true },
   },
   metadata: {},
@@ -78,5 +78,28 @@ describe('Finance direct-patient fee input', () => {
     expect(input.value).toBe('499.50');
     fireEvent.change(input, { target: { value: '499e2' } });
     expect(input.value).toBe('499.50');
+  });
+});
+
+describe('Website-direct Admin fee input', () => {
+  it('starts at ₹300 and saves a different website fee without changing legacy direct pricing', async () => {
+    mount();
+    const input = await screen.findByRole('textbox', { name: /website-direct registration fee/i }) as HTMLInputElement;
+    expect(input.value).toBe('300');
+    fireEvent.change(input, { target: { value: '650' } });
+    fireEvent.click(screen.getAllByRole('button', { name: /save section/i })[2]);
+    await waitFor(() => expect(apiClient.patch).toHaveBeenCalledWith(
+      '/admin/settings/finance',
+      expect.objectContaining({ websiteDirectRegistrationFee: 650, directPatientDefaultFee: 0 }),
+    ));
+  });
+
+  it('rejects a zero website fee while preserving legacy zero behavior', async () => {
+    mount();
+    const input = await screen.findByRole('textbox', { name: /website-direct registration fee/i }) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: '0' } });
+    fireEvent.click(screen.getAllByRole('button', { name: /save section/i })[2]);
+    expect((await screen.findByRole('alert')).textContent).toMatch(/website registration fee/i);
+    expect(apiClient.patch).not.toHaveBeenCalled();
   });
 });

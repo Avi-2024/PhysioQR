@@ -1,4 +1,8 @@
 import React from 'react';
+import { useQuery } from '@tanstack/react-query';
+import apiClient from '@/lib/api-client';
+import { formatCurrency } from '@/lib/formatters';
+import { Link } from 'react-router-dom';
 import {
   ArrowRight,
   Check,
@@ -15,6 +19,13 @@ interface HeroSectionProps {
 const trustItems = ['Secure & private', 'WhatsApp reminders', 'Progress tracked'];
 
 export function HeroSection({ onOpenPortal }: HeroSectionProps) {
+  const feeQuery = useQuery<{ amount: number }>({
+    queryKey: ['public-direct-registration-fee'],
+    queryFn: async () => (await apiClient.get('/settings/direct-registration-fee')).data,
+  });
+  const registrationFee = Number(feeQuery.data?.amount);
+  const feeLabel = feeQuery.isSuccess && Number.isFinite(registrationFee) && registrationFee > 0
+    ? ` for ${formatCurrency(registrationFee)}` : '';
   return (
     <section className="relative overflow-hidden border-b border-[#dcebe8] bg-[linear-gradient(115deg,#f8fcfb_0%,#f5fbfa_52%,#e9f8f5_100%)] py-14 sm:py-16 lg:py-20">
       <div className="pointer-events-none absolute right-[7%] top-[16%] h-[430px] w-[430px] rounded-full bg-[#d9f5ef]/55 blur-3xl" />
@@ -44,6 +55,10 @@ export function HeroSection({ onOpenPortal }: HeroSectionProps) {
                 Start Your Recovery
                 <ArrowRight className="h-4 w-4" />
               </button>
+              <Link to="/register" className="mt-3 inline-flex items-center gap-2 text-sm font-bold text-[#087c70] hover:underline">
+                New patient? Register directly{feeLabel}
+                <ArrowRight className="h-4 w-4" />
+              </Link>
             </div>
 
             <div className="mt-8 flex flex-wrap gap-x-6 gap-y-3">

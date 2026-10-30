@@ -109,7 +109,7 @@ export default function PatientContinuePaymentPage() {
                     ))}
                   </div>
                   <p className="mt-4 text-sm text-neutral-600">
-                    Fee decided by: <span className="font-semibold text-neutral-900">{isDirect ? 'PhysioQR Admin' : text(doctor.fullName, 'Referring Doctor')}</span>
+                    Fee decided by: <span className="font-semibold text-neutral-900">{isDirect ? ('PhysioQR Admin') : text(doctor.fullName, 'Referring Doctor')}</span>
                   </p>
                   <p className="mt-1 text-xs leading-5 text-neutral-500">The fee is for the patient rehabilitation access. Individual programmes do not have separate prices.</p>
                 </div>
