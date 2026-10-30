@@ -7,6 +7,7 @@ import {
   QrCode,
 } from 'lucide-react';
 import { UserRole } from '../types/landing.types';
+import { PATIENT_REGISTRATION_FEE_INR } from '@/config/patient-pricing';
 
 interface HeroSectionProps {
   onOpenPortal: (role?: UserRole) => void;
@@ -45,6 +46,10 @@ export function HeroSection({ onOpenPortal }: HeroSectionProps) {
                 <ArrowRight className="h-4 w-4" />
               </button>
             </div>
+
+            <p className="mt-4 text-sm font-semibold text-[#214e49]">
+              Patient registration & rehabilitation access: ₹{PATIENT_REGISTRATION_FEE_INR} one-time, payable after clinical clearance.
+            </p>
 
             <div className="mt-8 flex flex-wrap gap-x-6 gap-y-3">
               {trustItems.map((item) => (
