@@ -6,6 +6,7 @@ import apiClient from '@/lib/api-client';
 import ErrorState from '@/components/feedback/ErrorState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { formatCurrency } from '@/lib/formatters';
+import DoctorRecoveryOverviewPanel from '@/features/doctors/pages/dashboard/DoctorRecoveryOverviewPanel';
 
 type ApiRecord = Record<string, unknown>;
 
@@ -44,6 +45,8 @@ export default function DoctorDashboardPage() {
           <QrCode className="w-4 h-4" /> View My QR Code
         </button>
       </div>
+
+      <DoctorRecoveryOverviewPanel />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <MetricCard loading={qrQuery.isLoading} icon={QrCode} label="Total QR Scans" value={Number(qr.totalScans || 0)} tone="text-primary-600" />

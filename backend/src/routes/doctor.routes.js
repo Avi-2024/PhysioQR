@@ -9,6 +9,7 @@ const { updateDoctorKycAndBank } = require('../controllers/admin/doctor-kyc.cont
 const { approveDoctor } = require('../controllers/admin/doctor-approval.controller');
 const { registerDoctorSecure } = require('../controllers/doctorRegistration.controller');
 const { getMyPatientProgress } = require('../controllers/doctorPatientProgress.controller');
+const { getMyRecoveryOverview } = require('../controllers/doctorRecoveryOverview.controller');
 const {
   getAllDoctors, getDoctorById,
   rejectDoctor, requestDoctorDocuments, suspendDoctor,
@@ -25,6 +26,7 @@ router.get('/me/profile', authorize('doctor'), getMyProfile);
 router.put('/me/profile', authorize('doctor'), updateMyProfile);
 router.get('/me/summary', authorize('doctor'), getMySummary);
 router.get('/me/patients', authorize('doctor'), getMyPatients);
+router.get('/me/recovery-overview', authorize('doctor'), getMyRecoveryOverview);
 router.get('/me/patients/:patientId/progress', authorize('doctor'), getMyPatientProgress);
 router.get('/me/qr-stats', authorize('doctor'), getMyQrStats);
 router.post('/me/kyc-documents', authorize('doctor'), upload.single('document'), uploadMyKycDocument);

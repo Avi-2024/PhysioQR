@@ -50,5 +50,8 @@ jobs:
       - name: Agent doctor-wise visit and referral UI regression tests
         run: npm run test -- --run src/features/agents/pages/doctors/AgentDoctorsPage.test.tsx
 
+      - name: Doctor dashboard patient recovery UI regression tests
+        run: npm run test -- --run src/features/doctors/pages/dashboard/DoctorRecoveryOverviewPanel.test.tsx
+
       - name: Production build
         run: npm run build
