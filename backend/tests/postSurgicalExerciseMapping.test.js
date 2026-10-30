@@ -99,3 +99,25 @@ test('condition selector joins explicit condition tags with exercises in surgica
   assert.ok(!raw.includes('post_operative') && !raw.includes('all'),
     'Never implicitly show all general body-region exercises for ACL surgery');
 });
+
+test('all seeded surgery types resolve an exact programme and linked exercise IDs', async () => {
+  const seed = fs.readFileSync(path.join(__dirname, '../scripts/seedAssessmentPathways.js'), 'utf8');
+  const block = seed.split('const surgeries = {')[1].split('};')[0];
+  const pairs = [...block.matchAll(/\['([a-z_]+)',\s*'([^']+)'\]/g)];
+  assert.ok(pairs.length >= 20);
+  for (const [, code, name] of pairs) {
+    const surgery = { _id: SURGERY, code, name, bodyRegion: REGION };
+    const programId = '507f1f77bcf86cd799439015';
+    let requestedFilter;
+    matchingPrograms = [{ _id: programId }];
+    fakeProgram.find = (filter) => {
+      requestedFilter = filter;
+      return { select: () => ({ lean: async () => matchingPrograms }) };
+    };
+    const result = await exerciseIdsForSurgeryProgramme(surgery);
+    assert.deepEqual(result, [EXERCISE], code);
+    assert.equal(requestedFilter.difficultyLevel, 'post_operative', code);
+    assert.equal(requestedFilter.painCategory, REGION, code);
+    assert.ok(requestedFilter.$or.some((item) => item.programCode === surgeryProgrammeCode(code)), code);
+  }
+});
