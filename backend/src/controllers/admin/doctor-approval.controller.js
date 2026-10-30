@@ -2,6 +2,7 @@ const Doctor = require('../../models/Doctor.model');
 const { provisionApprovedDoctor } = require('../../services/doctorApproval.service');
 const { writeAuditLog } = require('../../utils/auditLogger');
 const asyncHandler = require('../../utils/asyncHandler');
+const { applyFixedSplitConfiguration } = require('../../utils/splitPolicy');
 
 const REVENUE_MODELS = ['split', 'platform_fee'];
 const FEE_SHARE_TYPES = ['percentage', 'fixed', 'slab'];
@@ -46,6 +47,7 @@ const approveDoctor = asyncHandler(async (req, res) => {
   if (revenueModel !== undefined) doctor.revenueModel = revenueModel;
   if (feeShareType !== undefined) doctor.feeShareType = feeShareType;
   if (fixedFeeShareAmount !== undefined) doctor.fixedFeeShareAmount = fixedFeeShareAmount;
+  applyFixedSplitConfiguration(doctor);
 
   const { temporaryPassword } = await provisionApprovedDoctor({ doctor, password });
 
