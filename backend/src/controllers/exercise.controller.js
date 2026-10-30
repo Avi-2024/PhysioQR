@@ -129,10 +129,11 @@ const getExercises = asyncHandler(async (req, res) => {
       return res.status(400).json({ message: 'Selected surgery is not mapped to the chosen body region' });
     }
     const programmeExercises = await exerciseIdsForSurgeryProgramme(surgery);
-    // Restrict by the existing category plus the explicit condition association.
-    // Never show generic region exercises as surgical recommendations.
-    filter.painCategory = surgery.bodyRegion;
-    filter.$and = [...(filter.$and || []), surgeryFilter(surgery._id, programmeExercises)];
+    // The condition itself establishes the body region. Do not constrain
+    // clinician-scheduled programme exercises to a single category: an approved
+    // surgery-specific day may intentionally reference a general exercise.
+    delete filter.painCategory;
+    filter.$and = [...(filter.$and || []), surgeryFilter(surgery._id, programmeExercises, surgery.bodyRegion)];
   }
   if (req.query.language) filter.language = req.query.language;
   if (req.query.status === 'active') filter.isActive = true;
