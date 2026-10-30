@@ -13,15 +13,19 @@ const resolveDirectPatientFee = async (patient) => {
   }
 
   const finance = await AppSetting.findOne({ key: 'finance' }).lean();
+  if (isWebsiteDirectPatient(patient)) {
+    // Use a separate Admin setting so existing legacy direct-patient prices
+    // are not unexpectedly changed when the website fee changes.
+    const websiteAmount = Number(finance?.value?.websiteDirectRegistrationFee);
+    if (Number.isFinite(websiteAmount) && websiteAmount > 0) {
+      return { amount: websiteAmount, source: 'website_direct_admin' };
+    }
+    return { amount: WEBSITE_DIRECT_REGISTRATION_FEE, source: 'website_direct_default' };
+  }
+
   const defaultAmount = Number(finance?.value?.directPatientDefaultFee);
   if (Number.isFinite(defaultAmount) && defaultAmount > 0) {
     return { amount: defaultAmount, source: 'admin_default' };
-  }
-
-  // Keep the previous Admin default/override priority. If neither is set,
-  // only public website registrations receive the new ₹300 default.
-  if (isWebsiteDirectPatient(patient)) {
-    return { amount: WEBSITE_DIRECT_REGISTRATION_FEE, source: 'website_direct_default' };
   }
   return { amount: 0, source: 'not_configured' };
 };
