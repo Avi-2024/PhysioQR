@@ -8,6 +8,7 @@ const { Payment } = require('../models/Payment.model');
 const Program = require('../models/Program.model');
 const { ProgramDay } = require('../models/Exercise.model');
 const asyncHandler = require('../utils/asyncHandler');
+const { PATIENT_REGISTRATION_FEE_INR } = require('../config/patientRegistrationFee');
 const { requiresClinicalProgrammeSelection } = require('../services/patientAssessmentClearance.service');
 
 // POST /api/patients/register
@@ -164,8 +165,7 @@ const getOnboardingQuote = asyncHandler(async (req, res) => {
     if (!program) return res.status(404).json({ message: 'No active rehabilitation programme is mapped to this body region' });
   }
 
-  const amount = patient.referringDoctor.approvedPatientFee || program.defaultPrice || 0;
-  if (amount <= 0) return res.status(400).json({ message: 'Program price is not configured for this doctor' });
+  const amount = PATIENT_REGISTRATION_FEE_INR;
   res.json({
     patient: { id: patient._id, patientId: patient.patientId, fullName: patient.fullName, mobile: patient.mobile, mobileVerified: patient.mobileVerified, consentAccepted: patient.consentAccepted },
     doctor: { id: patient.referringDoctor._id, doctorId: patient.referringDoctor.doctorId, fullName: patient.referringDoctor.fullName, clinicName: patient.referringDoctor.clinicName, revenueModel: patient.referringDoctor.revenueModel },
