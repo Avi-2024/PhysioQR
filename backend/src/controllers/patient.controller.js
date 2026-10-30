@@ -12,7 +12,7 @@ const { requiresClinicalProgrammeSelection } = require('../services/patientAsses
 
 // POST /api/patients/register
 const registerPatient = asyncHandler(async (req, res) => {
-  const { doctorCode, scanId, fullName, mobile, ...rest } = req.body;
+  const { doctorCode, scanId, fullName, mobile, email, age, gender, city } = req.body;
   if (!fullName || !mobile) return res.status(400).json({ message: 'fullName and mobile are required' });
 
   let referringDoctor = null;
@@ -30,7 +30,9 @@ const registerPatient = asyncHandler(async (req, res) => {
     });
   }
 
-  const patient = await Patient.create({ fullName, mobile, referringDoctor: referringDoctor?._id || null, referralSource: doctorCode ? 'qr_code' : 'direct', ...rest });
+  // Only accept registration profile fields. Client-supplied attribution, fees,
+  // payment status and referral associations must never override server values.
+  const patient = await Patient.create({ fullName, mobile, email, age, gender, city, referringDoctor: referringDoctor?._id || null, referralSource: doctorCode ? 'qr_code' : 'direct' });
   if (referringDoctor) {
     if (scanId) await QrScan.findOneAndUpdate({ _id: scanId, doctor: referringDoctor._id }, { patient: patient._id, registrationDate: new Date() });
     else await QrScan.create({ doctor: referringDoctor._id, agent: referringDoctor.agent || null, patient: patient._id, referralSource: 'qr_code', registrationDate: new Date(), ipAddress: req.ip });
