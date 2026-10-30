@@ -71,6 +71,11 @@ jobs:
           NODE_ENV: test
         run: node -e "require('./src/app')"
 
+      - name: Verify doctor QR uses canonical public URL
+        env:
+          NODE_ENV: test
+        run: npm run test:doctor-qr
+
       - name: Verify immutable doctor revenue split
         env:
           NODE_ENV: test

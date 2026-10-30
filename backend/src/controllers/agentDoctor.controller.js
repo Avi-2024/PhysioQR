@@ -12,6 +12,7 @@ const { uploadDoctorKycDocument } = require('../services/storage.service');
 const { provisionApprovedDoctor } = require('../services/doctorApproval.service');
 const { writeAuditLog } = require('../utils/auditLogger');
 const asyncHandler = require('../utils/asyncHandler');
+const { buildReferralUrl, getActiveReferralQr } = require('../services/doctorReferralQr.service');
 
 const VERIFIED_PAYMENT_STATUSES = ['successful', 'manually_verified', 'partially_refunded', 'refunded'];
 const AGENT_UPLOAD_DOCUMENT_TYPES = ['identity_proof', 'address_proof', 'medical_registration', 'profile_photo', 'other'];
@@ -54,12 +55,6 @@ const getCurrentAgent = async (req) => {
     throw error;
   }
   return agent;
-};
-
-const buildReferralUrl = (doctor) => {
-  if (!doctor?.doctorId) return null;
-  const appUrl = process.env.APP_URL || process.env.FRONTEND_URL || 'http://localhost:3000';
-  return `${appUrl.replace(/\/$/, '')}/register?doctor=${doctor.doctorId}`;
 };
 
 const pickEditableDoctorFields = (body = {}) => {
@@ -336,10 +331,11 @@ const getMyDoctorById = asyncHandler(async (req, res) => {
       .lean(),
   ]);
 
+  const qr = await getActiveReferralQr(doctor);
   res.set('Cache-Control', 'private, no-store');
   res.json({
-    doctor,
-    referralUrl: doctor.qrCodeActive ? buildReferralUrl(doctor) : null,
+    doctor: { ...doctor, qrCodeUrl: qr.qrCodeUrl },
+    referralUrl: qr.referralUrl,
     performance: { patientRegistrations: patientCount, connectedPatients: patientCount, clinicVisits },
     recentVisits,
   });
