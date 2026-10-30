@@ -31,7 +31,7 @@ describe('Agent doctor-wise operational metrics', () => {
     const table = await screen.findByRole('table');
     expect(within(table).getByRole('columnheader', { name: /clinic visits/i })).toBeTruthy();
     expect(within(table).getByRole('columnheader', { name: /referred patients/i })).toBeTruthy();
-    expect(within(table).getByText('Dr Alpha')).toBeTruthy();
+    expect(await within(table).findByText('Dr Alpha')).toBeTruthy();
     expect(within(table).getByText('9')).toBeTruthy();
     expect(within(table).getByText('4')).toBeTruthy();
     expect(within(table).getByText('Dr Beta')).toBeTruthy();
