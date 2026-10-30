@@ -1,11 +1,6 @@
-const QRCode = require('qrcode');
+const { createReferralQr } = require('./doctorReferralQr.service');
 const User = require('../models/User.model');
 const { DoctorWallet } = require('../models/Wallet.model');
-
-function buildReferralUrl(doctor) {
-  const appUrl = process.env.APP_URL || process.env.FRONTEND_URL || 'http://localhost:3000';
-  return `${appUrl.replace(/\/$/, '')}/register?doctor=${doctor.doctorId}`;
-}
 
 function createTemporaryPassword() {
   return `Doctor@${Math.floor(100000 + Math.random() * 900000)}`;
@@ -25,8 +20,8 @@ async function provisionApprovedDoctor({ doctor, password }) {
     throw error;
   }
 
-  const referralUrl = buildReferralUrl(doctor);
-  const qrCodeUrl = doctor.qrCodeUrl || await QRCode.toDataURL(referralUrl);
+  // Refresh previously saved localhost QR images when approving a doctor.
+  const { referralUrl, qrCodeUrl } = await createReferralQr(doctor);
   const generatedPassword = password || createTemporaryPassword();
   const walletAlreadyExists = Boolean(await DoctorWallet.exists({ doctor: doctor._id }));
   let loginUser = doctor.user ? await User.findById(doctor.user) : null;
