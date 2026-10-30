@@ -13,7 +13,7 @@ const { getNextSequence } = require('../services/sequence.service');
 const { activateProgrammeBundle } = require('../services/programBundle.service');
 const fraudService = require('../services/fraud.service');
 const asyncHandler = require('../utils/asyncHandler');
-const { resolveDirectPatientFee, isWebsiteDirectPatient } = require('../services/directPatientPricing.service');
+const { resolveDirectPatientFee } = require('../services/directPatientPricing.service');
 const { requiresClinicalProgrammeSelection } = require('../services/patientAssessmentClearance.service');
 
 let razorpayClient;
@@ -48,11 +48,6 @@ const verifyWebhookSignature = ({ rawBody, signature }) => {
 };
 
 const resolveDirectPricing = async ({ patient, programIds, couponCode }) => {
-  // Direct website registration is a fixed ₹300 charge. Coupons must not
-  // silently reduce its checkout total; other direct cohorts stay unchanged.
-  if (isWebsiteDirectPatient(patient) && couponCode) {
-    throw paymentError('Coupons cannot be applied to the fixed ₹300 website registration fee.', 400);
-  }
   const resolvedFee = await resolveDirectPatientFee(patient);
   const originalAmount = resolvedFee.amount;
   if (originalAmount <= 0) throw paymentError('Admin has not configured a default direct-patient fee or patient-specific fee yet.', 409);
@@ -79,7 +74,7 @@ const resolveDirectPricing = async ({ patient, programIds, couponCode }) => {
       programs: programIds,
       purchaseMode: 'direct',
       revenueModel: 'platform_direct',
-      feeAuthority: resolvedFee.source === 'website_direct_fixed' ? 'platform' : 'admin',
+      feeAuthority: 'admin',
       adminPatientFee: originalAmount,
       directFeeSource: resolvedFee.source,
       doctorFeeShare: 0,
