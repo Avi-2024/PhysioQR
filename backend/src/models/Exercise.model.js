@@ -33,10 +33,14 @@ const exerciseSchema = new mongoose.Schema({
   safetyInstructions: String,
   commonMistakes: String,
   painCategory: { type: mongoose.Schema.Types.ObjectId, ref: 'PainCategory' },
+  // Explicit condition suitability; never inferred from a body region alone.
+  surgeryTypes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'SurgeryType' }],
   language: { type: String, enum: ['en', 'hi'], default: 'en' },
   displayOrder: { type: Number, default: 0 },
   isActive: { type: Boolean, default: true },
 }, { timestamps: true });
+
+exerciseSchema.index({ surgeryTypes: 1, isActive: 1 });
 
 // One day in a program — contains a list of exercises
 const programDaySchema = new mongoose.Schema({
