@@ -7,6 +7,7 @@ const ClinicVisit = require('../models/ClinicVisit.model');
 const Patient = require('../models/Patient.model');
 const { Payment } = require('../models/Payment.model');
 const { getPatientCountsByDoctor } = require('../services/agentPatientCounts.service');
+const { getClinicVisitCountsByDoctor } = require('../services/agentDoctorVisits.service');
 const { uploadDoctorKycDocument } = require('../services/storage.service');
 const { provisionApprovedDoctor } = require('../services/doctorApproval.service');
 const { writeAuditLog } = require('../utils/auditLogger');
@@ -23,27 +24,27 @@ const AGENT_EDITABLE_DOCTOR_FIELDS = [
   'clinicName',
   'city',
   'preferredProgram',
-  'revenueModel',
-  'requestedPatientFee',
-  'requestedFeeShareType',
-  'requestedFeeSharePercentage',
-  'requestedFixedFeeShareAmount',
 ];
 const REVENUE_MODELS = ['split', 'platform_fee'];
 const REQUESTED_FEE_SHARE_TYPES = ['percentage', 'fixed'];
 
 const AGENT_DOCTOR_LIST_FIELDS = [
   'doctorId','fullName','mobile','qualification','specialization','medicalRegNumber',
-  'clinicName','city','preferredProgram','revenueModel','registrationDate','approvalDate',
+  'clinicName','city','preferredProgram','registrationDate','approvalDate',
   'status','rejectionReason','suspensionReason','referralCode','qrCodeActive','kycStatus','createdAt','updatedAt',
 ].join(' ');
 
 const AGENT_DOCTOR_DETAIL_FIELDS = [
   AGENT_DOCTOR_LIST_FIELDS,
   'qrCodeUrl',
-  'requestedPatientFee','requestedFeeShareType','requestedFeeSharePercentage','requestedFixedFeeShareAmount',
-  'approvedPatientFee','feeShareType','feeSharePercentage','fixedFeeShareAmount',
 ].join(' ');
+
+const COMMERCIAL_FIELD_NAMES = [
+  'revenueModel', 'requestedPatientFee', 'requestedFeeShareType',
+  'requestedFeeSharePercentage', 'requestedFixedFeeShareAmount',
+  'approvedPatientFee', 'feeShareType', 'feeSharePercentage',
+  'fixedFeeShareAmount', 'feeShareCalculationBasis',
+];
 
 const getCurrentAgent = async (req) => {
   const agent = await Agent.findOne({ user: req.user._id }).select('_id status');
@@ -301,10 +302,16 @@ const getMyDoctors = asyncHandler(async (req, res) => {
     .populate('preferredProgram', 'programCode name durationDays')
     .sort({ createdAt: -1 })
     .lean();
-  const counts = await getPatientCountsByDoctor(doctors.map((doctor) => doctor._id));
+  const doctorIds = doctors.map((doctor) => doctor._id);
+  const [patientCounts, visitCounts] = await Promise.all([
+    getPatientCountsByDoctor(doctorIds),
+    getClinicVisitCountsByDoctor({ agentId: agent._id, doctorIds }),
+  ]);
+  res.set('Cache-Control', 'private, no-store');
   res.json(doctors.map((doctor) => ({
     ...doctor,
-    connectedPatients: counts.get(String(doctor._id)) || 0,
+    connectedPatients: patientCounts.get(String(doctor._id)) || 0,
+    clinicVisits: visitCounts.get(String(doctor._id)) || 0,
   })));
 });
 
@@ -319,8 +326,9 @@ const getMyDoctorById = asyncHandler(async (req, res) => {
 
   if (!doctor) return res.status(404).json({ message: 'Doctor not found' });
 
-  const [patientCount, recentVisits] = await Promise.all([
+  const [patientCount, clinicVisits, recentVisits] = await Promise.all([
     Patient.countDocuments({ referringDoctor: doctor._id }),
+    ClinicVisit.countDocuments({ agent: agent._id, doctor: doctor._id }),
     ClinicVisit.find({ agent: agent._id, doctor: doctor._id })
       .select('visitDate visitTime clinicName clinicLocation outcome doctorInterestLevel followUpDate followUpStatus nextAction')
       .sort({ visitDate: -1, createdAt: -1 })
@@ -328,10 +336,11 @@ const getMyDoctorById = asyncHandler(async (req, res) => {
       .lean(),
   ]);
 
+  res.set('Cache-Control', 'private, no-store');
   res.json({
     doctor,
     referralUrl: doctor.qrCodeActive ? buildReferralUrl(doctor) : null,
-    performance: { patientRegistrations: patientCount, connectedPatients: patientCount },
+    performance: { patientRegistrations: patientCount, connectedPatients: patientCount, clinicVisits },
     recentVisits,
   });
 });
@@ -344,6 +353,12 @@ const updateMyDoctor = asyncHandler(async (req, res) => {
   const doctor = await Doctor.findOne({ _id: req.params.doctorId, agent: agent._id });
   if (!doctor) return res.status(404).json({ message: 'Doctor not found' });
 
+  if (COMMERCIAL_FIELD_NAMES.some((field) => Object.prototype.hasOwnProperty.call(req.body || {}, field))) {
+    return res.status(403).json({
+      code: 'AGENT_COMMERCIAL_UPDATE_FORBIDDEN',
+      message: 'Patient pricing and commission changes are managed by Admin after doctor registration',
+    });
+  }
   const updates = normalizeDoctorUpdates(pickEditableDoctorFields(req.body));
   if (!Object.keys(updates).length) return res.status(400).json({ message: 'No editable doctor fields were provided' });
 
