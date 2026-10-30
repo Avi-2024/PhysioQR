@@ -29,6 +29,7 @@
     "seed:clinical-content": "npm run seed:assessment-pathways && npm run seed:assessment-questions && npm run seed:rehab-programs",
     "reset:all-except-admin": "node scripts/resetAllExceptAdmin.js",
     "test:integration": "node scripts/integrationSmoke.js",
+    "test:revenue-split": "node --test tests/splitModel50.test.js",
     "test:assessment-visibility": "node --test tests/assessmentVisibility.test.js",
     "test:patient-auto-clearance": "node --test tests/patientAssessmentClearance.test.js tests/assessmentFlagSeverity.test.js",
     "test:assessment-questions": "node --test tests/patientAssessmentQuestions.test.js",

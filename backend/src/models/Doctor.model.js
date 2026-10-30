@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { normalizeRevenueConfiguration } = require('../utils/splitModel');
 
 const kycDocumentSchema = new mongoose.Schema({
   documentType: {
@@ -116,6 +117,12 @@ const doctorSchema = new mongoose.Schema({
   upiId: String,
   bankVerified: { type: Boolean, default: false },
 }, { timestamps: true });
+
+// Ensure that every saved Split Model doctor has canonical 50:50 terms.
+doctorSchema.pre('validate', function (next) {
+  normalizeRevenueConfiguration(this);
+  next();
+});
 
 // Auto-generate doctorId like DR00001 before saving
 doctorSchema.pre('save', async function (next) {

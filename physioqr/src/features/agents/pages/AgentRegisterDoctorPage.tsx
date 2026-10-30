@@ -7,11 +7,6 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, CheckCircle, Copy, Stethoscope } from 'lucide-react';
 import apiClient from '@/lib/api-client';
 
-const optionalNumber = (min: number, max: number) => z.preprocess(
-  (value) => value === '' || value === undefined || value === null ? undefined : Number(value),
-  z.number().min(min).max(max).optional(),
-);
-
 const schema = z.object({
   fullName: z.string().min(2, 'Enter doctor full name'),
   mobile: z.string().regex(/^[6-9]\d{9}$/, 'Enter valid 10-digit mobile number'),
@@ -23,27 +18,6 @@ const schema = z.object({
   preferredProgram: z.string().min(1, 'Select a rehab program'),
   revenueModel: z.enum(['split', 'platform_fee']),
   requestedPatientFee: z.coerce.number().min(1, 'Enter the patient price').max(100000, 'Price is too high'),
-  requestedFeeShareType: z.enum(['percentage', 'fixed']).optional(),
-  requestedFeeSharePercentage: optionalNumber(0, 100),
-  requestedFixedFeeShareAmount: optionalNumber(0, 100000),
-}).superRefine((data, ctx) => {
-  if (data.revenueModel !== 'split') return;
-
-  if (!data.requestedFeeShareType) {
-    ctx.addIssue({ code: 'custom', path: ['requestedFeeShareType'], message: 'Select doctor commission type' });
-    return;
-  }
-
-  if (data.requestedFeeShareType === 'percentage' && data.requestedFeeSharePercentage === undefined) {
-    ctx.addIssue({ code: 'custom', path: ['requestedFeeSharePercentage'], message: 'Enter commission percentage' });
-  }
-  if (data.requestedFeeShareType === 'fixed') {
-    if (data.requestedFixedFeeShareAmount === undefined) {
-      ctx.addIssue({ code: 'custom', path: ['requestedFixedFeeShareAmount'], message: 'Enter fixed commission' });
-    } else if (data.requestedFixedFeeShareAmount > data.requestedPatientFee) {
-      ctx.addIssue({ code: 'custom', path: ['requestedFixedFeeShareAmount'], message: 'Commission cannot exceed patient price' });
-    }
-  }
 });
 
 type FormData = z.infer<typeof schema>;
@@ -82,12 +56,10 @@ export default function AgentRegisterDoctorPage() {
     defaultValues: {
       revenueModel: 'split',
       preferredProgram: '',
-      requestedFeeShareType: 'percentage',
     },
   });
 
   const revenueModel = watch('revenueModel');
-  const commissionType = watch('requestedFeeShareType');
   const mutation = useMutation({
     mutationFn: async (data: FormData) => apiClient.post('/doctors', clean(data)),
     onSuccess: async (response) => {
@@ -192,23 +164,9 @@ export default function AgentRegisterDoctorPage() {
           </Field>
 
           {revenueModel === 'split' && (
-            <>
-              <Field label="Doctor Commission Type" required error={errors.requestedFeeShareType?.message}>
-                <select {...register('requestedFeeShareType')} className={inputClass}>
-                  <option value="percentage">Percentage (%)</option>
-                  <option value="fixed">Fixed Amount (₹)</option>
-                </select>
-              </Field>
-              {commissionType === 'fixed' ? (
-                <Field label="Doctor Commission (₹)" required error={errors.requestedFixedFeeShareAmount?.message}>
-                  <input {...register('requestedFixedFeeShareAmount')} type="number" min="0" max="100000" step="1" className={inputClass} placeholder="e.g. 500" />
-                </Field>
-              ) : (
-                <Field label="Doctor Commission (%)" required error={errors.requestedFeeSharePercentage?.message}>
-                  <input {...register('requestedFeeSharePercentage')} type="number" min="0" max="100" step="0.01" className={inputClass} placeholder="e.g. 60" />
-                </Field>
-              )}
-            </>
+            <div className="sm:col-span-2 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+              <strong>Fixed 50:50 Split:</strong> Doctor receives 50% and PhysioQR receives 50% of each verified patient payment. This share cannot be changed.
+            </div>
           )}
         </div>
 
@@ -230,14 +188,9 @@ function Field({ label, error, required, children }: { label: string; error?: st
 function Info({ label, value }: { label: string; value: string }) { return <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3"><div className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{label}</div><div className="mt-1 text-sm font-semibold text-neutral-900">{value}</div></div>; }
 function clean(data: FormData) {
   const payload = { ...data } as Record<string, unknown>;
-  if (data.revenueModel === 'platform_fee') {
-    delete payload.requestedFeeShareType;
-    delete payload.requestedFeeSharePercentage;
-    delete payload.requestedFixedFeeShareAmount;
-  } else if (data.requestedFeeShareType === 'percentage') {
-    delete payload.requestedFixedFeeShareAmount;
-  } else if (data.requestedFeeShareType === 'fixed') {
-    delete payload.requestedFeeSharePercentage;
+  if (data.revenueModel === 'split') {
+    payload.requestedFeeShareType = 'percentage';
+    payload.requestedFeeSharePercentage = 50;
   }
   return Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== '' && value !== undefined && value !== null));
 }

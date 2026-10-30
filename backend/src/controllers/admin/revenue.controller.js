@@ -5,6 +5,7 @@ const Refund = require('../../models/Refund.model');
 const { writeAuditLog } = require('../../utils/auditLogger');
 const { buildSearchFilter, getPagination } = require('../../utils/queryHelpers');
 const asyncHandler = require('../../utils/asyncHandler');
+const { assertSplitTerms, normalizeRevenueConfiguration } = require('../../utils/splitModel');
 
 const VERIFIED_PAYMENT_STATUSES = ['successful', 'manually_verified'];
 const HISTORICALLY_VERIFIED_STATUSES = ['refunded', 'partially_refunded', 'disputed', 'chargeback'];
@@ -37,9 +38,14 @@ const updateRevenueModel = asyncHandler(async (req, res) => {
   const previousValue = Object.fromEntries(allowed.map((key) => [key, doctor[key]]));
   const updates = {};
   for (const key of allowed) if (req.body[key] !== undefined) updates[key] = req.body[key];
+  const effectiveModel = updates.revenueModel ?? doctor.revenueModel ?? 'split';
+  if (effectiveModel === 'split') {
+    try { assertSplitTerms(req.body); } catch (error) { return res.status(400).json({ message: error.message }); }
+  }
   Object.assign(doctor, updates);
+  normalizeRevenueConfiguration(doctor);
   await doctor.save();
-  await writeAuditLog({ req, action: 'doctor_revenue_model_updated', module: 'Doctor', recordId: doctor._id, previousValue, newValue: updates, reason: req.body.reason });
+  await writeAuditLog({ req, action: 'doctor_revenue_model_updated', module: 'Doctor', recordId: doctor._id, previousValue, newValue: Object.fromEntries(allowed.map((key) => [key, doctor[key]])), reason: req.body.reason });
   res.json({ message: 'Revenue model updated', doctor });
 });
 

@@ -2,9 +2,9 @@ const Doctor = require('../../models/Doctor.model');
 const { provisionApprovedDoctor } = require('../../services/doctorApproval.service');
 const { writeAuditLog } = require('../../utils/auditLogger');
 const asyncHandler = require('../../utils/asyncHandler');
+const { assertSplitTerms, normalizeRevenueConfiguration } = require('../../utils/splitModel');
 
 const REVENUE_MODELS = ['split', 'platform_fee'];
-const FEE_SHARE_TYPES = ['percentage', 'fixed', 'slab'];
 
 // POST /api/doctors/:id/approve
 // Admin remains the authority for detailed pricing and fee-share configuration.
@@ -26,8 +26,9 @@ const approveDoctor = asyncHandler(async (req, res) => {
   if (revenueModel !== undefined && !REVENUE_MODELS.includes(revenueModel)) {
     return res.status(400).json({ message: 'Payment model must be split or platform_fee' });
   }
-  if (feeShareType !== undefined && !FEE_SHARE_TYPES.includes(feeShareType)) {
-    return res.status(400).json({ message: 'Fee share type must be percentage, fixed, or slab' });
+  const effectiveModel = revenueModel ?? doctor.revenueModel ?? 'split';
+  if (effectiveModel === 'split') {
+    try { assertSplitTerms(req.body); } catch (error) { return res.status(400).json({ message: error.message }); }
   }
 
   const previousValue = {
@@ -46,6 +47,7 @@ const approveDoctor = asyncHandler(async (req, res) => {
   if (revenueModel !== undefined) doctor.revenueModel = revenueModel;
   if (feeShareType !== undefined) doctor.feeShareType = feeShareType;
   if (fixedFeeShareAmount !== undefined) doctor.fixedFeeShareAmount = fixedFeeShareAmount;
+  normalizeRevenueConfiguration(doctor);
 
   const { temporaryPassword } = await provisionApprovedDoctor({ doctor, password });
 
