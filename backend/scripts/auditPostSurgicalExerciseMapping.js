@@ -20,8 +20,8 @@ async function run() {
       if (!surgery.bodyRegion?.isActive) continue;
       const compatibleSurgery = { ...surgery, bodyRegion: surgery.bodyRegion._id };
       const existingProgrammeIds = await exerciseIdsForSurgeryProgramme(compatibleSurgery);
-      const mappedQuery = { isActive: true, painCategory: surgery.bodyRegion._id,
-        ...surgeryFilter(surgery._id, existingProgrammeIds) };
+      const mappedQuery = { isActive: true,
+        ...surgeryFilter(surgery._id, existingProgrammeIds, surgery.bodyRegion._id) };
       const [mappedCount, taggedCount, inProgrammeCount] = await Promise.all([
         Exercise.countDocuments(mappedQuery),
         Exercise.countDocuments({ isActive: true, painCategory: surgery.bodyRegion._id, surgeryTypes: surgery._id }),
