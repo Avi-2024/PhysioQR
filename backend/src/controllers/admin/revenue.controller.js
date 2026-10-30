@@ -44,7 +44,8 @@ const updateRevenueModel = asyncHandler(async (req, res) => {
   Object.assign(doctor, updates);
   applyFixedSplitConfiguration(doctor);
   await doctor.save();
-  await writeAuditLog({ req, action: 'doctor_revenue_model_updated', module: 'Doctor', recordId: doctor._id, previousValue, newValue: updates, reason: req.body.reason });
+  const appliedUpdates = Object.fromEntries(Object.keys(updates).map((key) => [key, doctor[key]]));
+  await writeAuditLog({ req, action: 'doctor_revenue_model_updated', module: 'Doctor', recordId: doctor._id, previousValue, newValue: appliedUpdates, reason: req.body.reason });
   res.json({ message: 'Revenue model updated', doctor });
 });
 
