@@ -76,6 +76,11 @@ jobs:
           NODE_ENV: test
         run: npm run test:revenue-split
 
+      - name: Test optional patient medical document upload and access
+        env:
+          NODE_ENV: test
+        run: npm run test:assessment-documents
+
       - name: Run direct-patient pricing regression tests
         env:
           NODE_ENV: test
