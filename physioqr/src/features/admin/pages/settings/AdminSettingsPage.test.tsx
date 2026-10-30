@@ -13,7 +13,8 @@ const settingsResponse = {
   settings: {
     platform: { supportEmail: '', supportPhone: '', maintenanceMode: false },
     patient: { assessmentRequired: true, redFlagReviewRequired: true },
-    finance: { currency: 'INR', directPatientDefaultFee: 0, websiteDirectRegistrationFee: 300, paymentsEnabled: true, refundsEnabled: true, withdrawalsEnabled: true },
+    // Legacy price stays in the backend state but must never appear in the Admin UI.
+    finance: { currency: 'INR', directPatientDefaultFee: 850, websiteDirectRegistrationFee: 300, paymentsEnabled: true, refundsEnabled: true, withdrawalsEnabled: true },
     notifications: { inAppEnabled: true, webPushEnabled: true, emailEnabled: true, smsEnabled: true, whatsappEnabled: true },
   },
   metadata: {},
@@ -34,44 +35,46 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe('Finance direct-patient fee input', () => {
-  it('allows replacing a zero value without a number spinner and saves the numeric amount', async () => {
+describe('Admin Finance — website registration fee only', () => {
+  it('shows only the ₹300 website fee and keeps the old direct-patient fee hidden', async () => {
     mount();
-    const input = await screen.findByRole('textbox', { name: /default fee for patients without a referring doctor/i }) as HTMLInputElement;
-
+    const input = await screen.findByRole('textbox', { name: /website-direct registration fee/i }) as HTMLInputElement;
+    expect(input.value).toBe('300');
     expect(input.type).toBe('text');
     expect(input.inputMode).toBe('decimal');
-    expect(input.value).toBe('0');
+    expect(screen.queryByRole('textbox', { name: /default fee for patients without a referring doctor/i })).toBeNull();
+  });
 
-    fireEvent.change(input, { target: { value: '' } });
-    expect(input.value).toBe('');
-
-    fireEvent.change(input, { target: { value: '500' } });
-    expect(input.value).toBe('500');
-
+  it('saves the Admin-edited website fee without sending or overwriting the legacy fee', async () => {
+    mount();
+    const input = await screen.findByRole('textbox', { name: /website-direct registration fee/i }) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: '650' } });
     fireEvent.click(screen.getAllByRole('button', { name: /save section/i })[2]);
     await waitFor(() => expect(apiClient.patch).toHaveBeenCalledWith(
       '/admin/settings/finance',
-      expect.objectContaining({ directPatientDefaultFee: 500 }),
+      expect.objectContaining({ websiteDirectRegistrationFee: 650, paymentsEnabled: true, refundsEnabled: true, withdrawalsEnabled: true }),
     ));
+    const [, payload] = vi.mocked(apiClient.patch).mock.calls.find(([url]) => url === '/admin/settings/finance')!;
+    expect(payload).not.toHaveProperty('directPatientDefaultFee');
   });
 
-  it('does not replace an empty amount with zero or submit an unintentional fee', async () => {
+  it('rejects zero/blank website fee without submitting Finance settings', async () => {
     mount();
-    const input = await screen.findByRole('textbox', { name: /default fee for patients without a referring doctor/i }) as HTMLInputElement;
+    const input = await screen.findByRole('textbox', { name: /website-direct registration fee/i }) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: '0' } });
+    fireEvent.click(screen.getAllByRole('button', { name: /save section/i })[2]);
+    expect((await screen.findByRole('alert')).textContent).toMatch(/website registration fee/i);
+    expect(apiClient.patch).not.toHaveBeenCalled();
 
     fireEvent.change(input, { target: { value: '' } });
-    expect(input.value).toBe('');
     fireEvent.click(screen.getAllByRole('button', { name: /save section/i })[2]);
     expect(input.value).toBe('');
-    expect((await screen.findByRole('alert')).textContent).toMatch(/enter an amount/i);
     expect(apiClient.patch).not.toHaveBeenCalled();
   });
 
-  it('rejects non-numeric characters and more than two decimal places', async () => {
+  it('refuses non-numeric characters and more than two decimal places', async () => {
     mount();
-    const input = await screen.findByRole('textbox', { name: /default fee for patients without a referring doctor/i }) as HTMLInputElement;
-
+    const input = await screen.findByRole('textbox', { name: /website-direct registration fee/i }) as HTMLInputElement;
     fireEvent.change(input, { target: { value: '499.50' } });
     expect(input.value).toBe('499.50');
     fireEvent.change(input, { target: { value: '499.501' } });
@@ -79,27 +82,13 @@ describe('Finance direct-patient fee input', () => {
     fireEvent.change(input, { target: { value: '499e2' } });
     expect(input.value).toBe('499.50');
   });
-});
 
-describe('Website-direct Admin fee input', () => {
-  it('starts at ₹300 and saves a different website fee without changing legacy direct pricing', async () => {
+  it('loads an existing website fee set by Admin instead of assuming ₹300', async () => {
+    vi.mocked(apiClient.get).mockResolvedValueOnce({
+      data: { ...settingsResponse, settings: { ...settingsResponse.settings, finance: { ...settingsResponse.settings.finance, websiteDirectRegistrationFee: 725 } } },
+    } as never);
     mount();
     const input = await screen.findByRole('textbox', { name: /website-direct registration fee/i }) as HTMLInputElement;
-    expect(input.value).toBe('300');
-    fireEvent.change(input, { target: { value: '650' } });
-    fireEvent.click(screen.getAllByRole('button', { name: /save section/i })[2]);
-    await waitFor(() => expect(apiClient.patch).toHaveBeenCalledWith(
-      '/admin/settings/finance',
-      expect.objectContaining({ websiteDirectRegistrationFee: 650, directPatientDefaultFee: 0 }),
-    ));
-  });
-
-  it('rejects a zero website fee while preserving legacy zero behavior', async () => {
-    mount();
-    const input = await screen.findByRole('textbox', { name: /website-direct registration fee/i }) as HTMLInputElement;
-    fireEvent.change(input, { target: { value: '0' } });
-    fireEvent.click(screen.getAllByRole('button', { name: /save section/i })[2]);
-    expect((await screen.findByRole('alert')).textContent).toMatch(/website registration fee/i);
-    expect(apiClient.patch).not.toHaveBeenCalled();
+    expect(input.value).toBe('725');
   });
 });
