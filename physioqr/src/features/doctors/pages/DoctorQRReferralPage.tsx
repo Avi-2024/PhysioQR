@@ -128,8 +128,9 @@ export default function DoctorQRReferralPage() {
   const mobile = text(profile.clinicContact) || text(profile.mobile);
   // The backend referral URL and generated QR must point to the same registration destination.
   const referralLink = text(qr.referralUrl);
-  const qrCodeUrl = text(qr.qrCodeUrl) || text(profile.qrCodeUrl) ||
-    (referralLink ? `https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=${encodeURIComponent(referralLink)}` : '');
+  // Use the QR returned with the current backend referral URL. Saved legacy
+  // images in the profile could encode localhost, so never fall back to them.
+  const qrCodeUrl = text(qr.qrCodeUrl);
   const qrDisabled = profile.qrCodeActive === false;
   const isLoading = profileQuery.isLoading || qrQuery.isLoading;
   const canUseQr = Boolean(doctorId && referralLink && qrCodeUrl && qrImageReady && !qrImageFailed && !qrDisabled);
