@@ -6,7 +6,7 @@ const Module = require('node:module');
 const PATIENT_ID = '507f1f77bcf86cd799439011';
 const PROGRAM_ID = '507f1f77bcf86cd799439012';
 const REGION_ID = '507f1f77bcf86cd799439013';
-let patient, savedOrder, gatewayDefaultReads;
+let patient, savedOrder, gatewayDefaultReads, configuredAmount;
 
 const mockModels = {
   '../models/Patient.model': { findById: async () => patient },
@@ -28,13 +28,13 @@ const mockModels = {
     Payment: {},
   },
   '../models/Coupon.model': {
-    findOne: async () => { throw new Error('Unexpected coupon lookup'); },
+    findOne: async ({ couponCode }) => couponCode === 'SAVE50' ? { couponCode, usedCount: 0, usageLimit: 10, isActive: true, discountType: 'fixed', discountValue: 50 } : null,
   },
   '../models/AppSetting.model': {
     findOne: () => ({
       lean: async () => {
         gatewayDefaultReads++;
-        return { value: { directPatientDefaultFee: 1800 } };
+        return { value: { directPatientDefaultFee: configuredAmount } };
       },
     }),
   },
@@ -76,12 +76,13 @@ const request = (body = {}) => {
 test.beforeEach(() => {
   process.env.NODE_ENV = 'test';
   process.env.PAYMENT_GATEWAY_MODE = 'mock';
-  patient = { _id: PATIENT_ID, mobileVerified: true, consentAccepted: true, referralSource: 'direct', referringDoctor: null, directPatientFee: 5000 };
+  patient = { _id: PATIENT_ID, mobileVerified: true, consentAccepted: true, referralSource: 'direct', referringDoctor: null, directPatientFee: undefined };
+  configuredAmount = 0;
   savedOrder = null;
   gatewayDefaultReads = 0;
 });
 
-test('homepage direct payment charges exactly ₹300 (30000 paise) even with legacy Admin overrides', async () => {
+test('homepage direct payment defaults to ₹300 (30000 paise) when Admin fee is unset', async () => {
   const { req, res, outcome } = request();
   await createDirectOrder(req, res);
   assert.equal(outcome().status, 200);
@@ -90,17 +91,42 @@ test('homepage direct payment charges exactly ₹300 (30000 paise) even with leg
   assert.equal(savedOrder.originalAmount, 300);
   assert.equal(savedOrder.discountAmount, 0);
   assert.equal(savedOrder.finalAmount, 300);
-  assert.equal(savedOrder.pricingSnapshot.directFeeSource, 'website_direct_fixed');
-  assert.equal(savedOrder.pricingSnapshot.feeAuthority, 'platform');
+  assert.equal(savedOrder.pricingSnapshot.directFeeSource, 'website_direct_default');
+  assert.equal(savedOrder.pricingSnapshot.feeAuthority, 'admin');
   assert.equal(savedOrder.pricingSnapshot.doctorFeeShare, 0);
+  assert.equal(gatewayDefaultReads, 1);
+});
+
+test('Admin Finance setting changes website-direct Razorpay amount', async () => {
+  configuredAmount = 750;
+  const { req, res, outcome } = request();
+  await createDirectOrder(req, res);
+  assert.equal(outcome().status, 200);
+  assert.equal(outcome().result.amount, 75000);
+  assert.equal(savedOrder.finalAmount, 750);
+  assert.equal(savedOrder.pricingSnapshot.directFeeSource, 'admin_default');
+});
+
+test('Admin patient-specific override remains effective before payment', async () => {
+  configuredAmount = 750;
+  patient.directPatientFee = 950;
+  const { req, res, outcome } = request();
+  await createDirectOrder(req, res);
+  assert.equal(outcome().status, 200);
+  assert.equal(outcome().result.amount, 95000);
+  assert.equal(savedOrder.pricingSnapshot.directFeeSource, 'patient_override');
   assert.equal(gatewayDefaultReads, 0);
 });
 
-test('website direct checkout cannot silently discount fixed ₹300 with a coupon', async () => {
-  const { req, res } = request({ couponCode: 'DISCOUNT50' });
-  await assert.rejects(() => createDirectOrder(req, res),
-    (err) => err.status === 400 && /fixed ₹300/.test(err.message));
-  assert.equal(savedOrder, null);
+test('existing coupon logic remains active for a website-direct payment', async () => {
+  const { req, res, outcome } = request({ couponCode: 'SAVE50' });
+  await createDirectOrder(req, res);
+  assert.equal(outcome().status, 200);
+  assert.equal(outcome().result.originalAmount, 300);
+  assert.equal(outcome().result.discountAmount, 50);
+  assert.equal(outcome().result.finalAmount, 250);
+  assert.equal(outcome().result.amount, 25000);
+  assert.equal(savedOrder.pricingSnapshot.couponCode, 'SAVE50');
 });
 
 test('doctor-referred patients cannot enter direct payment endpoint', async () => {
@@ -114,6 +140,7 @@ test('doctor-referred patients cannot enter direct payment endpoint', async () =
 test('other non-website direct patients still use configured Admin default', async () => {
   patient.referralSource = 'legacy_direct';
   patient.directPatientFee = undefined;
+  configuredAmount = 1800;
   const { req, res, outcome } = request();
   await createDirectOrder(req, res);
   assert.equal(outcome().status, 200);
