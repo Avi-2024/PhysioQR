@@ -11,7 +11,7 @@ const QrScan = require('../models/QrScan.model');
 const { DoctorWallet, WalletTransaction } = require('../models/Wallet.model');
 const { FeeShare } = require('../models/FeeShare.model');
 const { calculateFeeShare } = require('../utils/feeCalculator');
-const { SPLIT_DOCTOR_PERCENTAGE } = require('../utils/splitModel');
+const { SPLIT_DOCTOR_PERCENTAGE, isWebsiteDirectDoctor } = require('../utils/splitModel');
 const { generateInvoiceNumber } = require('../utils/idGenerator');
 const { writeAuditLog } = require('../utils/auditLogger');
 const { getNextSequence } = require('../services/sequence.service');
@@ -85,11 +85,12 @@ const resolveOrderPricing = async ({ doctor, programId, couponCode }) => {
       doctor: doctor._id,
       revenueModel: doctor.revenueModel || 'split',
       approvedPatientFee: doctor.approvedPatientFee,
-      feeShareType: 'percentage',
-      feeSharePercentage: (doctor.revenueModel || 'split') === 'split' ? SPLIT_DOCTOR_PERCENTAGE : 0,
-      fixedFeeShareAmount: 0,
-      feeShareSlabs: [],
-      feeShareCalculationBasis: 'gross',
+      registrationSource: doctor.registrationSource || null,
+      feeShareType: isWebsiteDirectDoctor(doctor) ? 'percentage' : (doctor.feeShareType || 'percentage'),
+      feeSharePercentage: isWebsiteDirectDoctor(doctor) ? SPLIT_DOCTOR_PERCENTAGE : (doctor.feeSharePercentage ?? 0),
+      fixedFeeShareAmount: isWebsiteDirectDoctor(doctor) ? 0 : (doctor.fixedFeeShareAmount || 0),
+      feeShareSlabs: isWebsiteDirectDoctor(doctor) ? [] : (doctor.feeShareSlabs || []),
+      feeShareCalculationBasis: isWebsiteDirectDoctor(doctor) ? 'gross' : (doctor.feeShareCalculationBasis || 'gross'),
       feeShareHoldingDays: doctor.feeShareHoldingDays || 15,
       couponCode: appliedCoupon?.couponCode || null,
     },
@@ -113,14 +114,17 @@ const assertNoActiveProgramPurchase = async ({ patientId, programId }) => {
 
 const createFeeShareAndWalletEntries = async ({ order, payment, doctor, session }) => {
   const pricing = order.pricingSnapshot || {};
-  const revenueModel = pricing.revenueModel || doctor.revenueModel || 'split';
-  // Treat previously-created order snapshots as historical metadata, not as
-  // authorization to override the permanent Split Model contract.
-  const feeShareType = 'percentage';
-  const percentage = revenueModel === 'split' ? SPLIT_DOCTOR_PERCENTAGE : 0;
-  const fixedAmount = 0;
-  const slabs = [];
-  const basis = 'gross';
+  const revenueModel = isWebsiteDirectDoctor(doctor) || pricing.registrationSource === 'website_direct'
+    ? 'split' : (pricing.revenueModel || doctor.revenueModel || 'split');
+  // Direct-website agreements remain fixed at 50:50 at settlement, even
+  // when an outdated/unsettled order snapshot contains other terms.
+  // All other doctors use the original contract recorded with the order.
+  const direct = isWebsiteDirectDoctor(doctor) || pricing.registrationSource === 'website_direct';
+  const feeShareType = direct ? 'percentage' : (pricing.feeShareType || doctor.feeShareType || 'percentage');
+  const percentage = direct ? SPLIT_DOCTOR_PERCENTAGE : (pricing.feeSharePercentage ?? doctor.feeSharePercentage ?? 0);
+  const fixedAmount = direct ? 0 : (pricing.fixedFeeShareAmount ?? doctor.fixedFeeShareAmount ?? 0);
+  const slabs = direct ? [] : (Array.isArray(pricing.feeShareSlabs) ? pricing.feeShareSlabs : (doctor.feeShareSlabs || []));
+  const basis = direct ? 'gross' : (pricing.feeShareCalculationBasis || doctor.feeShareCalculationBasis || 'gross');
   const holdingDays = pricing.feeShareHoldingDays ?? doctor.feeShareHoldingDays ?? 15;
 
   const totalPaidPatients = await Payment.countDocuments({ doctor: doctor._id, verifiedAt: { $ne: null } }).session(session);
