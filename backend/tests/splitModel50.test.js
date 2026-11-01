@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { calculateFeeShare } = require('../src/utils/feeCalculator');
-const { SPLIT_DOCTOR_PERCENTAGE, isWebsiteDirectDoctor, assertSplitTerms, normalizeRevenueConfiguration } = require('../src/utils/splitModel');
+const { SPLIT_DOCTOR_PERCENTAGE, isWebsiteDirectDoctor, assertSplitTerms, normalizeRevenueConfiguration, resolveSettlementTerms } = require('../src/utils/splitModel');
 const Doctor = require('../src/models/Doctor.model');
 
 test('only independently website-registered doctors have an immutable 50:50 agreement', () => {
@@ -64,4 +64,27 @@ test('a website-direct doctor is always normalized to split 50:50 even if commer
   assert.equal(cfg.revenueModel,'split');
   assert.equal(cfg.feeSharePercentage,50);
   assert.equal(cfg.feeShareType,'percentage');
+});
+
+test('direct website payment ignores stale non-50 order snapshots when settling', () => {
+  const doctor = {registrationSource:'website_direct',revenueModel:'split',feeSharePercentage:50};
+  const terms=resolveSettlementTerms(doctor,{revenueModel:'platform_fee',feeShareType:'fixed',fixedFeeShareAmount:1900,feeSharePercentage:90,feeShareCalculationBasis:'net_after_charges'});
+  assert.deepEqual(terms,{revenueModel:'split',feeShareType:'percentage',percentage:50,fixedAmount:0,slabs:[],basis:'gross'});
+  assert.deepEqual(calculateFeeShare({paidAmount:2000,...terms}),{doctorShare:1000,platformShare:1000,eligibleAmount:2000});
+});
+test('Agent-created and legacy order snapshots keep original approved commercial terms',()=>{
+  const doc={registrationSource:'agent',revenueModel:'split',feeShareType:'percentage',feeSharePercentage:60,feeShareCalculationBasis:'gross'};
+  const terms=resolveSettlementTerms(doc,{revenueModel:'split',feeShareType:'fixed',fixedFeeShareAmount:450,feeShareCalculationBasis:'gross'});
+  assert.equal(terms.feeShareType,'fixed');assert.equal(terms.fixedAmount,450);
+  assert.deepEqual(calculateFeeShare({paidAmount:1500,...terms}),{doctorShare:450,platformShare:1050,eligibleAmount:1500});
+  const legacy=resolveSettlementTerms({revenueModel:'split',feeShareType:'percentage',feeSharePercentage:65},{});
+  assert.equal(legacy.percentage,65);
+  const slab=resolveSettlementTerms({revenueModel:'split',feeShareType:'slab',feeShareSlabs:[{minPatients:1,maxPatients:null,percentage:70}]},{});
+  assert.equal(slab.feeShareType,'slab');
+  assert.equal(slab.slabs.length,1);
+});
+test('the existing platform fee model still assigns 100% to PhysioQR',()=>{
+  const terms=resolveSettlementTerms({registrationSource:'agent',revenueModel:'platform_fee',feeSharePercentage:55},{});
+  assert.equal(terms.revenueModel,'platform_fee');
+  assert.equal(calculateFeeShare({paidAmount:300,...terms}).doctorShare,0);
 });
