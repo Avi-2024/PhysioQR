@@ -26,7 +26,7 @@ describe('Public independent doctor registration',()=>{
   it('submits an agentless application without trusting any commercial terms from the browser',async()=>{
     vi.mocked(apiClient.post).mockResolvedValue({data:{status:'submitted'}} as never);
     mount(<DoctorSelfRegisterPage/>);
-    expect(screen.getByText(/50% Doctor \/ 50% PhysioQR/i)).toBeTruthy();
+    expect(screen.getByText(/Doctor receives/i)).toBeTruthy();
     for(const [label,value] of [
       ['Doctor full name','Dr Test Doctor'], ['Mobile number','9876543210'],
       ['Qualification','MBBS'], ['Specialization','Orthopedics'],
