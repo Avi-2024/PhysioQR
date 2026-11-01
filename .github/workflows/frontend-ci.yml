@@ -53,5 +53,8 @@ jobs:
       - name: Doctor dashboard patient recovery UI regression tests
         run: npm run test -- --run src/features/doctors/pages/dashboard/DoctorRecoveryOverviewPanel.test.tsx
 
+      - name: Public doctor registration and homepage CTA tests
+        run: npm run test -- --run src/features/landing/pages/DoctorSelfRegisterPage.test.tsx
+
       - name: Production build
         run: npm run build
