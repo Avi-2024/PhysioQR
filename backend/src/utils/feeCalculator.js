@@ -1,5 +1,3 @@
-const { SPLIT_DOCTOR_PERCENTAGE } = require('./splitModel');
-
 /**
  * SRS §27 — Fee Share Calculation
  * Supports: percentage, fixed, slab-based
@@ -82,16 +80,13 @@ const calculateFeeShare = (config) => {
     return { doctorShare: 0, platformShare: paidAmount, eligibleAmount: paidAmount };
   }
 
-  // Split Model always distributes the verified amount 50:50, regardless of
-  // legacy doctor settings or order snapshots. Paise rounding preserves totals.
-  const paidPaise = Math.round(paidAmount * 100);
-  const doctorPaise = Math.round(paidPaise * SPLIT_DOCTOR_PERCENTAGE / 100);
-  return {
-    doctorShare: doctorPaise / 100,
-    platformShare: (paidPaise - doctorPaise) / 100,
-    eligibleAmount: paidPaise / 100,
-  };
-
+  if (feeShareType === 'fixed') {
+    return calculateFixedFeeShare(paidAmount, discountAmount, gatewayCharges, fixedAmount, basis);
+  }
+  if (feeShareType === 'slab') {
+    return calculateSlabFeeShare(paidAmount, discountAmount, gatewayCharges, slabs, totalPaidPatients, basis);
+  }
+  return calculatePercentageFeeShare(paidAmount, discountAmount, gatewayCharges, percentage, basis);
 };
 
 module.exports = { calculateFeeShare, getEligibleAmount };
