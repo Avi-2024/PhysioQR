@@ -45,7 +45,7 @@ export default function DoctorSelfRegisterPage() {
               <CheckCircle2 className="h-12 w-12 text-emerald-600" />
               <h1 className="text-2xl font-extrabold text-slate-900">Registration submitted successfully</h1>
               <p className="text-sm leading-6 text-slate-600">Your doctor application has been received for Admin verification. The account and referral QR become active only after approval.</p>
-              <p className="rounded-lg bg-emerald-50 p-4 text-sm text-emerald-900">Your Split Model agreement: <strong>50% Doctor / 50% PhysioQR</strong>.</p>
+              <p className="rounded-lg bg-emerald-50 p-4 text-sm text-emerald-900">Your doctor earning share: <strong>50% of each verified patient programme payment</strong>.</p>
               <Link to="/" className="inline-block rounded-lg bg-emerald-700 px-5 py-3 text-sm font-semibold text-white">Return home</Link>
             </div>
           ) : (
@@ -53,7 +53,7 @@ export default function DoctorSelfRegisterPage() {
               <div className="flex items-center gap-3"><div className="rounded-xl bg-emerald-50 p-3 text-emerald-700"><Stethoscope className="h-6 w-6" /></div><div><h1 className="text-2xl font-extrabold text-slate-900">Doctor Registration</h1><p className="text-sm text-slate-500">Join PhysioQR directly, without an agent.</p></div></div>
               <div className="mt-6 rounded-xl border border-teal-200 bg-teal-50 p-4 text-sm text-teal-950">
                 <div className="flex items-center gap-2 font-bold"><ShieldCheck className="h-4 w-4" />Direct website Split Model</div>
-                <p className="mt-1">Doctor receives <strong>50%</strong> and PhysioQR receives <strong>50%</strong> of each verified patient programme payment. This split is fixed for direct website registrations.</p>
+                <p className="mt-1">As a directly registered doctor, you receive <strong>50% of each verified patient programme payment</strong>. Your earning percentage is fixed for direct website registrations.</p>
                 <p className="mt-2 text-xs">Admin verifies your professional details and sets the applicable patient programme price before activating your account.</p>
               </div>
               <form onSubmit={submit} className="mt-7 space-y-5">
