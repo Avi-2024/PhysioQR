@@ -11,7 +11,7 @@ const QrScan = require('../models/QrScan.model');
 const { DoctorWallet, WalletTransaction } = require('../models/Wallet.model');
 const { FeeShare } = require('../models/FeeShare.model');
 const { calculateFeeShare } = require('../utils/feeCalculator');
-const { SPLIT_DOCTOR_PERCENTAGE, isWebsiteDirectDoctor } = require('../utils/splitModel');
+const { SPLIT_DOCTOR_PERCENTAGE, isWebsiteDirectDoctor, resolveSettlementTerms } = require('../utils/splitModel');
 const { generateInvoiceNumber } = require('../utils/idGenerator');
 const { writeAuditLog } = require('../utils/auditLogger');
 const { getNextSequence } = require('../services/sequence.service');
@@ -114,17 +114,8 @@ const assertNoActiveProgramPurchase = async ({ patientId, programId }) => {
 
 const createFeeShareAndWalletEntries = async ({ order, payment, doctor, session }) => {
   const pricing = order.pricingSnapshot || {};
-  const revenueModel = isWebsiteDirectDoctor(doctor) || pricing.registrationSource === 'website_direct'
-    ? 'split' : (pricing.revenueModel || doctor.revenueModel || 'split');
-  // Direct-website agreements remain fixed at 50:50 at settlement, even
-  // when an outdated/unsettled order snapshot contains other terms.
-  // All other doctors use the original contract recorded with the order.
-  const direct = isWebsiteDirectDoctor(doctor) || pricing.registrationSource === 'website_direct';
-  const feeShareType = direct ? 'percentage' : (pricing.feeShareType || doctor.feeShareType || 'percentage');
-  const percentage = direct ? SPLIT_DOCTOR_PERCENTAGE : (pricing.feeSharePercentage ?? doctor.feeSharePercentage ?? 0);
-  const fixedAmount = direct ? 0 : (pricing.fixedFeeShareAmount ?? doctor.fixedFeeShareAmount ?? 0);
-  const slabs = direct ? [] : (Array.isArray(pricing.feeShareSlabs) ? pricing.feeShareSlabs : (doctor.feeShareSlabs || []));
-  const basis = direct ? 'gross' : (pricing.feeShareCalculationBasis || doctor.feeShareCalculationBasis || 'gross');
+  const { revenueModel, feeShareType, percentage, fixedAmount, slabs, basis } =
+    resolveSettlementTerms(doctor, pricing);
   const holdingDays = pricing.feeShareHoldingDays ?? doctor.feeShareHoldingDays ?? 15;
 
   const totalPaidPatients = await Payment.countDocuments({ doctor: doctor._id, verifiedAt: { $ne: null } }).session(session);
