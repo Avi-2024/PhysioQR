@@ -23,7 +23,7 @@ export function LandingHeader({ onOpenPortal }: LandingHeaderProps) {
   return (
     <>
       <header style={{ position: 'sticky', top: 0, zIndex: 40, height: '74px', background: 'rgba(255, 255, 255, 0.94)', backdropFilter: 'blur(8px)', borderBottom: '1px solid var(--border-default)', boxShadow: isScrolled ? '0 4px 20px rgba(10, 40, 38, 0.05)' : 'none', transition: 'all 200ms ease-out', display: 'flex', alignItems: 'center' }}>
-        <div className="rc-container rc-landing-header-grid" style={{ width: '100%', display: 'grid', gridTemplateColumns: '260px minmax(0, 1fr) 305px', alignItems: 'center', gap: '12px' }}>
+        <div className="rc-container rc-landing-header-grid" style={{ width: '100%', display: 'grid', gridTemplateColumns: '260px minmax(0, 1fr) 230px', alignItems: 'center', gap: '12px' }}>
           <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', minWidth: 0, justifySelf: 'start' }}>
             <Logo width={210} height={60} imageScale={2.8} />
           </Link>
@@ -40,7 +40,6 @@ export function LandingHeader({ onOpenPortal }: LandingHeaderProps) {
           </nav>
 
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px', flexShrink: 0 }}>
-            <Link to="/doctor-register" className="hidden xl:inline-flex rc-btn-outline" style={{ minHeight: '42px', textDecoration: 'none', alignItems: 'center', justifyContent: 'center', whiteSpace: 'nowrap', padding: '0 12px' }} aria-label="Register as a doctor" title="Independent doctor registration">Doctor Register</Link>
             <Link to="/register" className="hidden lg:inline-flex rc-btn-outline" style={{ minHeight: '42px', textDecoration: 'none', alignItems: 'center', justifyContent: 'center', whiteSpace: 'nowrap' }} aria-label="Register as a patient" title="Patient registration">
               Register
             </Link>
