@@ -36,6 +36,10 @@ const approveDoctor = asyncHandler(async (req, res) => {
     return res.status(400).json({ message: 'Fee share type must be percentage, fixed, or slab' });
   }
 
+  if (direct && !(Number(approvedPatientFee ?? doctor.approvedPatientFee) > 0)) {
+    return res.status(400).json({ message: 'Set an approved patient programme fee before activating a direct website doctor' });
+  }
+
   const previousValue = {
     status: doctor.status,
     approvedPatientFee: doctor.approvedPatientFee,
