@@ -264,6 +264,13 @@ const changePassword = asyncHandler(async (req, res) => {
 // POST /api/auth/send-otp
 const sendOtp = asyncHandler(async (req, res) => {
   const { mobile, purpose } = req.body;
+  if (purpose === 'registration') {
+    const existing = await Patient.findOne({ mobile: normalizeMobile(mobile) }).select('mobileVerified');
+    if (existing?.mobileVerified) return res.status(409).json({
+      code: 'PATIENT_ALREADY_REGISTERED',
+      message: 'This number is already registered. Please sign in using patient OTP instead.',
+    });
+  }
   const result = await otpService.sendOtp({ mobile, purpose });
   res.json({ message: 'OTP sent successfully', ...result });
 });
@@ -271,6 +278,15 @@ const sendOtp = asyncHandler(async (req, res) => {
 // POST /api/auth/verify-otp
 const verifyOtp = asyncHandler(async (req, res) => {
   const { mobile, otp, purpose } = req.body;
+  // Registration OTP must never act as a login shortcut for an existing
+  // verified account. Use explicit purpose=login to start a returning session.
+  if (purpose === 'registration') {
+    const existing = await Patient.findOne({ mobile: normalizeMobile(mobile) }).select('mobileVerified');
+    if (existing?.mobileVerified) return res.status(409).json({
+      code: 'PATIENT_ALREADY_REGISTERED',
+      message: 'This number is already registered. Please sign in instead.',
+    });
+  }
   const verification = await otpService.verifyOtp({ mobile, otp, purpose });
   const normalizedMobile = verification.mobile;
 

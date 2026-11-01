@@ -23,16 +23,26 @@ const registerPatient = asyncHandler(async (req, res) => {
 
   const existing = await Patient.findOne({ mobile }).select('_id mobileVerified consentAccepted referralLocked status');
   if (existing) {
-    return res.status(409).json({
-      code: 'PATIENT_ALREADY_REGISTERED',
-      message: 'This mobile number is already registered. Verify OTP to sign in and continue your existing registration.',
-      registered: true,
+    // Completed accounts must explicitly sign in. An unfinished registration
+    // can resume after mobile ownership has been verified by OTP.
+    return res.status(409).json(existing.mobileVerified
+      ? { code: 'PATIENT_ALREADY_REGISTERED', message: 'This mobile number is already registered. Please sign in to your existing patient account.' }
+      : { code: 'PATIENT_REGISTRATION_PENDING', message: 'An unfinished registration exists for this mobile number. Verify OTP to continue.' });
+  }
+
+  if (email && String(email).trim()) {
+    const normalizedEmail = String(email).trim().toLowerCase();
+    const emailUsed = await Patient.findOne({ email: normalizedEmail })
+      .collation({ locale: 'en', strength: 2 }).select('_id');
+    if (emailUsed) return res.status(409).json({
+      code: 'PATIENT_EMAIL_ALREADY_REGISTERED',
+      message: 'This email address is already registered. Please sign in to your existing patient account.',
     });
   }
 
   // Only accept registration profile fields. Client-supplied attribution, fees,
   // payment status and referral associations must never override server values.
-  const patient = await Patient.create({ fullName, mobile, email, age, gender, city, referringDoctor: referringDoctor?._id || null, referralSource: doctorCode ? 'qr_code' : 'direct' });
+  const patient = await Patient.create({ fullName, mobile, email: email ? String(email).trim().toLowerCase() : undefined, age, gender, city, referringDoctor: referringDoctor?._id || null, referralSource: doctorCode ? 'qr_code' : 'direct' });
   if (referringDoctor) {
     if (scanId) await QrScan.findOneAndUpdate({ _id: scanId, doctor: referringDoctor._id }, { patient: patient._id, registrationDate: new Date() });
     else await QrScan.create({ doctor: referringDoctor._id, agent: referringDoctor.agent || null, patient: patient._id, referralSource: 'qr_code', registrationDate: new Date(), ipAddress: req.ip });
