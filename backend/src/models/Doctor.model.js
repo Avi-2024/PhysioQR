@@ -21,6 +21,8 @@ const doctorSchema = new mongoose.Schema({
   doctorId: { type: String, unique: true },  // e.g. DR001
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   agent: { type: mongoose.Schema.Types.ObjectId, ref: 'Agent' },
+  // Set exclusively by the server at registration; legacy records remain legacy.
+  registrationSource: { type: String, enum: ['website_direct', 'agent', 'admin'] },
 
   // Personal Details
   fullName: { type: String, required: true },
@@ -118,7 +120,8 @@ const doctorSchema = new mongoose.Schema({
   bankVerified: { type: Boolean, default: false },
 }, { timestamps: true });
 
-// Ensure that every saved Split Model doctor has canonical 50:50 terms.
+// Enforce canonical terms only for website-direct registrations; preserve
+// historical and Agent/Admin-managed fee-share configurations.
 doctorSchema.pre('validate', function (next) {
   normalizeRevenueConfiguration(this);
   next();
