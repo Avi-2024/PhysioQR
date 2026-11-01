@@ -22,7 +22,7 @@ const doctorSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   agent: { type: mongoose.Schema.Types.ObjectId, ref: 'Agent' },
   // Set exclusively by the server at registration; legacy records remain legacy.
-  registrationSource: { type: String, enum: ['website_direct', 'agent', 'admin'] },
+  registrationSource: { type: String, enum: ['website_direct', 'agent', 'admin'], immutable: true },
 
   // Personal Details
   fullName: { type: String, required: true },
