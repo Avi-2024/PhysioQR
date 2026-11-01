@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { QrCode, ArrowRight } from 'lucide-react';
 import { UserRole } from '../types/landing.types';
 
@@ -109,10 +110,15 @@ export function DoctorExperienceSection({ onOpenPortal }: DoctorExperienceProps)
               ))}
             </div>
 
-            <button className="rc-btn-outline" onClick={() => onOpenPortal('doctor')}>
-              <span>Access Doctor Portal</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
+            <div className="flex flex-wrap items-center gap-3">
+              <Link to="/doctor-register" className="rc-btn-primary inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold no-underline">
+                Register as Doctor <ArrowRight className="h-4 w-4" />
+              </Link>
+              <button className="rc-btn-outline" onClick={() => onOpenPortal('doctor')}>
+                <span>Access Doctor Portal</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
       </div>
