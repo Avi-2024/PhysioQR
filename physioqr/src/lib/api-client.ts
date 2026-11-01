@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { getAccessToken, setAccessToken, clearTokens } from './auth-storage';
+import { shouldHandleUnauthorizedSession } from './auth-redirect-policy';
 
 const BASE_URL =
   (import.meta as unknown as { env?: Record<string, string> })
@@ -52,7 +53,13 @@ apiClient.interceptors.response.use(
     const status = error.response?.status;
     const originalRequest = error.config || {};
 
-    if (status === 401 && !originalRequest._retry && !String(originalRequest.url || '').includes('/auth/login') && !String(originalRequest.url || '').includes('/auth/refresh')) {
+    // Public pages never redirect to login because of an incidental API error.
+    // That includes the homepage's read-only registration fee lookup.
+    const sessionUnauthorized = shouldHandleUnauthorizedSession(
+      status, String(originalRequest.url || ''), window.location.pathname,
+    );
+
+    if (sessionUnauthorized && !originalRequest._retry && !String(originalRequest.url || '').includes('/auth/login') && !String(originalRequest.url || '').includes('/auth/refresh')) {
       originalRequest._retry = true;
       const token = await refreshAccessToken();
       if (token) {
@@ -62,13 +69,11 @@ apiClient.interceptors.response.use(
       }
     }
 
-    if (status === 401) {
+    if (sessionUnauthorized) {
       clearTokens();
       localStorage.removeItem('rc_user');
       sessionStorage.removeItem('rc_user');
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
-      }
+      window.location.href = '/login';
     }
 
     if (status === 403) {
