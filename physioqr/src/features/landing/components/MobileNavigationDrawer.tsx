@@ -25,7 +25,8 @@ export function MobileNavigationDrawer({ isOpen, onClose, onOpenPortal }: Mobile
         {APP_CONFIG.navLinks.map((link) => <li key={link.href}>{link.href.startsWith('/') ? <Link to={link.href} onClick={onClose} style={navStyle}>{link.label}</Link> : <a href={link.href} onClick={onClose} style={navStyle}>{link.label}</a>}</li>)}
       </ul>
       <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', paddingTop: '16px', borderTop: '1px solid var(--border-default)' }}>
-        <Link to="/register" onClick={onClose} className="rc-btn-outline" style={{ width: '100%', justifyContent: 'center', textDecoration: 'none' }} aria-label="Register as a patient">Register</Link>
+        <Link to="/doctor-register" onClick={onClose} className="rc-btn-outline" style={{ width: '100%', justifyContent: 'center', textDecoration: 'none' }} aria-label="Register as a doctor">Doctor Register</Link>
+        <Link to="/register" onClick={onClose} className="rc-btn-outline" style={{ width: '100%', justifyContent: 'center', textDecoration: 'none' }} aria-label="Register as a patient">Patient Register</Link>
         <button className="rc-btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => { onClose(); onOpenPortal(); }}>Sign In</button>
       </div>
     </div>
