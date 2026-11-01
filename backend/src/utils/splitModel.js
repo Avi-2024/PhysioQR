@@ -37,8 +37,8 @@ const assertSplitTerms = (input = {}) => {
   }
 };
 
-// Normalize existing legacy doctor records when written; settlement enforces this
-// separately even for historical orders/doctor records that have not been saved again.
+// Normalize only website-direct doctors; legacy agreements are never rewritten.
+// Settlement independently guards website-direct orders against stale terms.
 const normalizeRevenueConfiguration = (doctor) => {
   // Neither Agent/Admin agreements nor Platform Fee records should be
   // rewritten merely because an existing doctor document is saved.
