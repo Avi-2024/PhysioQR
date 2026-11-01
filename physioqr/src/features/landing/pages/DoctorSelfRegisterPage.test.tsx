@@ -26,7 +26,9 @@ describe('Public independent doctor registration',()=>{
   it('submits an agentless application without trusting any commercial terms from the browser',async()=>{
     vi.mocked(apiClient.post).mockResolvedValue({data:{status:'submitted'}} as never);
     mount(<DoctorSelfRegisterPage/>);
-    expect(screen.getByText(/Doctor receives/i)).toBeTruthy();
+    expect(screen.getByText(/As a directly registered doctor/i)).toBeTruthy();
+    expect(screen.getByText(/50% of each verified patient programme payment/i)).toBeTruthy();
+    expect(screen.queryByText(/PhysioQR receives\s*50%/i)).toBeNull();
     for(const [label,value] of [
       ['Doctor full name','Dr Test Doctor'], ['Mobile number','9876543210'],
       ['Qualification','MBBS'], ['Specialization','Orthopedics'],
@@ -42,6 +44,8 @@ describe('Public independent doctor registration',()=>{
       expect(body).not.toHaveProperty(forbidden);
     }
     expect(await screen.findByText('Registration submitted successfully')).toBeTruthy();
+    expect(screen.getByText(/Your doctor earning share:/i)).toBeTruthy();
+    expect(screen.queryByText(/PhysioQR receives\s*50%/i)).toBeNull();
     expect(screen.getByText(/Admin verification/i)).toBeTruthy();
   });
 
