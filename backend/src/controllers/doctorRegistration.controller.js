@@ -212,6 +212,13 @@ const registerDoctorSecure = asyncHandler(async (req, res) => {
     if (duplicate) return res.status(409).json({ message: 'A doctor with the same mobile, email, or medical registration number already exists' });
   }
 
+  if (isWebsiteRegistration) {
+    const identifierFilter = loginIdentifierFilter(payload);
+    if (identifierFilter && await User.exists(identifierFilter)) {
+      return res.status(409).json({ message: 'A doctor login already exists with this mobile or email' });
+    }
+  }
+
   if (isAgentRegistration) {
     const agent = await Agent.findOne({ user: req.user._id }).select('_id status');
     if (!agent) return res.status(404).json({ message: 'Agent profile not found' });
