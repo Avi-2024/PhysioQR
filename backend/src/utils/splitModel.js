@@ -1,5 +1,7 @@
-// The Split Model is a product-level 50:50 revenue agreement, not a configurable commission.
+// Fixed 50:50 applies ONLY to doctors who self-register through the public website.
+// Existing/agent-referred Split Model doctors keep their approved configurable terms.
 const SPLIT_DOCTOR_PERCENTAGE = 50;
+const isWebsiteDirectDoctor = (doctor) => doctor?.registrationSource === 'website_direct';
 
 const assertSplitTerms = (input = {}) => {
   for (const field of ['requestedFeeShareType', 'feeShareType']) {
@@ -38,7 +40,8 @@ const assertSplitTerms = (input = {}) => {
 // Normalize existing legacy doctor records when written; settlement enforces this
 // separately even for historical orders/doctor records that have not been saved again.
 const normalizeRevenueConfiguration = (doctor) => {
-  if (doctor.revenueModel === 'platform_fee') {
+  if (!isWebsiteDirectDoctor(doctor) && doctor.revenueModel !== 'platform_fee') return doctor;
+  if (doctor.revenueModel === 'platform_fee' && !isWebsiteDirectDoctor(doctor)) {
     doctor.requestedFeeShareType = undefined;
     doctor.requestedFeeSharePercentage = undefined;
     doctor.requestedFixedFeeShareAmount = undefined;
@@ -60,4 +63,4 @@ const normalizeRevenueConfiguration = (doctor) => {
   return doctor;
 };
 
-module.exports = { SPLIT_DOCTOR_PERCENTAGE, assertSplitTerms, normalizeRevenueConfiguration };
+module.exports = { SPLIT_DOCTOR_PERCENTAGE, isWebsiteDirectDoctor, assertSplitTerms, normalizeRevenueConfiguration };
