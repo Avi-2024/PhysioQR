@@ -40,17 +40,9 @@ const assertSplitTerms = (input = {}) => {
 // Normalize existing legacy doctor records when written; settlement enforces this
 // separately even for historical orders/doctor records that have not been saved again.
 const normalizeRevenueConfiguration = (doctor) => {
-  if (!isWebsiteDirectDoctor(doctor) && doctor.revenueModel !== 'platform_fee') return doctor;
-  if (doctor.revenueModel === 'platform_fee' && !isWebsiteDirectDoctor(doctor)) {
-    doctor.requestedFeeShareType = undefined;
-    doctor.requestedFeeSharePercentage = undefined;
-    doctor.requestedFixedFeeShareAmount = undefined;
-    doctor.feeShareType = 'percentage';
-    doctor.feeSharePercentage = 0;
-    doctor.fixedFeeShareAmount = undefined;
-    doctor.feeShareSlabs = [];
-    return doctor;
-  }
+  // Neither Agent/Admin agreements nor Platform Fee records should be
+  // rewritten merely because an existing doctor document is saved.
+  if (!isWebsiteDirectDoctor(doctor)) return doctor;
   doctor.revenueModel = 'split';
   doctor.requestedFeeShareType = 'percentage';
   doctor.requestedFeeSharePercentage = SPLIT_DOCTOR_PERCENTAGE;
