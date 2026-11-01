@@ -23,55 +23,17 @@ const registerPatient = asyncHandler(async (req, res) => {
 
   const existing = await Patient.findOne({ mobile }).select('_id mobileVerified consentAccepted referralLocked status');
   if (existing) {
-    // An unfinished registration can be resumed only after verifying ownership
-    // of the SAME mobile via the registration OTP; completed accounts must
-    // explicitly use the sign-in flow instead of being logged in via signup.
+    // Completed accounts must explicitly sign in. An unfinished registration
+    // can resume after mobile ownership has been verified by OTP.
     return res.status(409).json(existing.mobileVerified
-      ? {
-        code: 'PATIENT_ALREADY_REGISTERED',
-        message: 'This mobile number is already registered. Please sign in to your existing patient account.',
-      }
-      : {
-        code: 'PATIENT_REGISTRATION_PENDING',
-        message: 'An unfinished registration exists for this mobile number. Verify OTP to continue.',
-      });
+      ? { code: 'PATIENT_ALREADY_REGISTERED', message: 'This mobile number is already registered. Please sign in to your existing patient account.' }
+      : { code: 'PATIENT_REGISTRATION_PENDING', message: 'An unfinished registration exists for this mobile number. Verify OTP to continue.' });
   }
 
   if (email && String(email).trim()) {
     const normalizedEmail = String(email).trim().toLowerCase();
-    const safeEmail = normalizedEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\  const existing = await Patient.findOne({ mobile }).select('_id mobileVerified consentAccepted referralLocked status');
-  if (existing) {
-    return res.status(409).json({
-      code: 'PATIENT_ALREADY_REGISTERED',
-      message: 'This mobile number is already registered. Verify OTP to sign in and continue your existing registration.',
-      registered: true,
-    });
-  }
-');
-    const emailUsed = await Patient.findOne({ email: { $regex: `^${safeEmail}const Patient = require('../models/Patient.model');
-const Doctor = require('../models/Doctor.model');
-const QrScan = require('../models/QrScan.model');
-const PatientProgram = require('../models/PatientProgram.model');
-const ProgramProgress = require('../models/ProgramProgress.model');
-const PatientAssessment = require('../models/PatientAssessment.model');
-const { Payment } = require('../models/Payment.model');
-const Program = require('../models/Program.model');
-const { ProgramDay } = require('../models/Exercise.model');
-const asyncHandler = require('../utils/asyncHandler');
-const { requiresClinicalProgrammeSelection } = require('../services/patientAssessmentClearance.service');
-
-// POST /api/patients/register
-const registerPatient = asyncHandler(async (req, res) => {
-  const { doctorCode, scanId, fullName, mobile, email, age, gender, city } = req.body;
-  if (!fullName || !mobile) return res.status(400).json({ message: 'fullName and mobile are required' });
-
-  let referringDoctor = null;
-  if (doctorCode) {
-    referringDoctor = await Doctor.findOne({ referralCode: doctorCode, qrCodeActive: true });
-    if (!referringDoctor) return res.status(400).json({ message: 'Invalid or inactive doctor QR code' });
-  }
-
-, $options: 'i' } }).select('_id');
+    const emailUsed = await Patient.findOne({ email: normalizedEmail })
+      .collation({ locale: 'en', strength: 2 }).select('_id');
     if (emailUsed) return res.status(409).json({
       code: 'PATIENT_EMAIL_ALREADY_REGISTERED',
       message: 'This email address is already registered. Please sign in to your existing patient account.',
