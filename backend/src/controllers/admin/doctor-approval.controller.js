@@ -2,7 +2,8 @@ const Doctor = require('../../models/Doctor.model');
 const { provisionApprovedDoctor } = require('../../services/doctorApproval.service');
 const { writeAuditLog } = require('../../utils/auditLogger');
 const asyncHandler = require('../../utils/asyncHandler');
-const { assertSplitTerms, normalizeRevenueConfiguration } = require('../../utils/splitModel');
+const { assertSplitTerms, normalizeRevenueConfiguration, isWebsiteDirectDoctor } = require('../../utils/splitModel');
+const FEE_SHARE_TYPES = ['percentage', 'fixed', 'slab'];
 
 const REVENUE_MODELS = ['split', 'platform_fee'];
 
@@ -26,9 +27,13 @@ const approveDoctor = asyncHandler(async (req, res) => {
   if (revenueModel !== undefined && !REVENUE_MODELS.includes(revenueModel)) {
     return res.status(400).json({ message: 'Payment model must be split or platform_fee' });
   }
+  const direct = isWebsiteDirectDoctor(doctor);
   const effectiveModel = revenueModel ?? doctor.revenueModel ?? 'split';
-  if (effectiveModel === 'split') {
+  if (direct) {
+    if (effectiveModel !== 'split') return res.status(400).json({ message: 'Website-direct doctors must use the 50:50 Split Model' });
     try { assertSplitTerms(req.body); } catch (error) { return res.status(400).json({ message: error.message }); }
+  } else if (feeShareType !== undefined && !FEE_SHARE_TYPES.includes(feeShareType)) {
+    return res.status(400).json({ message: 'Fee share type must be percentage, fixed, or slab' });
   }
 
   const previousValue = {
@@ -47,7 +52,7 @@ const approveDoctor = asyncHandler(async (req, res) => {
   if (revenueModel !== undefined) doctor.revenueModel = revenueModel;
   if (feeShareType !== undefined) doctor.feeShareType = feeShareType;
   if (fixedFeeShareAmount !== undefined) doctor.fixedFeeShareAmount = fixedFeeShareAmount;
-  normalizeRevenueConfiguration(doctor);
+  if (direct) normalizeRevenueConfiguration(doctor);
 
   const { temporaryPassword } = await provisionApprovedDoctor({ doctor, password });
 
