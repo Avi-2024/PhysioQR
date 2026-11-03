@@ -27,7 +27,8 @@ const AGENT_REGISTRATION_FIELDS = [
   'medicalRegNumber',
   'clinicName',
   'city',
-  'preferredProgram',
+  // Rehab programmes are selected later during patient clinical onboarding,
+  // never while an Agent registers a doctor.
   'revenueModel',
   'requestedPatientFee',
   'requestedFeeShareType',
@@ -43,7 +44,6 @@ const AGENT_REQUIRED_FIELDS = [
   'medicalRegNumber',
   'clinicName',
   'city',
-  'preferredProgram',
   'revenueModel',
   'requestedPatientFee',
 ];

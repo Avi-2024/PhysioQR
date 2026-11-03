@@ -77,7 +77,7 @@ test('public signup refuses duplicate portal identities without overriding them'
 });
 
 test('authenticated Agent retains variable percentage commissions and auto-approval',async()=>{
-  const x=call({...profile,preferredProgram:ID,revenueModel:'split',
+  const x=call({...profile,revenueModel:'split',
     requestedPatientFee:1200,requestedFeeShareType:'percentage',
     requestedFeeSharePercentage:65},'agent');
   await register(x.req,x.res);
@@ -86,15 +86,18 @@ test('authenticated Agent retains variable percentage commissions and auto-appro
   assert.equal(created.revenueModel,'split');
   assert.equal(created.feeSharePercentage,65);
   assert.equal(created.agent,ID);
+  assert.equal(created.preferredProgram,undefined,'Agent registration must not require a rehab programme');
   assert.equal(provisioned,1);
 });
 
 test('Agent fixed commission remains supported; Admin can submit variable terms',async()=>{
   let x=call({...profile,preferredProgram:ID,revenueModel:'split',requestedPatientFee:1000,
     requestedFeeShareType:'fixed',requestedFixedFeeShareAmount:250},'agent');
+  // Even stale/mobile clients that send preferredProgram cannot attach it to an Agent doctor.
   await register(x.req,x.res);
   assert.equal(x.outcome().status,201);
   assert.equal(created.feeShareType,'fixed');assert.equal(created.fixedFeeShareAmount,250);
+  assert.equal(created.preferredProgram,undefined,'Agent payload must ignore forged or legacy programme selection');
   created=null;
   x=call({...profile,revenueModel:'split',requestedPatientFee:1000,
     requestedFeeShareType:'percentage',requestedFeeSharePercentage:70},'admin');
