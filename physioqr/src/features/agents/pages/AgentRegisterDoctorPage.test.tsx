@@ -48,7 +48,7 @@ describe('Agent doctor registration without Rehab Program', () => {
       ['Doctor Commission (%)', '60'],
     ] as const;
     for (const [name, value] of values) {
-      fireEvent.change(screen.getByLabelText(name), { target: { value } });
+      fireEvent.change(screen.getByLabelText(name, { exact: false }), { target: { value } });
     }
 
     fireEvent.click(screen.getByRole('button', { name: 'Register Doctor' }));
