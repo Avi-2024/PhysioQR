@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -20,7 +20,6 @@ const schema = z.object({
   medicalRegNumber: z.string().min(2, 'Medical registration number required'),
   clinicName: z.string().min(2, 'Clinic name required'),
   city: z.string().min(2, 'City required'),
-  preferredProgram: z.string().min(1, 'Select a rehab program'),
   revenueModel: z.enum(['split', 'platform_fee']),
   requestedPatientFee: z.coerce.number().min(1, 'Enter the patient price').max(100000, 'Price is too high'),
   requestedFeeShareType: z.enum(['percentage', 'fixed']).optional(),
@@ -47,13 +46,6 @@ const schema = z.object({
 });
 
 type FormData = z.infer<typeof schema>;
-type ProgramOption = {
-  _id: string;
-  programCode?: string;
-  name: string;
-  durationDays?: number;
-  painCategory?: { name?: string } | null;
-};
 type CreatedDoctor = {
   _id: string;
   doctorId?: string;
@@ -69,19 +61,10 @@ export default function AgentRegisterDoctorPage() {
   const [createdDoctor, setCreatedDoctor] = useState<CreatedDoctor | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const programsQuery = useQuery<ProgramOption[]>({
-    queryKey: ['agent-registration-programs'],
-    queryFn: async () => {
-      const response = await apiClient.get('/programs');
-      return Array.isArray(response.data) ? response.data : [];
-    },
-  });
-
   const { register, handleSubmit, watch, reset, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
       revenueModel: 'split',
-      preferredProgram: '',
       requestedFeeShareType: 'percentage',
     },
   });
@@ -98,8 +81,6 @@ export default function AgentRegisterDoctorPage() {
       ]);
     },
   });
-
-  const programs = programsQuery.data || [];
 
   if (createdDoctor) {
     const copyPassword = async () => {
@@ -149,7 +130,7 @@ export default function AgentRegisterDoctorPage() {
         <button type="button" onClick={() => navigate(-1)} className="rounded-lg border border-neutral-300 p-2" aria-label="Go back"><ArrowLeft className="h-4 w-4" /></button>
         <div>
           <h1 className="text-2xl font-bold text-neutral-900">Register New Doctor</h1>
-          <p className="text-sm text-neutral-500">Add the doctor profile, rehab program and payment setup.</p>
+          <p className="text-sm text-neutral-500">Add the doctor profile and payment setup.</p>
         </div>
       </div>
 
@@ -162,16 +143,6 @@ export default function AgentRegisterDoctorPage() {
           <Field label="Medical Registration Number" required error={errors.medicalRegNumber?.message}><input {...register('medicalRegNumber')} className={inputClass} /></Field>
           <Field label="Clinic Name" required error={errors.clinicName?.message}><input {...register('clinicName')} className={inputClass} /></Field>
           <Field label="City" required error={errors.city?.message}><input {...register('city')} className={inputClass} /></Field>
-          <Field label="Rehab Program" required error={errors.preferredProgram?.message}>
-            <select {...register('preferredProgram')} className={inputClass} disabled={programsQuery.isLoading || programs.length === 0}>
-              <option value="">{programsQuery.isLoading ? 'Loading rehab programs...' : programs.length ? 'Select rehab program' : 'No active rehab programs available'}</option>
-              {programs.map((program) => (
-                <option key={program._id} value={program._id}>
-                  {program.name}{program.durationDays ? ` – ${program.durationDays} Days` : ''}
-                </option>
-              ))}
-            </select>
-          </Field>
         </div>
 
         <div className="my-6 border-t border-neutral-200" />
@@ -216,10 +187,9 @@ export default function AgentRegisterDoctorPage() {
           <p className="mt-3 text-xs leading-5 text-neutral-500">Platform Fee: the verified patient payment belongs to PhysioQR, so no Doctor commission is created.</p>
         )}
 
-        {programsQuery.isError && <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs font-medium text-amber-800">Active rehab programs could not load. Please retry before registering the doctor.</div>}
         {mutation.error && <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-700">{errorMessage(mutation.error)}</div>}
 
-        <button type="submit" disabled={mutation.isPending || programsQuery.isLoading || programs.length === 0} className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-primary-600 py-3 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-60"><CheckCircle className="h-4 w-4" />{mutation.isPending ? 'Registering...' : 'Register Doctor'}</button>
+        <button type="submit" disabled={mutation.isPending} className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-primary-600 py-3 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-60"><CheckCircle className="h-4 w-4" />{mutation.isPending ? 'Registering...' : 'Register Doctor'}</button>
       </form>
     </div>
   );
