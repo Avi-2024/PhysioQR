@@ -8,6 +8,7 @@ const { Payment } = require('../models/Payment.model');
 const Program = require('../models/Program.model');
 const { ProgramDay } = require('../models/Exercise.model');
 const asyncHandler = require('../utils/asyncHandler');
+const { hasReplayAccess } = require('../services/programmeAccessValidity.service');
 const { requiresClinicalProgrammeSelection } = require('../services/patientAssessmentClearance.service');
 
 // POST /api/patients/register
@@ -188,12 +189,13 @@ const getOnboardingQuote = asyncHandler(async (req, res) => {
 });
 
 const getMyProgram = asyncHandler(async (req, res) => {
-  const activePrograms = await PatientProgram.find({ patient: req.user._id, status: 'active' })
+  const candidates = await PatientProgram.find({ patient: req.user._id, status: { $in: ['active', 'completed'] } })
     .populate('program')
     .populate('doctor', 'fullName clinicName')
     .sort({ startDate: -1, createdAt: -1 })
     .lean();
 
+  const activePrograms = candidates.filter(hasReplayAccess);
   if (!activePrograms.length) return res.json(null);
 
   let preferred = null;
