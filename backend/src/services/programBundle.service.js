@@ -1,7 +1,7 @@
 const PatientAssessment = require('../models/PatientAssessment.model');
 const PatientProgram = require('../models/PatientProgram.model');
 const Program = require('../models/Program.model');
-const { calculateProgrammeExpiry } = require('./programmeAccessValidity.service');
+const { calculateProgrammeExpiry, hasReplayAccess } = require('./programmeAccessValidity.service');
 
 const normalizeIds = (values = []) => [...new Set((values || []).map((value) => String(value)).filter(Boolean))];
 
@@ -42,7 +42,11 @@ const activateProgrammeBundle = async ({ patientId, paymentId, doctorId = null, 
     if (session) existingQuery = existingQuery.session(session);
     const existing = await existingQuery;
 
-    if (existing?.status === 'active') {
+    // A finished programme must remain completed for reporting while replay
+    // access stays valid. Never silently restart it on a clinical-access check.
+    if (existing?.status === 'active' || existing?.status === 'completed') {
+      // Do not revive completed or expired entitlements with an old payment.
+      if (!hasReplayAccess(existing)) { results.push(existing); continue; }
       existing.activationPayment = paymentId;
       if (isPrimary && !existing.payment) existing.payment = paymentId;
       if (doctorId) existing.doctor = doctorId;
