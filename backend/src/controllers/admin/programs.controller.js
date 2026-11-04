@@ -52,6 +52,7 @@ const validatePayload = async (payload, { partial = false, programId = null } = 
   if (payload.painCategory !== undefined && !payload.painCategory) return 'Pain category is required';
   if (!partial && (!Number.isFinite(payload.durationDays) || payload.durationDays < 1)) return 'Duration must be at least 1 day';
   if (payload.durationDays !== undefined && (!Number.isFinite(payload.durationDays) || payload.durationDays < 1 || payload.durationDays > 365)) return 'Duration must be between 1 and 365 days';
+  if (payload.accessValidityDays !== undefined && (!Number.isInteger(payload.accessValidityDays) || payload.accessValidityDays < 1 || payload.accessValidityDays > 365)) return 'Access validity must be between 1 and 365 days';
   if (payload.sessionsPerDay !== undefined && (!Number.isFinite(payload.sessionsPerDay) || payload.sessionsPerDay < 1 || payload.sessionsPerDay > 10)) return 'Sessions per day must be between 1 and 10';
   if (payload.difficultyLevel !== undefined && payload.difficultyLevel && !DIFFICULTY_LEVELS.includes(payload.difficultyLevel)) return 'Invalid difficulty level';
 
