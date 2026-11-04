@@ -200,6 +200,7 @@ const createProgram = asyncHandler(async (req, res) => {
   const payload = normalizePayload(req.body);
   const error = await validatePayload(payload);
   if (error) return res.status(400).json({ message: error });
+  if (payload.accessValidityDays && payload.accessValidityDays < payload.durationDays) return res.status(400).json({ message: 'Access validity cannot be shorter than exercise programme duration' });
   const program = await Program.create(payload);
   await writeAuditLog({ req, action: 'program_created', module: 'Program', recordId: program._id, newValue: program });
   res.status(201).json(program);
@@ -214,13 +215,16 @@ const updateProgram = asyncHandler(async (req, res) => {
   const error = await validatePayload(payload, { partial: true, programId: program._id });
   if (error) return res.status(400).json({ message: error });
 
+  const exerciseDuration = payload.durationDays ?? program.durationDays;
+  const accessValidity = payload.accessValidityDays ?? program.accessValidityDays;
+  if (accessValidity && accessValidity < exerciseDuration) return res.status(400).json({ message: 'Access validity cannot be shorter than exercise programme duration' });
   if (program.clinicalApprovalRequired && payload.isActive !== undefined) {
     return res.status(409).json({ message: 'This reviewed programme can only be published or unpublished through the audited status action' });
   }
   if (payload.isActive === true && !program.isActive) await ensureApprovedRelease(program);
   const previousValue = program.toObject();
   Object.assign(program, payload);
-  if (program.clinicalApprovalRequired && program.clinicalApproval?.approvedAt) {
+  if (program.clinicalApprovalRequired && program.clinicalApproval?.approvedAt && Object.keys(payload).some((key) => key !== 'accessValidityDays')) {
     // Any clinical programme detail change requires a renewed sign-off.
     program.clinicalApproval = {};
   }
