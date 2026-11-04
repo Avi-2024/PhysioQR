@@ -2,6 +2,7 @@ const PatientProgram = require('../models/PatientProgram.model');
 const SystemSettings = require('../models/SystemSettings.model');
 const { writeAuditLog } = require('../utils/auditLogger');
 const asyncHandler = require('../utils/asyncHandler');
+const { hasReplayAccess } = require('../services/programmeAccessValidity.service');
 
 const canAccessProgram = (program, user) => (
   user.role === 'admin' || program.patient.toString() === user._id.toString()
@@ -74,6 +75,9 @@ const getPatientProgram = asyncHandler(async (req, res) => {
     .populate('doctor', 'fullName clinicName');
   if (!program) return res.status(404).json({ message: 'Program not found' });
   if (!canAccessProgram(program, req.user)) return res.status(403).json({ message: 'Access denied' });
+  if (req.user.role === 'patient' && !hasReplayAccess(program)) {
+    return res.status(403).json({ code: 'PROGRAM_ACCESS_EXPIRED', message: 'Programme access expired. Contact your care team to extend access.' });
+  }
 
   res.json(program);
 });
