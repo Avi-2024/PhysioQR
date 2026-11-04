@@ -40,22 +40,41 @@ export function shouldReloadForStaleChunk(
   return true;
 }
 
+type RecoveryContext = {
+  storage: RecoveryStorage;
+  page: string;
+  now: number;
+  online: boolean;
+  reload: () => void;
+};
+
+/** Testable, one-shot Vite preload-error handler. */
+export function handleDynamicImportPreloadError(event: Event, context: RecoveryContext): void {
+  // A reload while offline would only frustrate the user. Let the route error
+  // boundary show a retry option once connectivity returns.
+  if (!context.online) return;
+  try {
+    if (!shouldReloadForStaleChunk(context.storage, context.page, context.now)) {
+      // Do not prevent the error: route errorElement can show a recovery screen
+      // if even a freshly reloaded page cannot fetch the requested module.
+      return;
+    }
+    event.preventDefault();
+    context.reload();
+  } catch {
+    // sessionStorage may be blocked by browser privacy settings. Never enter
+    // an unguarded reload loop.
+  }
+}
+
 export function registerDynamicImportRecovery(): void {
   window.addEventListener('vite:preloadError', (event) => {
-    // A reload while offline would only frustrate the user; let React Router's
-    // error screen offer an explicit retry when connectivity returns.
-    if (!navigator.onLine) return;
-    try {
-      const page = window.location.pathname + window.location.search;
-      if (!shouldReloadForStaleChunk(window.sessionStorage, page, Date.now())) {
-        // Do not prevent the error: route errorElement can render a recoverable
-        // screen if even the fresh reload cannot load the requested module.
-        return;
-      }
-      event.preventDefault();
-      window.location.reload();
-    } catch {
-      // Browsers may block sessionStorage; never enter an unguarded reload loop.
-    }
+    handleDynamicImportPreloadError(event, {
+      storage: window.sessionStorage,
+      page: window.location.pathname + window.location.search,
+      now: Date.now(),
+      online: navigator.onLine,
+      reload: () => window.location.reload(),
+    });
   });
 }
