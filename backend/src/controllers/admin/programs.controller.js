@@ -33,6 +33,7 @@ const normalizePayload = (body = {}) => {
   if (body.painCategory !== undefined) payload.painCategory = body.painCategory || null;
   if (body.difficultyLevel !== undefined) payload.difficultyLevel = body.difficultyLevel || undefined;
   if (body.durationDays !== undefined && body.durationDays !== '') payload.durationDays = Number(body.durationDays);
+  if (body.accessValidityDays !== undefined && body.accessValidityDays !== '') payload.accessValidityDays = Number(body.accessValidityDays);
   if (body.sessionsPerDay !== undefined && body.sessionsPerDay !== '') payload.sessionsPerDay = Number(body.sessionsPerDay);
   if (body.isActive !== undefined) payload.isActive = Boolean(body.isActive);
 
