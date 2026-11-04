@@ -65,5 +65,8 @@ jobs:
       - name: Patient registration toast notification regressions
         run: npm run test -- --run src/features/patients/pages/PatientRegistrationToast.test.tsx
 
+      - name: Stale dashboard chunk recovery and router fallback regressions
+        run: npm run test -- --run src/lib/chunk-load-recovery.test.ts src/app/RouteLoadErrorPage.test.tsx
+
       - name: Production build
         run: npm run build
