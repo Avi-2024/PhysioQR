@@ -22,7 +22,7 @@ type ActiveProgram = {
   enrollmentId?: string;
   currentDay?: number;
   completionPercentage?: number;
-  program?: { programCode?: string; name?: string; nameHindi?: string; durationDays?: number };
+  program?: { programCode?: string; name?: string; nameHindi?: string; durationDays?: number; accessValidityDays?: number };
   currentDayContent?: {
     programDayId?: string | null;
     exerciseCount?: number;
@@ -334,7 +334,7 @@ export default function PatientProgrammePage() {
               <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">Your session library</p>
               <h2 className="mt-1 text-xl font-black text-neutral-950">Revisit your unlocked days</h2>
               <p className="mt-1 max-w-xl text-sm leading-6 text-neutral-600">
-                Replay previous exercises whenever you need a refresher. Days available ahead of schedule are not marked as completed.
+                {program.durationDays ? `${program.durationDays} exercise days.` : 'Your exercise days.'} {program.accessValidityDays ? `You can revisit them during your ${program.accessValidityDays}-day access period.` : 'Replay previous exercises whenever you need a refresher.'} Days available ahead of schedule are not marked as completed.
               </p>
             </div>
             {daysQuery.isSuccess && (
