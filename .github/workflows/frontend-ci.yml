@@ -62,5 +62,8 @@ jobs:
       - name: Patient duplicate registration and account switch tests
         run: npm run test -- --run src/features/patients/pages/PatientExistingRegistration.test.tsx src/app/route-guards.account-switch.test.tsx
 
+      - name: Patient registration toast notification regressions
+        run: npm run test -- --run src/features/patients/pages/PatientRegistrationToast.test.tsx
+
       - name: Production build
         run: npm run build
