@@ -17,6 +17,7 @@ const { writeAuditLog } = require('../utils/auditLogger');
 const { getNextSequence } = require('../services/sequence.service');
 const fraudService = require('../services/fraud.service');
 const asyncHandler = require('../utils/asyncHandler');
+const { calculateProgrammeExpiry } = require('../services/programmeAccessValidity.service');
 
 let razorpayClient;
 const VERIFIED_LIFECYCLE_STATUSES = ['successful', 'manually_verified', 'refunded', 'partially_refunded', 'disputed', 'chargeback'];
@@ -177,10 +178,8 @@ const activatePatientProgram = async ({ order, payment, doctor, session }) => {
   const program = await Program.findById(order.program).session(session);
   if (!program || !program.isActive) throw paymentError('Program is no longer available for activation', 409);
 
-  const durationDays = program.durationDays || 30;
-  const gracePeriodDays = 3;
   const startDate = new Date();
-  const expiryDate = new Date(startDate.getTime() + (durationDays + gracePeriodDays) * 24 * 60 * 60 * 1000);
+  const { expiryDate, gracePeriodDays } = calculateProgrammeExpiry(program, startDate);
 
   await PatientProgram.findOneAndUpdate(
     { patient: order.patient, program: order.program },

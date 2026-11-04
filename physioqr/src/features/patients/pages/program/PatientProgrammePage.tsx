@@ -15,14 +15,14 @@ import apiClient from '@/lib/api-client';
 import ErrorState from '@/components/feedback/ErrorState';
 import { cn } from '@/lib/cn';
 import { getExerciseYouTubeId, getVideoAvailabilityMessage, type PatientVideoAvailability } from '@/lib/exercise-video';
-import { getPatientDayTileState, patientDayTileLabel } from '@/lib/patient-session';
+import { getExerciseDayNumbers, getPatientDayTileState, patientDayTileLabel } from '@/lib/patient-session';
 
 type ApiRecord = Record<string, unknown>;
 type ActiveProgram = {
   enrollmentId?: string;
   currentDay?: number;
   completionPercentage?: number;
-  program?: { programCode?: string; name?: string; nameHindi?: string; durationDays?: number };
+  program?: { programCode?: string; name?: string; nameHindi?: string; durationDays?: number; accessValidityDays?: number };
   currentDayContent?: {
     programDayId?: string | null;
     exerciseCount?: number;
@@ -42,7 +42,7 @@ type Prescription = {
   enrollment?: { id?: string; currentDay?: number; completionPercentage?: number };
   patient?: { patientId?: string; fullName?: string; mobile?: string; age?: number; dateOfBirth?: string; gender?: string };
   doctor?: { doctorId?: string; fullName?: string; qualification?: string; specialization?: string; clinicName?: string; clinicAddress?: string; city?: string; state?: string; postalCode?: string; clinicContact?: string };
-  program?: { programCode?: string; name?: string; nameHindi?: string; description?: string; instructions?: string; precautions?: string; durationDays?: number };
+  program?: { programCode?: string; name?: string; nameHindi?: string; description?: string; instructions?: string; precautions?: string; durationDays?: number; accessValidityDays?: number };
   day?: { id?: string; dayNumber?: number; title?: string; focus?: string; exercises?: Array<{ displayOrder?: number; exercise?: ApiRecord | null }>; videoAvailability?: PatientVideoAvailability };
 };
 
@@ -334,7 +334,7 @@ export default function PatientProgrammePage() {
               <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">Your session library</p>
               <h2 className="mt-1 text-xl font-black text-neutral-950">Revisit your unlocked days</h2>
               <p className="mt-1 max-w-xl text-sm leading-6 text-neutral-600">
-                Replay previous exercises whenever you need a refresher. Days available ahead of schedule are not marked as completed.
+                {program.durationDays ? `${program.durationDays} exercise days.` : 'Your exercise days.'} {program.accessValidityDays ? `You can revisit them during your ${program.accessValidityDays}-day access period.` : 'Replay previous exercises whenever you need a refresher.'} Days available ahead of schedule are not marked as completed.
               </p>
             </div>
             {daysQuery.isSuccess && (
@@ -351,7 +351,7 @@ export default function PatientProgrammePage() {
           )}
           {daysQuery.isSuccess && (
             <div className="mt-5 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
-              {Array.from({ length: Math.min(365, Math.max(0, Number(daysQuery.data?.durationDays || program.durationDays || 0))) }, (_, index) => index + 1).map((dayNumber) => {
+              {getExerciseDayNumbers(daysQuery.data?.durationDays || program.durationDays, program.accessValidityDays).map((dayNumber) => {
                 const unlocked = Boolean(daysQuery.data?.unlockedDays?.includes(dayNumber));
                 const completed = Boolean(daysQuery.data?.progress?.some((item) => item.dayNumber === dayNumber && item.dayCompleted));
                 const state = getPatientDayTileState({ dayNumber, currentDay, unlocked, completed, currentDayHasContent: todayHasContent });

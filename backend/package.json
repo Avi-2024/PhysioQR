@@ -17,6 +17,7 @@
     "validate:knee-general-30d-draft": "node scripts/seedGeneralKnee30DayDraft.js --validate",
     "test:knee-general-30d-draft": "node --test tests/generalKnee30DayDraft.test.js tests/programmeReleaseChecklist.test.js",
     "test:patient-programme-publication": "node --test tests/patientProgrammePublication.test.js",
+    "test:programme-access-validity": "node --test tests/programmeAccessValidity.test.js",
     "test:exercise-bulk-status": "node --test tests/exerciseBulkStatus.test.js",
     "test:exercise-validation": "node --test tests/exerciseCreationValidation.test.js",
     "test:post-surgical-exercises": "node --test tests/postSurgicalExerciseMapping.test.js",

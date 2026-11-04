@@ -9,6 +9,7 @@ const { assessProgrammeEligibility } = require('../../services/adminComplimentar
 const { ensureApprovedRelease } = require('../../services/programmeReleaseGate.service');
 const { ProgramDay } = require('../../models/Exercise.model');
 const { summarizeDayVideoStatus } = require('../../services/patientVideoStatus.service');
+const { calculateProgrammeExpiry } = require('../../services/programmeAccessValidity.service');
 
 const isObjectId = (value) => /^[a-f\d]{24}$/i.test(String(value));
 const findPatient = (identifier) => Patient.findOne({
@@ -113,7 +114,7 @@ const assignComplimentaryProgramme = asyncHandler(async (req, res) => {
 
   const clinicalNote = String(req.body.clinicalNote || '').trim();
   const now = new Date();
-  const expiryDate = new Date(now.getTime() + (Number(programme.durationDays) + 3) * 86400000);
+  const { expiryDate, gracePeriodDays } = calculateProgrammeExpiry(programme, now);
   let enrollment;
   try {
     enrollment = await PatientProgram.create({
@@ -126,7 +127,7 @@ const assignComplimentaryProgramme = asyncHandler(async (req, res) => {
       currentDay: 1,
       completionPercentage: 0,
       unlockMethod: 'every_24_hours',
-      gracePeriodDays: 3,
+      gracePeriodDays,
       complimentaryAssignment: {
         grantedBy: req.user._id,
         grantedAt: now,

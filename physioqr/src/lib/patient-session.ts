@@ -21,6 +21,14 @@ export function getPatientSessionState(data: SessionData | null | undefined) {
   return { status, exerciseCount, readyVideoCount };
 }
 
+// Access validity does not add exercise days. Keep the grid limited to the
+// clinical programme duration even when patients can replay for 90 days.
+export function getExerciseDayNumbers(durationDays: number | undefined, _accessValidityDays?: number): number[] {
+  const duration = Number(durationDays || 0);
+  if (!Number.isInteger(duration) || duration <= 0) return [];
+  return Array.from({ length: Math.min(365, duration) }, (_, index) => index + 1);
+}
+
 export type PatientDayTileState = 'completed' | 'today' | 'needs_content' | 'revisit' | 'available_early' | 'locked';
 
 export function getPatientDayTileState({

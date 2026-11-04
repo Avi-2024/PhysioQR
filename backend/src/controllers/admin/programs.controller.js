@@ -33,6 +33,7 @@ const normalizePayload = (body = {}) => {
   if (body.painCategory !== undefined) payload.painCategory = body.painCategory || null;
   if (body.difficultyLevel !== undefined) payload.difficultyLevel = body.difficultyLevel || undefined;
   if (body.durationDays !== undefined && body.durationDays !== '') payload.durationDays = Number(body.durationDays);
+  if (body.accessValidityDays !== undefined && body.accessValidityDays !== '') payload.accessValidityDays = Number(body.accessValidityDays);
   if (body.sessionsPerDay !== undefined && body.sessionsPerDay !== '') payload.sessionsPerDay = Number(body.sessionsPerDay);
   if (body.isActive !== undefined) payload.isActive = Boolean(body.isActive);
 
@@ -51,6 +52,7 @@ const validatePayload = async (payload, { partial = false, programId = null } = 
   if (payload.painCategory !== undefined && !payload.painCategory) return 'Pain category is required';
   if (!partial && (!Number.isFinite(payload.durationDays) || payload.durationDays < 1)) return 'Duration must be at least 1 day';
   if (payload.durationDays !== undefined && (!Number.isFinite(payload.durationDays) || payload.durationDays < 1 || payload.durationDays > 365)) return 'Duration must be between 1 and 365 days';
+  if (payload.accessValidityDays !== undefined && (!Number.isInteger(payload.accessValidityDays) || payload.accessValidityDays < 1 || payload.accessValidityDays > 365)) return 'Access validity must be between 1 and 365 days';
   if (payload.sessionsPerDay !== undefined && (!Number.isFinite(payload.sessionsPerDay) || payload.sessionsPerDay < 1 || payload.sessionsPerDay > 10)) return 'Sessions per day must be between 1 and 10';
   if (payload.difficultyLevel !== undefined && payload.difficultyLevel && !DIFFICULTY_LEVELS.includes(payload.difficultyLevel)) return 'Invalid difficulty level';
 
@@ -198,6 +200,7 @@ const createProgram = asyncHandler(async (req, res) => {
   const payload = normalizePayload(req.body);
   const error = await validatePayload(payload);
   if (error) return res.status(400).json({ message: error });
+  if (payload.accessValidityDays && payload.accessValidityDays < payload.durationDays) return res.status(400).json({ message: 'Access validity cannot be shorter than exercise programme duration' });
   const program = await Program.create(payload);
   await writeAuditLog({ req, action: 'program_created', module: 'Program', recordId: program._id, newValue: program });
   res.status(201).json(program);
@@ -212,13 +215,16 @@ const updateProgram = asyncHandler(async (req, res) => {
   const error = await validatePayload(payload, { partial: true, programId: program._id });
   if (error) return res.status(400).json({ message: error });
 
+  const exerciseDuration = payload.durationDays ?? program.durationDays;
+  const accessValidity = payload.accessValidityDays ?? program.accessValidityDays;
+  if (accessValidity && accessValidity < exerciseDuration) return res.status(400).json({ message: 'Access validity cannot be shorter than exercise programme duration' });
   if (program.clinicalApprovalRequired && payload.isActive !== undefined) {
     return res.status(409).json({ message: 'This reviewed programme can only be published or unpublished through the audited status action' });
   }
   if (payload.isActive === true && !program.isActive) await ensureApprovedRelease(program);
   const previousValue = program.toObject();
   Object.assign(program, payload);
-  if (program.clinicalApprovalRequired && program.clinicalApproval?.approvedAt) {
+  if (program.clinicalApprovalRequired && program.clinicalApproval?.approvedAt && Object.keys(payload).some((key) => key !== 'accessValidityDays')) {
     // Any clinical programme detail change requires a renewed sign-off.
     program.clinicalApproval = {};
   }

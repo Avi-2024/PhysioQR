@@ -8,6 +8,7 @@ const { withDayDosageInProgramme } = require('../services/dayExerciseDosage.serv
 const { patientSafeDay } = require('../services/demoExerciseVideo.service');
 const { summarizeDayVideoStatus } = require('../services/patientVideoStatus.service');
 const { isReleasedForPatient } = require('../services/patientProgrammePublication.service');
+const { hasReplayAccess } = require('../services/programmeAccessValidity.service');
 
 const EXERCISE_EVENTS = ['video_started', 'video_completed', 'marked_completed', 'skipped'];
 
@@ -28,6 +29,12 @@ const loadAccessiblePatientProgram = async (req, patientProgramId) => {
   }
 
   if (req.user.role === 'patient') {
+    if (!hasReplayAccess(patientProgram)) {
+      const error = new Error('Programme access has expired or is inactive. Contact the care team to extend access.');
+      error.status = 403;
+      error.code = 'PROGRAM_ACCESS_EXPIRED';
+      throw error;
+    }
     const clinicalProgramme = await Program.findById(patientProgram.program)
       .select('clinicalApprovalRequired clinicalApproval isActive').lean();
     if (!isReleasedForPatient(clinicalProgramme)) {

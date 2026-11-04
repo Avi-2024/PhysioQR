@@ -1,6 +1,7 @@
 const PatientAssessment = require('../models/PatientAssessment.model');
 const PatientProgram = require('../models/PatientProgram.model');
 const Program = require('../models/Program.model');
+const { calculateProgrammeExpiry, hasReplayAccess } = require('./programmeAccessValidity.service');
 
 const normalizeIds = (values = []) => [...new Set((values || []).map((value) => String(value)).filter(Boolean))];
 
@@ -23,7 +24,7 @@ const activateProgrammeBundle = async ({ patientId, paymentId, doctorId = null, 
   const selectedIds = normalizeIds(programIds);
   if (!selectedIds.length) return [];
 
-  let programQuery = Program.find({ _id: { $in: selectedIds }, isActive: true }).select('_id durationDays');
+  let programQuery = Program.find({ _id: { $in: selectedIds }, isActive: true }).select('_id durationDays accessValidityDays');
   if (session) programQuery = programQuery.session(session);
   const programs = await programQuery;
   if (programs.length !== selectedIds.length) {
@@ -41,7 +42,11 @@ const activateProgrammeBundle = async ({ patientId, paymentId, doctorId = null, 
     if (session) existingQuery = existingQuery.session(session);
     const existing = await existingQuery;
 
-    if (existing?.status === 'active') {
+    // A finished programme must remain completed for reporting while replay
+    // access stays valid. Never silently restart it on a clinical-access check.
+    if (existing?.status === 'active' || existing?.status === 'completed') {
+      // Do not revive completed or expired entitlements with an old payment.
+      if (!hasReplayAccess(existing)) { results.push(existing); continue; }
       existing.activationPayment = paymentId;
       if (isPrimary && !existing.payment) existing.payment = paymentId;
       if (doctorId) existing.doctor = doctorId;
@@ -52,9 +57,9 @@ const activateProgrammeBundle = async ({ patientId, paymentId, doctorId = null, 
     }
 
     const startDate = existing?.startDate || new Date();
-    const gracePeriodDays = Number(existing?.gracePeriodDays ?? 3);
-    const durationDays = Number(program.durationDays || 30);
-    const expiryDate = existing?.expiryDate || new Date(startDate.getTime() + (durationDays + gracePeriodDays) * 24 * 60 * 60 * 1000);
+    const accessWindow = calculateProgrammeExpiry(program, startDate);
+    const gracePeriodDays = existing?.expiryDate ? Number(existing?.gracePeriodDays ?? 3) : accessWindow.gracePeriodDays;
+    const expiryDate = existing?.expiryDate || accessWindow.expiryDate;
 
     const set = {
       status: 'active',
