@@ -108,7 +108,7 @@ const getClinicalAccess = asyncHandler(async (req, res) => {
     paymentCompleted,
     payment: verifiedPayment || null,
     programActivated: programmeBundleActivated,
-    program: patientPrograms.find(hasReplayAccess) || null,
+    program: patientPrograms.find((item) => hasReplayAccess(item)) || null,
     programs: patientPrograms,
     approvedProgramIds,
     nextAction: accessState === 'active' ? 'dashboard' : accessState,
