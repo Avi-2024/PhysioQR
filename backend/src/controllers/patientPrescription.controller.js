@@ -7,6 +7,7 @@ const { withDayDosage } = require('../services/dayExerciseDosage.service');
 const { patientSafeExercise } = require('../services/demoExerciseVideo.service');
 const { summarizeDayVideoStatus } = require('../services/patientVideoStatus.service');
 const { isReleasedForPatient } = require('../services/patientProgrammePublication.service');
+const { hasReplayAccess } = require('../services/programmeAccessValidity.service');
 
 const enrollmentPopulate = [
   { path: 'patient', select: 'patientId fullName mobile age dateOfBirth gender preferredLanguage' },
@@ -36,11 +37,12 @@ const getMyPrescription = asyncHandler(async (req, res) => {
     });
   }
 
-  const activeEnrollments = await PatientProgram.find({ patient: patientId, status: 'active' })
+  const candidates = await PatientProgram.find({ patient: patientId, status: { $in: ['active', 'completed'] } })
     .populate('program', 'programCode name nameHindi durationDays isActive clinicalApprovalRequired clinicalApproval.approvedAt')
     .sort({ startDate: -1, createdAt: -1 })
     .lean();
 
+  const activeEnrollments = candidates.filter(hasReplayAccess);
   const releasedEnrollments = activeEnrollments.filter((item) => isReleasedForPatient(item.program));
   if (!releasedEnrollments.length) {
     return res.status(activeEnrollments.length ? 409 : 404).json({
@@ -101,11 +103,11 @@ const getMyPrescription = asyncHandler(async (req, res) => {
 
   if (!selectedSummary) return res.status(404).json({ message: 'Selected rehabilitation programme is not active for this patient.' });
 
-  const enrollment = await PatientProgram.findOne({ _id: selectedSummary._id, patient: patientId, status: 'active' })
+  const enrollment = await PatientProgram.findOne({ _id: selectedSummary._id, patient: patientId, status: { $in: ['active', 'completed'] } })
     .populate(enrollmentPopulate)
     .lean();
 
-  if (!enrollment || !isReleasedForPatient(enrollment.program)) {
+  if (!hasReplayAccess(enrollment) || !isReleasedForPatient(enrollment.program)) {
     return res.status(404).json({ message: 'Selected rehabilitation prescription is unavailable.' });
   }
 
