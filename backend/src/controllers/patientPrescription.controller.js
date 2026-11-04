@@ -42,7 +42,7 @@ const getMyPrescription = asyncHandler(async (req, res) => {
     .sort({ startDate: -1, createdAt: -1 })
     .lean();
 
-  const activeEnrollments = candidates.filter(hasReplayAccess);
+  const activeEnrollments = candidates.filter((item) => hasReplayAccess(item));
   const releasedEnrollments = activeEnrollments.filter((item) => isReleasedForPatient(item.program));
   if (!releasedEnrollments.length) {
     return res.status(activeEnrollments.length ? 409 : 404).json({
