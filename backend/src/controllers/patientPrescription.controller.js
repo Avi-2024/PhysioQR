@@ -11,7 +11,7 @@ const { hasReplayAccess } = require('../services/programmeAccessValidity.service
 
 const enrollmentPopulate = [
   { path: 'patient', select: 'patientId fullName mobile age dateOfBirth gender preferredLanguage' },
-  { path: 'program', select: 'programCode name nameHindi description durationDays sessionsPerDay instructions precautions painCategory isActive clinicalApprovalRequired clinicalApproval' },
+  { path: 'program', select: 'programCode name nameHindi description durationDays accessValidityDays sessionsPerDay instructions precautions painCategory isActive clinicalApprovalRequired clinicalApproval' },
   { path: 'doctor', select: 'doctorId fullName qualification specialization clinicName clinicAddress city state postalCode clinicContact clinicEmail' },
 ];
 
@@ -38,7 +38,7 @@ const getMyPrescription = asyncHandler(async (req, res) => {
   }
 
   const candidates = await PatientProgram.find({ patient: patientId, status: { $in: ['active', 'completed'] } })
-    .populate('program', 'programCode name nameHindi durationDays isActive clinicalApprovalRequired clinicalApproval.approvedAt')
+    .populate('program', 'programCode name nameHindi durationDays accessValidityDays isActive clinicalApprovalRequired clinicalApproval.approvedAt')
     .sort({ startDate: -1, createdAt: -1 })
     .lean();
 
