@@ -3,6 +3,7 @@ const PatientProgram = require('../models/PatientProgram.model');
 const { Payment } = require('../models/Payment.model');
 const { activateProgrammeBundle, getApprovedProgrammeIds } = require('../services/programBundle.service');
 const asyncHandler = require('../utils/asyncHandler');
+const { hasReplayAccess } = require('../services/programmeAccessValidity.service');
 
 const ACTIVE_PAYMENT_STATUSES = ['successful', 'manually_verified', 'partially_refunded'];
 
@@ -62,7 +63,7 @@ const getClinicalAccess = asyncHandler(async (req, res) => {
   const currentPaymentId = verifiedPayment ? String(verifiedPayment._id) : '';
   const activeProgramIds = new Set(
     patientPrograms
-      .filter((item) => item.status === 'active' && (
+      .filter((item) => hasReplayAccess(item) && (
         !currentPaymentId ||
         String(item.activationPayment || '') === currentPaymentId ||
         String(item.payment || '') === currentPaymentId
@@ -72,10 +73,11 @@ const getClinicalAccess = asyncHandler(async (req, res) => {
 
   const programmeBundleActivated = Boolean(verifiedPayment) && (approvedProgramIds.length
     ? approvedProgramIds.every((id) => activeProgramIds.has(String(id)))
-    : patientPrograms.some((item) => item.status === 'active' && (
+    : patientPrograms.some((item) => hasReplayAccess(item) && (
       String(item.activationPayment || '') === currentPaymentId || String(item.payment || '') === currentPaymentId
     )));
 
+  const expiredEnrolment = patientPrograms.some((item) => ['active', 'completed'].includes(item.status) && item.expiryDate && !hasReplayAccess(item));
   let accessState = 'active';
   let assessment = null;
 
@@ -88,7 +90,7 @@ const getClinicalAccess = asyncHandler(async (req, res) => {
   } else if (!verifiedPayment) {
     accessState = 'payment_required'; assessment = latestAssessment;
   } else if (!programmeBundleActivated) {
-    accessState = 'activation_pending'; assessment = latestAssessment;
+    accessState = expiredEnrolment ? 'access_expired' : 'activation_pending'; assessment = latestAssessment;
   } else {
     assessment = latestAssessment;
   }
@@ -106,7 +108,7 @@ const getClinicalAccess = asyncHandler(async (req, res) => {
     paymentCompleted,
     payment: verifiedPayment || null,
     programActivated: programmeBundleActivated,
-    program: patientPrograms.find((item) => item.status === 'active') || null,
+    program: patientPrograms.find(hasReplayAccess) || null,
     programs: patientPrograms,
     approvedProgramIds,
     nextAction: accessState === 'active' ? 'dashboard' : accessState,
