@@ -195,7 +195,7 @@ const getMyProgram = asyncHandler(async (req, res) => {
     .sort({ startDate: -1, createdAt: -1 })
     .lean();
 
-  const activePrograms = candidates.filter(hasReplayAccess);
+  const activePrograms = candidates.filter((item) => hasReplayAccess(item));
   if (!activePrograms.length) return res.json(null);
 
   let preferred = null;
