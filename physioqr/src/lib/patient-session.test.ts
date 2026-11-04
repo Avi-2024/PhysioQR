@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { getPatientDayTileState, getPatientSessionState } from './patient-session';
+import { getExerciseDayNumbers, getPatientDayTileState, getPatientSessionState } from './patient-session';
 
 describe('patient exercise-first dashboard', () => {
+  it('renders exactly 25 exercise-day tiles despite 90 days of paid access', () => {
+    const tiles = getExerciseDayNumbers(25, 90);
+    expect(tiles).toHaveLength(25);
+    expect(tiles[0]).toBe(1);
+    expect(tiles[24]).toBe(25);
+    expect(tiles).not.toContain(26);
+    expect(tiles).not.toContain(90);
+    expect(getExerciseDayNumbers(0, 90)).toEqual([]);
+  });
+
   it('does not announce a ready session if current day has no exercises', () => {
     expect(getPatientSessionState({ day: { exercises: [], videoAvailability: { ready: 0 } } }).status).toBe('not_configured');
     expect(getPatientSessionState({ day: { id: 'day1', exercises: [] } }).status).toBe('not_configured');
