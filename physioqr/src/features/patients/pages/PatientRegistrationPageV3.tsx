@@ -280,7 +280,7 @@ function AmountRow({label,value,strong}:{label:string;value:number;strong?:boole
 function extractItems(payload:unknown):ApiRecord[]{if(Array.isArray(payload))return payload as ApiRecord[];const record=asRecord(payload);if(Array.isArray(record.items))return record.items as ApiRecord[];if(Array.isArray(record.data))return record.data as ApiRecord[];return []}
 function asRecord(value:unknown):ApiRecord{return value&&typeof value==='object'?value as ApiRecord:{}} function text(value:unknown,fallback=''){return value===undefined||value===null||value===''?fallback:String(value)} function labelize(value:unknown){return text(value,'-').replace(/_/g,' ')} function mutationError(error:unknown){if(!error)return '';const response=asRecord(asRecord(error).response);const data=asRecord(response.data);return text(data.message||asRecord(error).message,'Request failed.')}
 
-function patientRegistrationErrorMessage(message:string){
+export function patientRegistrationErrorMessage(message:string){
   // Missing private document storage is an operational limitation, not a
   // patient mistake. Explain the safe next step without exposing infrastructure.
   if(/private document storage is not configured|document storage is not configured/i.test(message)){
