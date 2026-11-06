@@ -37,8 +37,12 @@ const PermissionDenied = () => {
 interface PublicRouteProps { children: ReactNode; }
 export const PublicRoute = ({ children }: PublicRouteProps) => {
   const { isAuthenticated, user, isLoading } = useAuthStore();
+  const location = useLocation();
+  // Explicit "Sign In / Switch account" must remain on the login form even
+  // when another patient's old browser session is still present.
+  const switchingAccount = location.pathname === '/login' && new URLSearchParams(location.search).get('switch') === '1';
   if (isLoading) return null;
-  if (isAuthenticated && user) {
+  if (isAuthenticated && user && !switchingAccount) {
     if (user.mustChangePassword) return <Navigate to="/change-password" replace />;
     return <Navigate to={getRedirectPathForRole(user.role)} replace />;
   }

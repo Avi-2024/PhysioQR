@@ -12,6 +12,9 @@ const programSchema = new mongoose.Schema({
     enum: ['beginner', 'intermediate', 'advanced', 'senior_friendly', 'post_operative', 'general_mobility', 'condition_specific'],
   },
   durationDays: { type: Number, required: true },
+  // How long the patient may access/replay the programme after activation.
+  // Independent of exercise days; absence preserves legacy duration + grace.
+  accessValidityDays: { type: Number, min: 1, max: 365 },
   sessionsPerDay: { type: Number, default: 1 },
   recommendedAgeGroup: String,
   eligibleConditions: [String],

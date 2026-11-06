@@ -1,11 +1,16 @@
 import { useState, type ReactNode } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, CheckCircle, Copy, Stethoscope } from 'lucide-react';
 import apiClient from '@/lib/api-client';
+
+const optionalNumber = (min: number, max: number) => z.preprocess(
+  (value) => value === '' || value === undefined || value === null ? undefined : Number(value),
+  z.number().min(min).max(max).optional(),
+);
 
 const schema = z.object({
   fullName: z.string().min(2, 'Enter doctor full name'),
@@ -15,19 +20,32 @@ const schema = z.object({
   medicalRegNumber: z.string().min(2, 'Medical registration number required'),
   clinicName: z.string().min(2, 'Clinic name required'),
   city: z.string().min(2, 'City required'),
-  preferredProgram: z.string().min(1, 'Select a rehab program'),
   revenueModel: z.enum(['split', 'platform_fee']),
   requestedPatientFee: z.coerce.number().min(1, 'Enter the patient price').max(100000, 'Price is too high'),
+  requestedFeeShareType: z.enum(['percentage', 'fixed']).optional(),
+  requestedFeeSharePercentage: optionalNumber(0, 100),
+  requestedFixedFeeShareAmount: optionalNumber(0, 100000),
+}).superRefine((data, ctx) => {
+  if (data.revenueModel !== 'split') return;
+
+  if (!data.requestedFeeShareType) {
+    ctx.addIssue({ code: 'custom', path: ['requestedFeeShareType'], message: 'Select doctor commission type' });
+    return;
+  }
+
+  if (data.requestedFeeShareType === 'percentage' && data.requestedFeeSharePercentage === undefined) {
+    ctx.addIssue({ code: 'custom', path: ['requestedFeeSharePercentage'], message: 'Enter commission percentage' });
+  }
+  if (data.requestedFeeShareType === 'fixed') {
+    if (data.requestedFixedFeeShareAmount === undefined) {
+      ctx.addIssue({ code: 'custom', path: ['requestedFixedFeeShareAmount'], message: 'Enter fixed commission' });
+    } else if (data.requestedFixedFeeShareAmount > data.requestedPatientFee) {
+      ctx.addIssue({ code: 'custom', path: ['requestedFixedFeeShareAmount'], message: 'Commission cannot exceed patient price' });
+    }
+  }
 });
 
 type FormData = z.infer<typeof schema>;
-type ProgramOption = {
-  _id: string;
-  programCode?: string;
-  name: string;
-  durationDays?: number;
-  painCategory?: { name?: string } | null;
-};
 type CreatedDoctor = {
   _id: string;
   doctorId?: string;
@@ -43,23 +61,16 @@ export default function AgentRegisterDoctorPage() {
   const [createdDoctor, setCreatedDoctor] = useState<CreatedDoctor | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const programsQuery = useQuery<ProgramOption[]>({
-    queryKey: ['agent-registration-programs'],
-    queryFn: async () => {
-      const response = await apiClient.get('/programs');
-      return Array.isArray(response.data) ? response.data : [];
-    },
-  });
-
   const { register, handleSubmit, watch, reset, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
       revenueModel: 'split',
-      preferredProgram: '',
+      requestedFeeShareType: 'percentage',
     },
   });
 
   const revenueModel = watch('revenueModel');
+  const commissionType = watch('requestedFeeShareType');
   const mutation = useMutation({
     mutationFn: async (data: FormData) => apiClient.post('/doctors', clean(data)),
     onSuccess: async (response) => {
@@ -70,8 +81,6 @@ export default function AgentRegisterDoctorPage() {
       ]);
     },
   });
-
-  const programs = programsQuery.data || [];
 
   if (createdDoctor) {
     const copyPassword = async () => {
@@ -121,7 +130,7 @@ export default function AgentRegisterDoctorPage() {
         <button type="button" onClick={() => navigate(-1)} className="rounded-lg border border-neutral-300 p-2" aria-label="Go back"><ArrowLeft className="h-4 w-4" /></button>
         <div>
           <h1 className="text-2xl font-bold text-neutral-900">Register New Doctor</h1>
-          <p className="text-sm text-neutral-500">Add the doctor profile, rehab program and payment setup.</p>
+          <p className="text-sm text-neutral-500">Add the doctor profile and payment setup.</p>
         </div>
       </div>
 
@@ -134,16 +143,6 @@ export default function AgentRegisterDoctorPage() {
           <Field label="Medical Registration Number" required error={errors.medicalRegNumber?.message}><input {...register('medicalRegNumber')} className={inputClass} /></Field>
           <Field label="Clinic Name" required error={errors.clinicName?.message}><input {...register('clinicName')} className={inputClass} /></Field>
           <Field label="City" required error={errors.city?.message}><input {...register('city')} className={inputClass} /></Field>
-          <Field label="Rehab Program" required error={errors.preferredProgram?.message}>
-            <select {...register('preferredProgram')} className={inputClass} disabled={programsQuery.isLoading || programs.length === 0}>
-              <option value="">{programsQuery.isLoading ? 'Loading rehab programs...' : programs.length ? 'Select rehab program' : 'No active rehab programs available'}</option>
-              {programs.map((program) => (
-                <option key={program._id} value={program._id}>
-                  {program.name}{program.durationDays ? ` – ${program.durationDays} Days` : ''}
-                </option>
-              ))}
-            </select>
-          </Field>
         </div>
 
         <div className="my-6 border-t border-neutral-200" />
@@ -164,9 +163,23 @@ export default function AgentRegisterDoctorPage() {
           </Field>
 
           {revenueModel === 'split' && (
-            <div className="sm:col-span-2 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
-              <strong>Fixed 50:50 Split:</strong> Doctor receives 50% and PhysioQR receives 50% of each verified patient payment. This share cannot be changed.
-            </div>
+            <>
+              <Field label="Doctor Commission Type" required error={errors.requestedFeeShareType?.message}>
+                <select {...register('requestedFeeShareType')} className={inputClass}>
+                  <option value="percentage">Percentage (%)</option>
+                  <option value="fixed">Fixed Amount (₹)</option>
+                </select>
+              </Field>
+              {commissionType === 'fixed' ? (
+                <Field label="Doctor Commission (₹)" required error={errors.requestedFixedFeeShareAmount?.message}>
+                  <input {...register('requestedFixedFeeShareAmount')} type="number" min="0" max="100000" step="1" className={inputClass} placeholder="e.g. 500" />
+                </Field>
+              ) : (
+                <Field label="Doctor Commission (%)" required error={errors.requestedFeeSharePercentage?.message}>
+                  <input {...register('requestedFeeSharePercentage')} type="number" min="0" max="100" step="0.01" className={inputClass} placeholder="e.g. 60" />
+                </Field>
+              )}
+            </>
           )}
         </div>
 
@@ -174,10 +187,9 @@ export default function AgentRegisterDoctorPage() {
           <p className="mt-3 text-xs leading-5 text-neutral-500">Platform Fee: the verified patient payment belongs to PhysioQR, so no Doctor commission is created.</p>
         )}
 
-        {programsQuery.isError && <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs font-medium text-amber-800">Active rehab programs could not load. Please retry before registering the doctor.</div>}
         {mutation.error && <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-700">{errorMessage(mutation.error)}</div>}
 
-        <button type="submit" disabled={mutation.isPending || programsQuery.isLoading || programs.length === 0} className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-primary-600 py-3 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-60"><CheckCircle className="h-4 w-4" />{mutation.isPending ? 'Registering...' : 'Register Doctor'}</button>
+        <button type="submit" disabled={mutation.isPending} className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-primary-600 py-3 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-60"><CheckCircle className="h-4 w-4" />{mutation.isPending ? 'Registering...' : 'Register Doctor'}</button>
       </form>
     </div>
   );
@@ -188,9 +200,14 @@ function Field({ label, error, required, children }: { label: string; error?: st
 function Info({ label, value }: { label: string; value: string }) { return <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3"><div className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{label}</div><div className="mt-1 text-sm font-semibold text-neutral-900">{value}</div></div>; }
 function clean(data: FormData) {
   const payload = { ...data } as Record<string, unknown>;
-  if (data.revenueModel === 'split') {
-    payload.requestedFeeShareType = 'percentage';
-    payload.requestedFeeSharePercentage = 50;
+  if (data.revenueModel === 'platform_fee') {
+    delete payload.requestedFeeShareType;
+    delete payload.requestedFeeSharePercentage;
+    delete payload.requestedFixedFeeShareAmount;
+  } else if (data.requestedFeeShareType === 'percentage') {
+    delete payload.requestedFixedFeeShareAmount;
+  } else if (data.requestedFeeShareType === 'fixed') {
+    delete payload.requestedFeeSharePercentage;
   }
   return Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== '' && value !== undefined && value !== null));
 }

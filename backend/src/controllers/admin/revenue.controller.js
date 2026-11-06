@@ -5,7 +5,7 @@ const Refund = require('../../models/Refund.model');
 const { writeAuditLog } = require('../../utils/auditLogger');
 const { buildSearchFilter, getPagination } = require('../../utils/queryHelpers');
 const asyncHandler = require('../../utils/asyncHandler');
-const { assertSplitTerms, normalizeRevenueConfiguration } = require('../../utils/splitModel');
+const { assertSplitTerms, normalizeRevenueConfiguration, isWebsiteDirectDoctor } = require('../../utils/splitModel');
 
 const VERIFIED_PAYMENT_STATUSES = ['successful', 'manually_verified'];
 const HISTORICALLY_VERIFIED_STATUSES = ['refunded', 'partially_refunded', 'disputed', 'chargeback'];
@@ -19,7 +19,7 @@ const getRevenueModels = asyncHandler(async (req, res) => {
 
   const [items, total, splitCount, platformFeeCount] = await Promise.all([
     Doctor.find(filter)
-      .select('doctorId fullName clinicName city status revenueModel approvedPatientFee requestedPatientFee feeSharePercentage feeShareType fixedFeeShareAmount feeShareCalculationBasis feeShareHoldingDays minWithdrawal maxWithdrawal payoutCycle qrCodeActive updatedAt createdAt')
+      .select('doctorId fullName clinicName city status registrationSource revenueModel approvedPatientFee requestedPatientFee feeSharePercentage feeShareType fixedFeeShareAmount feeShareCalculationBasis feeShareHoldingDays minWithdrawal maxWithdrawal payoutCycle qrCodeActive updatedAt createdAt')
       .sort({ updatedAt: -1 }).skip(skip).limit(limit).lean(),
     Doctor.countDocuments(filter),
     Doctor.countDocuments({ revenueModel: 'split' }),
@@ -39,11 +39,12 @@ const updateRevenueModel = asyncHandler(async (req, res) => {
   const updates = {};
   for (const key of allowed) if (req.body[key] !== undefined) updates[key] = req.body[key];
   const effectiveModel = updates.revenueModel ?? doctor.revenueModel ?? 'split';
-  if (effectiveModel === 'split') {
+  if (isWebsiteDirectDoctor(doctor)) {
+    if (effectiveModel !== 'split') return res.status(400).json({ message: 'Website-direct doctors must retain the 50:50 Split Model' });
     try { assertSplitTerms(req.body); } catch (error) { return res.status(400).json({ message: error.message }); }
   }
   Object.assign(doctor, updates);
-  normalizeRevenueConfiguration(doctor);
+  if (isWebsiteDirectDoctor(doctor)) normalizeRevenueConfiguration(doctor);
   await doctor.save();
   await writeAuditLog({ req, action: 'doctor_revenue_model_updated', module: 'Doctor', recordId: doctor._id, previousValue, newValue: Object.fromEntries(allowed.map((key) => [key, doctor[key]])), reason: req.body.reason });
   res.json({ message: 'Revenue model updated', doctor });

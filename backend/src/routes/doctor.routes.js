@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
+const rateLimit = require('express-rate-limit');
 const { protect, authorize } = require('../middlewares/auth.middleware');
 const { requireFields, validateNumberRange } = require('../middlewares/validate.middleware');
 const { notifyAssignedAgentAfterDoctorAction } = require('../middlewares/agentDoctorNotification.middleware');
@@ -20,7 +21,9 @@ const {
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
-router.post('/self-register', requireFields('fullName', 'mobile'), registerDoctorSecure);
+// Public doctor applications are untrusted; throttle abuse and never autoapprove.
+const selfRegistrationLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 8, standardHeaders: true, legacyHeaders: false });
+router.post('/self-register', selfRegistrationLimiter, requireFields('fullName', 'mobile'), registerDoctorSecure);
 router.use(protect);
 router.get('/me/profile', authorize('doctor'), getMyProfile);
 router.put('/me/profile', authorize('doctor'), updateMyProfile);

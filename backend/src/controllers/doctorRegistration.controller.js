@@ -6,8 +6,9 @@ const Program = require('../models/Program.model');
 const { provisionApprovedDoctor } = require('../services/doctorApproval.service');
 const { writeAuditLog } = require('../utils/auditLogger');
 const asyncHandler = require('../utils/asyncHandler');
-const { assertSplitTerms, normalizeRevenueConfiguration } = require('../utils/splitModel');
+const { assertSplitTerms, normalizeRevenueConfiguration, isWebsiteDirectDoctor } = require('../utils/splitModel');
 
+const DIRECT_REQUIRED_FIELDS = ['fullName', 'mobile', 'qualification', 'specialization', 'medicalRegNumber', 'clinicName', 'city'];
 const REGISTRATION_FIELDS = [
   'fullName', 'mobile', 'whatsapp', 'email', 'gender', 'dateOfBirth', 'profilePhoto',
   'qualification', 'specialization', 'medicalRegNumber', 'registrationCouncil',
@@ -26,7 +27,8 @@ const AGENT_REGISTRATION_FIELDS = [
   'medicalRegNumber',
   'clinicName',
   'city',
-  'preferredProgram',
+  // Rehab programmes are selected later during patient clinical onboarding,
+  // never while an Agent registers a doctor.
   'revenueModel',
   'requestedPatientFee',
   'requestedFeeShareType',
@@ -42,11 +44,11 @@ const AGENT_REQUIRED_FIELDS = [
   'medicalRegNumber',
   'clinicName',
   'city',
-  'preferredProgram',
   'revenueModel',
   'requestedPatientFee',
 ];
 const REVENUE_MODELS = ['split', 'platform_fee'];
+const REQUESTED_FEE_SHARE_TYPES = ['percentage', 'fixed'];
 
 function pickRegistrationFields(body = {}, fields = REGISTRATION_FIELDS) {
   const payload = {};
@@ -61,6 +63,10 @@ function validateAgentRegistration(payload) {
     if (payload[field] === undefined || payload[field] === null || String(payload[field]).trim() === '') {
       return `${field} is required`;
     }
+  }
+
+  if (payload.revenueModel === 'split' && !payload.requestedFeeShareType) {
+    return 'requestedFeeShareType is required for Split Model';
   }
 
   return null;
@@ -82,10 +88,23 @@ function validateCommercialProposal(payload) {
     return null;
   }
 
-  try {
-    assertSplitTerms(payload);
-  } catch (error) {
-    return error.message;
+  if (payload.requestedFeeShareType && !REQUESTED_FEE_SHARE_TYPES.includes(payload.requestedFeeShareType)) {
+    return 'Commission type must be percentage or fixed';
+  }
+
+  if (payload.requestedFeeShareType === 'percentage') {
+    const percentage = Number(payload.requestedFeeSharePercentage);
+    if (!Number.isFinite(percentage) || percentage < 0 || percentage > 100) return 'Commission percentage must be between 0 and 100';
+    payload.requestedFeeSharePercentage = percentage;
+    delete payload.requestedFixedFeeShareAmount;
+  }
+
+  if (payload.requestedFeeShareType === 'fixed') {
+    const amount = Number(payload.requestedFixedFeeShareAmount);
+    if (!Number.isFinite(amount) || amount < 0 || amount > 100000) return 'Fixed commission must be between 0 and 100000';
+    if (payload.requestedPatientFee !== undefined && amount > payload.requestedPatientFee) return 'Fixed commission cannot exceed the patient price';
+    payload.requestedFixedFeeShareAmount = amount;
+    delete payload.requestedFeeSharePercentage;
   }
 
   return null;
@@ -93,7 +112,27 @@ function validateCommercialProposal(payload) {
 
 function applyCommercialProposalDefaults(payload) {
   if (payload.requestedPatientFee !== undefined) payload.approvedPatientFee = payload.requestedPatientFee;
-  normalizeRevenueConfiguration(payload);
+
+  if (payload.revenueModel === 'platform_fee') {
+    payload.feeShareType = 'percentage';
+    payload.feeSharePercentage = 0;
+    delete payload.fixedFeeShareAmount;
+    delete payload.requestedFeeShareType;
+    delete payload.requestedFeeSharePercentage;
+    delete payload.requestedFixedFeeShareAmount;
+    return;
+  }
+
+  if (payload.requestedFeeShareType === 'percentage') {
+    payload.feeShareType = 'percentage';
+    payload.feeSharePercentage = payload.requestedFeeSharePercentage;
+    delete payload.fixedFeeShareAmount;
+  }
+  if (payload.requestedFeeShareType === 'fixed') {
+    payload.feeShareType = 'fixed';
+    payload.fixedFeeShareAmount = payload.requestedFixedFeeShareAmount;
+    delete payload.feeSharePercentage;
+  }
 }
 
 function loginIdentifierFilter(payload) {
@@ -105,10 +144,28 @@ function loginIdentifierFilter(payload) {
 
 const registerDoctorSecure = asyncHandler(async (req, res) => {
   const isAgentRegistration = req.user?.role === 'agent';
+  const isWebsiteRegistration = !req.user; // only /self-register is public
   const payload = pickRegistrationFields(
     req.body,
     isAgentRegistration ? AGENT_REGISTRATION_FIELDS : REGISTRATION_FIELDS
   );
+  // Public requests cannot assign an agent, price, platform-fee model, or
+  // negotiable commission. Registration source is always derived server-side.
+  payload.registrationSource = isWebsiteRegistration ? 'website_direct' : isAgentRegistration ? 'agent' : 'admin';
+  if (isWebsiteRegistration) {
+    for (const key of DIRECT_REQUIRED_FIELDS) {
+      if (!String(payload[key] ?? '').trim()) return res.status(400).json({ message: `${key} is required` });
+    }
+    if (!/^[6-9]\d{9}$/.test(String(payload.mobile || '').trim())) {
+      return res.status(400).json({ message: 'Enter a valid 10-digit mobile number' });
+    }
+    delete payload.requestedPatientFee;
+    delete payload.approvedPatientFee;
+    delete payload.requestedFeeShareType;
+    delete payload.requestedFeeSharePercentage;
+    delete payload.requestedFixedFeeShareAmount;
+    payload.revenueModel = 'split';
+  }
 
   payload.status = isAgentRegistration ? 'under_review' : 'submitted';
   payload.registrationDate = new Date();
@@ -128,7 +185,12 @@ const registerDoctorSecure = asyncHandler(async (req, res) => {
 
   const commercialError = validateCommercialProposal(payload);
   if (commercialError) return res.status(400).json({ message: commercialError });
-  applyCommercialProposalDefaults(payload);
+  if (isWebsiteDirectDoctor(payload)) {
+    // Direct website submissions are fixed 50:50 independent of form fields.
+    normalizeRevenueConfiguration(payload);
+  } else {
+    applyCommercialProposalDefaults(payload);
+  }
 
   if (payload.preferredProgram) {
     if (!mongoose.isValidObjectId(payload.preferredProgram)) {
@@ -148,6 +210,13 @@ const registerDoctorSecure = asyncHandler(async (req, res) => {
       .select('_id doctorId fullName mobile email medicalRegNumber')
       .lean();
     if (duplicate) return res.status(409).json({ message: 'A doctor with the same mobile, email, or medical registration number already exists' });
+  }
+
+  if (isWebsiteRegistration) {
+    const identifierFilter = loginIdentifierFilter(payload);
+    if (identifierFilter && await User.exists(identifierFilter)) {
+      return res.status(409).json({ message: 'A doctor login already exists with this mobile or email' });
+    }
   }
 
   if (isAgentRegistration) {
@@ -188,6 +257,7 @@ const registerDoctorSecure = asyncHandler(async (req, res) => {
     newValue: {
       fullName: doctor.fullName,
       status: doctor.status,
+      registrationSource: doctor.registrationSource,
       agent: doctor.agent || null,
       preferredProgram: doctor.preferredProgram || null,
       revenueModel: doctor.revenueModel,

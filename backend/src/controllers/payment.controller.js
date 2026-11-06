@@ -11,12 +11,13 @@ const QrScan = require('../models/QrScan.model');
 const { DoctorWallet, WalletTransaction } = require('../models/Wallet.model');
 const { FeeShare } = require('../models/FeeShare.model');
 const { calculateFeeShare } = require('../utils/feeCalculator');
-const { SPLIT_DOCTOR_PERCENTAGE } = require('../utils/splitModel');
+const { SPLIT_DOCTOR_PERCENTAGE, isWebsiteDirectDoctor, resolveSettlementTerms } = require('../utils/splitModel');
 const { generateInvoiceNumber } = require('../utils/idGenerator');
 const { writeAuditLog } = require('../utils/auditLogger');
 const { getNextSequence } = require('../services/sequence.service');
 const fraudService = require('../services/fraud.service');
 const asyncHandler = require('../utils/asyncHandler');
+const { calculateProgrammeExpiry } = require('../services/programmeAccessValidity.service');
 
 let razorpayClient;
 const VERIFIED_LIFECYCLE_STATUSES = ['successful', 'manually_verified', 'refunded', 'partially_refunded', 'disputed', 'chargeback'];
@@ -85,11 +86,12 @@ const resolveOrderPricing = async ({ doctor, programId, couponCode }) => {
       doctor: doctor._id,
       revenueModel: doctor.revenueModel || 'split',
       approvedPatientFee: doctor.approvedPatientFee,
-      feeShareType: 'percentage',
-      feeSharePercentage: (doctor.revenueModel || 'split') === 'split' ? SPLIT_DOCTOR_PERCENTAGE : 0,
-      fixedFeeShareAmount: 0,
-      feeShareSlabs: [],
-      feeShareCalculationBasis: 'gross',
+      registrationSource: doctor.registrationSource || null,
+      feeShareType: isWebsiteDirectDoctor(doctor) ? 'percentage' : (doctor.feeShareType || 'percentage'),
+      feeSharePercentage: isWebsiteDirectDoctor(doctor) ? SPLIT_DOCTOR_PERCENTAGE : (doctor.feeSharePercentage ?? 0),
+      fixedFeeShareAmount: isWebsiteDirectDoctor(doctor) ? 0 : (doctor.fixedFeeShareAmount || 0),
+      feeShareSlabs: isWebsiteDirectDoctor(doctor) ? [] : (doctor.feeShareSlabs || []),
+      feeShareCalculationBasis: isWebsiteDirectDoctor(doctor) ? 'gross' : (doctor.feeShareCalculationBasis || 'gross'),
       feeShareHoldingDays: doctor.feeShareHoldingDays || 15,
       couponCode: appliedCoupon?.couponCode || null,
     },
@@ -113,14 +115,8 @@ const assertNoActiveProgramPurchase = async ({ patientId, programId }) => {
 
 const createFeeShareAndWalletEntries = async ({ order, payment, doctor, session }) => {
   const pricing = order.pricingSnapshot || {};
-  const revenueModel = pricing.revenueModel || doctor.revenueModel || 'split';
-  // Treat previously-created order snapshots as historical metadata, not as
-  // authorization to override the permanent Split Model contract.
-  const feeShareType = 'percentage';
-  const percentage = revenueModel === 'split' ? SPLIT_DOCTOR_PERCENTAGE : 0;
-  const fixedAmount = 0;
-  const slabs = [];
-  const basis = 'gross';
+  const { revenueModel, feeShareType, percentage, fixedAmount, slabs, basis } =
+    resolveSettlementTerms(doctor, pricing);
   const holdingDays = pricing.feeShareHoldingDays ?? doctor.feeShareHoldingDays ?? 15;
 
   const totalPaidPatients = await Payment.countDocuments({ doctor: doctor._id, verifiedAt: { $ne: null } }).session(session);
@@ -182,10 +178,8 @@ const activatePatientProgram = async ({ order, payment, doctor, session }) => {
   const program = await Program.findById(order.program).session(session);
   if (!program || !program.isActive) throw paymentError('Program is no longer available for activation', 409);
 
-  const durationDays = program.durationDays || 30;
-  const gracePeriodDays = 3;
   const startDate = new Date();
-  const expiryDate = new Date(startDate.getTime() + (durationDays + gracePeriodDays) * 24 * 60 * 60 * 1000);
+  const { expiryDate, gracePeriodDays } = calculateProgrammeExpiry(program, startDate);
 
   await PatientProgram.findOneAndUpdate(
     { patient: order.patient, program: order.program },

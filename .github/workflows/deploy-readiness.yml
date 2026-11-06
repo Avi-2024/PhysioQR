@@ -71,12 +71,17 @@ jobs:
           NODE_ENV: test
         run: node -e "require('./src/app')"
 
+      - name: Verify rehab exercise duration vs access validity
+        env:
+          NODE_ENV: test
+        run: npm run test:programme-access-validity
+
       - name: Verify doctor QR uses canonical public URL
         env:
           NODE_ENV: test
         run: npm run test:doctor-qr
 
-      - name: Verify immutable doctor revenue split
+      - name: Verify direct-only doctor split and original Agent terms
         env:
           NODE_ENV: test
         run: npm run test:revenue-split

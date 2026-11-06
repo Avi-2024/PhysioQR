@@ -1,86 +1,90 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { calculateFeeShare } = require('../src/utils/feeCalculator');
-const { SPLIT_DOCTOR_PERCENTAGE, assertSplitTerms, normalizeRevenueConfiguration } = require('../src/utils/splitModel');
+const { SPLIT_DOCTOR_PERCENTAGE, isWebsiteDirectDoctor, assertSplitTerms, normalizeRevenueConfiguration, resolveSettlementTerms } = require('../src/utils/splitModel');
 const Doctor = require('../src/models/Doctor.model');
 
-test('Split Model contract is fixed at 50% for doctor', () => {
+test('only independently website-registered doctors have an immutable 50:50 agreement', () => {
   assert.equal(SPLIT_DOCTOR_PERCENTAGE, 50);
-  assert.doesNotThrow(() => assertSplitTerms({ requestedFeeShareType: 'percentage', requestedFeeSharePercentage: 50 }));
-  assert.doesNotThrow(() => assertSplitTerms({ feeShareType: 'percentage', feeSharePercentage: 50, feeShareCalculationBasis: 'gross' }));
-  for (const terms of [
-    { feeSharePercentage: 65 },
-    { requestedFeeSharePercentage: '49' },
-    { feeShareType: 'fixed' },
-    { requestedFeeShareType: 'fixed' },
-    { fixedFeeShareAmount: 300 },
-    { requestedFixedFeeShareAmount: 300 },
-    { feeShareCalculationBasis: 'after_discount' },
-    { feeShareSlabs: [{ minPatients: 1, percentage: 80 }] },
-  ]) assert.throws(() => assertSplitTerms(terms), { status: 400 });
+  assert.equal(isWebsiteDirectDoctor({registrationSource:'website_direct'}),true);
+  for(const source of [undefined,'agent','admin']) assert.equal(isWebsiteDirectDoctor({registrationSource:source}),false);
+  assert.doesNotThrow(()=>assertSplitTerms({requestedFeeShareType:'percentage',requestedFeeSharePercentage:50}));
+  for(const terms of [
+    {feeSharePercentage:65}, {requestedFeeSharePercentage:40},
+    {feeShareType:'fixed'}, {fixedFeeShareAmount:300},
+    {feeShareCalculationBasis:'net_after_charges'},
+    {feeShareSlabs:[{minPatients:1,percentage:80}]},
+  ]) assert.throws(()=>assertSplitTerms(terms),{status:400});
 });
 
-test('new split registrations are normalized even when commission fields are omitted', () => {
-  const doc = normalizeRevenueConfiguration({ revenueModel: 'split' });
-  assert.equal(doc.requestedFeeShareType, 'percentage');
-  assert.equal(doc.requestedFeeSharePercentage, 50);
-  assert.equal(doc.feeShareType, 'percentage');
-  assert.equal(doc.feeSharePercentage, 50);
-  assert.equal(doc.feeShareCalculationBasis, 'gross');
-  assert.deepEqual(doc.feeShareSlabs, []);
-  assert.equal(doc.fixedFeeShareAmount, undefined);
+test('website-direct doctor is normalized on schema validation but Agent and legacy split settings are preserved', async()=>{
+  const website = new Doctor({fullName:'Independent Doctor',mobile:'9999999999',
+    registrationSource:'website_direct',revenueModel:'split',feeShareType:'fixed',
+    fixedFeeShareAmount:350,feeSharePercentage:90,feeShareCalculationBasis:'after_discount'});
+  await website.validate();
+  assert.equal(website.feeShareType,'percentage');
+  assert.equal(website.feeSharePercentage,50);
+  assert.equal(website.requestedFeeSharePercentage,50);
+  assert.equal(website.feeShareCalculationBasis,'gross');
+  const agent = new Doctor({fullName:'Agent Doctor',mobile:'9999999998',
+    registrationSource:'agent',revenueModel:'split',feeShareType:'fixed',
+    fixedFeeShareAmount:350,feeShareCalculationBasis:'net_after_charges'});
+  await agent.validate();
+  assert.equal(agent.feeShareType,'fixed');
+  assert.equal(agent.fixedFeeShareAmount,350);
+  assert.equal(agent.feeShareCalculationBasis,'net_after_charges');
+  const legacy = new Doctor({fullName:'Legacy Doctor',mobile:'9999999997',
+    revenueModel:'split',feeShareType:'slab',feeShareSlabs:[{minPatients:1,maxPatients:10,percentage:70}]});
+  await legacy.validate();
+  assert.equal(legacy.feeShareType,'slab');
+  assert.equal(legacy.feeShareSlabs.length,1);
 });
 
-test('saving a legacy split doctor overwrites variable fee-share terms', async () => {
-  const doctor = new Doctor({
-    fullName: 'Clinical Test Doctor',
-    mobile: '9999999999',
-    revenueModel: 'split',
-    feeShareType: 'slab',
-    feeSharePercentage: 80,
-    requestedFeeSharePercentage: 80,
-    fixedFeeShareAmount: 200,
-    feeShareCalculationBasis: 'net_after_charges',
-    feeShareSlabs: [{ minPatients: 1, maxPatients: 10, percentage: 80 }],
-  });
-  await doctor.validate();
-  assert.equal(doctor.feeShareType, 'percentage');
-  assert.equal(doctor.feeSharePercentage, 50);
-  assert.equal(doctor.requestedFeeSharePercentage, 50);
-  assert.equal(doctor.feeShareCalculationBasis, 'gross');
-  assert.equal(doctor.feeShareSlabs.length, 0);
+test('legacy percentage, fixed and slab calculations work again',()=>{
+  assert.deepEqual(calculateFeeShare({paidAmount:2000,feeShareType:'percentage',percentage:60}),
+    {doctorShare:1200,platformShare:800,eligibleAmount:2000});
+  assert.deepEqual(calculateFeeShare({paidAmount:2000,feeShareType:'fixed',fixedAmount:350}),
+    {doctorShare:350,platformShare:1650,eligibleAmount:2000});
+  const slab=calculateFeeShare({paidAmount:2000,feeShareType:'slab',
+    slabs:[{minPatients:1,maxPatients:10,percentage:70}],totalPaidPatients:4});
+  assert.equal(slab.doctorShare,1400);
+  assert.equal(slab.platformShare,600);
+  assert.equal(slab.appliedPercentage,70);
 });
 
-test('new Split Model payment is exactly 50:50 for an even number of paise', () => {
-  assert.deepEqual(calculateFeeShare({ paidAmount: 2000, revenueModel: 'split' }), {
-    doctorShare: 1000, platformShare: 1000, eligibleAmount: 2000,
-  });
+test('fee-share calculation basis and Platform Fee are preserved',()=>{
+  const net=calculateFeeShare({paidAmount:2000,gatewayCharges:100,percentage:50,basis:'net_after_charges'});
+  assert.deepEqual(net,{doctorShare:950,platformShare:950,eligibleAmount:1900});
+  assert.deepEqual(calculateFeeShare({paidAmount:2000,revenueModel:'platform_fee',percentage:50}),
+    {doctorShare:0,platformShare:2000,eligibleAmount:2000});
 });
 
-test('legacy percentage, fixed and slab snapshots cannot override 50:50', () => {
-  for (const override of [
-    { feeShareType: 'percentage', percentage: 90 },
-    { feeShareType: 'fixed', fixedAmount: 1900 },
-    { feeShareType: 'slab', slabs: [{ minPatients: 1, maxPatients: null, percentage: 80 }] },
-    { basis: 'net_after_charges', gatewayCharges: 100 },
-    { basis: 'after_discount', discountAmount: 150 },
-  ]) {
-    const result = calculateFeeShare({ paidAmount: 2000, revenueModel: 'split', ...override });
-    assert.equal(result.doctorShare, 1000);
-    assert.equal(result.platformShare, 1000);
-  }
+test('a website-direct doctor is always normalized to split 50:50 even if commercial fields are manipulated',()=>{
+  const cfg=normalizeRevenueConfiguration({registrationSource:'website_direct',revenueModel:'platform_fee',feeShareType:'slab',feeSharePercentage:75});
+  assert.equal(cfg.revenueModel,'split');
+  assert.equal(cfg.feeSharePercentage,50);
+  assert.equal(cfg.feeShareType,'percentage');
 });
 
-test('amount with an odd paise keeps exact total and limits rounding difference to one paise', () => {
-  const result = calculateFeeShare({ paidAmount: 99.99, revenueModel: 'split' });
-  assert.equal(result.doctorShare, 50);
-  assert.equal(result.platformShare, 49.99);
-  assert.equal(Math.round((result.doctorShare + result.platformShare) * 100), 9999);
+test('direct website payment ignores stale non-50 order snapshots when settling', () => {
+  const doctor = {registrationSource:'website_direct',revenueModel:'split',feeSharePercentage:50};
+  const terms=resolveSettlementTerms(doctor,{revenueModel:'platform_fee',feeShareType:'fixed',fixedFeeShareAmount:1900,feeSharePercentage:90,feeShareCalculationBasis:'net_after_charges'});
+  assert.deepEqual(terms,{revenueModel:'split',feeShareType:'percentage',percentage:50,fixedAmount:0,slabs:[],basis:'gross'});
+  assert.deepEqual(calculateFeeShare({paidAmount:2000,...terms}),{doctorShare:1000,platformShare:1000,eligibleAmount:2000});
 });
-
-test('Platform Fee model still assigns no doctor share', () => {
-  const result = calculateFeeShare({ paidAmount: 2000, revenueModel: 'platform_fee', percentage: 50 });
-  assert.deepEqual(result, { doctorShare: 0, platformShare: 2000, eligibleAmount: 2000 });
-  const doc = normalizeRevenueConfiguration({ revenueModel: 'platform_fee', feeSharePercentage: 50 });
-  assert.equal(doc.feeSharePercentage, 0);
+test('Agent-created and legacy order snapshots keep original approved commercial terms',()=>{
+  const doc={registrationSource:'agent',revenueModel:'split',feeShareType:'percentage',feeSharePercentage:60,feeShareCalculationBasis:'gross'};
+  const terms=resolveSettlementTerms(doc,{revenueModel:'split',feeShareType:'fixed',fixedFeeShareAmount:450,feeShareCalculationBasis:'gross'});
+  assert.equal(terms.feeShareType,'fixed');assert.equal(terms.fixedAmount,450);
+  assert.deepEqual(calculateFeeShare({paidAmount:1500,...terms}),{doctorShare:450,platformShare:1050,eligibleAmount:1500});
+  const legacy=resolveSettlementTerms({revenueModel:'split',feeShareType:'percentage',feeSharePercentage:65},{});
+  assert.equal(legacy.percentage,65);
+  const slab=resolveSettlementTerms({revenueModel:'split',feeShareType:'slab',feeShareSlabs:[{minPatients:1,maxPatients:null,percentage:70}]},{});
+  assert.equal(slab.feeShareType,'slab');
+  assert.equal(slab.slabs.length,1);
+});
+test('the existing platform fee model still assigns 100% to PhysioQR',()=>{
+  const terms=resolveSettlementTerms({registrationSource:'agent',revenueModel:'platform_fee',feeSharePercentage:55},{});
+  assert.equal(terms.revenueModel,'platform_fee');
+  assert.equal(calculateFeeShare({paidAmount:300,...terms}).doctorShare,0);
 });

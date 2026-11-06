@@ -50,8 +50,23 @@ jobs:
       - name: Agent doctor-wise visit and referral UI regression tests
         run: npm run test -- --run src/features/agents/pages/doctors/AgentDoctorsPage.test.tsx
 
+      - name: Agent doctor registration without programme regression test
+        run: npm run test -- --run src/features/agents/pages/AgentRegisterDoctorPage.test.tsx
+
       - name: Doctor dashboard patient recovery UI regression tests
         run: npm run test -- --run src/features/doctors/pages/dashboard/DoctorRecoveryOverviewPanel.test.tsx
+
+      - name: Public doctor registration and homepage CTA tests
+        run: npm run test -- --run src/features/landing/pages/DoctorSelfRegisterPage.test.tsx
+
+      - name: Patient duplicate registration and account switch tests
+        run: npm run test -- --run src/features/patients/pages/PatientExistingRegistration.test.tsx src/app/route-guards.account-switch.test.tsx
+
+      - name: Patient registration toast notification regressions
+        run: npm run test -- --run src/features/patients/pages/PatientRegistrationToast.test.tsx
+
+      - name: Stale dashboard chunk recovery and router fallback regressions
+        run: npm run test -- --run src/lib/chunk-load-recovery.test.ts src/app/RouteLoadErrorPage.test.tsx
 
       - name: Production build
         run: npm run build
