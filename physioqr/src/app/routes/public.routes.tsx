@@ -14,6 +14,7 @@ const ForgotPasswordPage = lazy(() => import('@/features/common/pages/ForgotPass
 const LandingPage = lazy(() => import('@/features/landing/LandingPage'));
 const PatientPage = lazy(() => import('@/features/landing/PatientPage'));
 const DoctorPage = lazy(() => import('@/features/landing/DoctorPage'));
+const DoctorRegistrationPage = lazy(() => import('@/features/doctors/pages/DoctorRegistrationPage'));
 
 export const publicRoutes: RouteObject = {
   element: <PublicLayout />,
@@ -29,6 +30,9 @@ export const publicRoutes: RouteObject = {
     { path: '/change-password', element: withSuspense(<ChangePasswordPage />) },
     { path: '/forgot-password', element: withSuspense(<ForgotPasswordPage />) },
     { path: '/register', element: withSuspense(<PatientRegistrationPage />) },
+    { path: '/register/patient', element: withSuspense(<PatientRegistrationPage />) },
+    { path: '/register/doctor', element: withSuspense(<DoctorRegistrationPage />) },
+    { path: '/doctors/register', element: withSuspense(<DoctorRegistrationPage />) },
     { path: '/qr', element: withSuspense(<PatientQRLandingPage />) },
     { path: '/payment-success', element: withSuspense(<PaymentSuccessPage />) },
     { path: '/payment-failed', element: withSuspense(<PaymentFailedPage />) },

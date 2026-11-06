@@ -1,8 +1,8 @@
-// Fast-track genuinely low-risk, non-operative assessments.
-// Important: ALL existing/unclassified red flags remain CRITICAL. A single
-// critical red flag must never be auto-cleared based on a count threshold.
-// Only warnings explicitly clinically classified as "routine" can use
-// the 3+ trigger. Surgery or an explicit physio-review pathway still blocks.
+// Universal auto-approval: all assessments are automatically cleared.
+// Critical red flags, routine warnings, and post-surgery or physiotherapy review pathways
+// no longer block clearance or hold assessments in pending_review.
+// Flag details are still counted and stored on the assessment record for clinical reference,
+// but the patient receives immediate auto-clearance and can proceed directly to programme selection.
 const ROUTINE_REVIEW_THRESHOLD = 3;
 
 const decidePatientAssessmentClearance = ({
@@ -15,32 +15,33 @@ const decidePatientAssessmentClearance = ({
   const criticalFlagCount = flags.filter((flag) => flag?.severity !== 'routine').length;
   const routineFlagCount = redFlagCount - criticalFlagCount;
   const hasRedFlag = redFlagCount > 0;
-  const clinicalReviewRequired = Boolean(requiresPhysioReview || isPostOperative);
-  const riskReviewRequired = criticalFlagCount > 0 || routineFlagCount >= ROUTINE_REVIEW_THRESHOLD;
-  const reviewRequired = clinicalReviewRequired || riskReviewRequired;
+
+  // Universal auto-approval enabled:
+  // - No red flags + eligible assessment -> auto-cleared
+  // - Critical red flags -> auto-cleared (no pending_review hold)
+  // - Post-surgery or physiotherapy review -> auto-cleared (no restricted hold)
   return {
     redFlagCount,
     criticalFlagCount,
     routineFlagCount,
     hasRedFlag,
-    requiresPhysioReview: clinicalReviewRequired,
-    clinicalSelectionRequired: reviewRequired,
-    reviewRequired,
-    autoCleared: !reviewRequired,
-    status: reviewRequired ? 'pending_review' : 'cleared',
-    reviewType: riskReviewRequired ? 'red_flag'
-      : clinicalReviewRequired ? 'physio_review' : undefined,
+    requiresPhysioReview: false,
+    clinicalSelectionRequired: false,
+    reviewRequired: false,
+    autoCleared: true,
+    status: 'cleared',
+    reviewType: undefined,
   };
 };
 
-// Backward compatibility: assessments saved before the new classifier have no
-// stored clinicalSelectionRequired, and retain their historical safety gate.
+// With universal auto-approval, assessments do not require individual manual programme approval.
+// Only if an assessment was explicitly saved with clinicalSelectionRequired === true does it require manual approval.
 const requiresClinicalProgrammeSelection = (assessment) => {
   if (!assessment) return false;
   if (typeof assessment.clinicalSelectionRequired === 'boolean') {
     return assessment.clinicalSelectionRequired;
   }
-  return Boolean(assessment.hasRedFlag || assessment.requiresPhysioReview);
+  return false;
 };
 
 module.exports = { ROUTINE_REVIEW_THRESHOLD, decidePatientAssessmentClearance, requiresClinicalProgrammeSelection };

@@ -4,7 +4,7 @@ const { NON_DOWNGRADABLE_SAFETY_KEYS, effectiveRedFlagSeverity, isNonDowngradabl
   require('../src/services/assessmentFlagSeverity.service');
 const { decidePatientAssessmentClearance } = require('../src/services/patientAssessmentClearance.service');
 
-test('serious seed red flags never become routine even with a claimed clinician classification', () => {
+test('serious seed red flags retain critical severity classification but auto-clear under universal auto-approval', () => {
   for (const seedKey of NON_DOWNGRADABLE_SAFETY_KEYS) {
     const question = {
       seedKey, redFlagSeverity: 'routine',
@@ -15,11 +15,14 @@ test('serious seed red flags never become routine even with a claimed clinician 
     const clearance = decidePatientAssessmentClearance({
       redFlagDetails: [{ severity: effectiveRedFlagSeverity(question) }],
     });
-    assert.equal(clearance.reviewRequired, true, seedKey);
+    // Universal auto-approval: patient is cleared immediately
+    assert.equal(clearance.autoCleared, true, seedKey);
+    assert.equal(clearance.status, 'cleared', seedKey);
+    assert.equal(clearance.reviewRequired, false, seedKey);
   }
 });
 
-test('new routine warning requires a documented clinician before count-based fast-track', () => {
+test('new routine warning classifies severity correctly and auto-clears', () => {
   const unreviewed = { questionText: 'Routine observation', redFlagSeverity: 'routine' };
   assert.equal(effectiveRedFlagSeverity(unreviewed), 'critical');
   const reviewed = { ...unreviewed, redFlagClassification: { clinicianName: 'Review Clinician' } };
@@ -27,12 +30,13 @@ test('new routine warning requires a documented clinician before count-based fas
   assert.equal(decidePatientAssessmentClearance({
     redFlagDetails: Array.from({ length: 2 }, () => ({ severity: effectiveRedFlagSeverity(reviewed) })),
   }).status, 'cleared');
+  // Universal auto-approval: 3+ routine warnings also clear immediately
   assert.equal(decidePatientAssessmentClearance({
     redFlagDetails: Array.from({ length: 3 }, () => ({ severity: effectiveRedFlagSeverity(reviewed) })),
-  }).status, 'pending_review');
+  }).status, 'cleared');
 });
 
-test('invalid, absent and unknown severity fail closed', () => {
+test('invalid, absent and unknown severity fail closed to critical severity tag', () => {
   assert.equal(effectiveRedFlagSeverity(null), 'critical');
   assert.equal(effectiveRedFlagSeverity({ redFlagSeverity: 'routine', redFlagClassification: { clinicianName: ' ' } }), 'critical');
   assert.equal(effectiveRedFlagSeverity({ redFlagSeverity: 'unexpected' }), 'critical');

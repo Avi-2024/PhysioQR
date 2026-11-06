@@ -56,7 +56,7 @@ export function HeroSection({ onOpenPortal }: HeroSectionProps) {
                 <ArrowRight className="h-4 w-4" />
               </button>
               <Link to="/register" className="mt-3 inline-flex items-center gap-2 text-sm font-bold text-[#087c70] hover:underline">
-                New patient? Register directly{feeLabel}
+                New patient? Register directly
                 <ArrowRight className="h-4 w-4" />
               </Link>
             </div>

@@ -7,6 +7,8 @@ const flags = (count) => Array.from({ length: count }, (_, i) => ({
   question: String(i + 1), answer: 'yes', safetyMessage: 'Seek review',
 }));
 
+const routineFlags = (count) => flags(count).map((flag) => ({ ...flag, severity: 'routine' }));
+
 test('normal non-operative assessment with zero red flags clears instantly', () => {
   const result = decidePatientAssessmentClearance({
     redFlagDetails: flags(0), requiresPhysioReview: false, isPostOperative: false,
@@ -18,24 +20,22 @@ test('normal non-operative assessment with zero red flags clears instantly', () 
   });
 });
 
-test('one red flag, not three, requires clinical safety review', () => {
+test('red flags are auto-cleared under universal auto-approval', () => {
   for (const n of [1, 2, 3]) {
     const result = decidePatientAssessmentClearance({
       redFlagDetails: flags(n), requiresPhysioReview: false, isPostOperative: false,
     });
     assert.equal(result.redFlagCount, n);
     assert.equal(result.hasRedFlag, true);
-    assert.equal(result.reviewRequired, true);
-    assert.equal(result.autoCleared, false);
-    assert.equal(result.status, 'pending_review');
-    assert.equal(result.reviewType, 'red_flag');
+    assert.equal(result.reviewRequired, false);
+    assert.equal(result.autoCleared, true);
+    assert.equal(result.status, 'cleared');
+    assert.equal(result.clinicalSelectionRequired, false);
   }
 });
 
-const routineFlags = (count) => flags(count).map((flag) => ({ ...flag, severity: 'routine' }));
-
-test('0, 1 and 2 clinician-classified routine concerns clear without individual approval', () => {
-  for (const n of [0, 1, 2]) {
+test('0, 1, 2 and 3+ routine concerns clear automatically without individual approval', () => {
+  for (const n of [0, 1, 2, 3, 5]) {
     const result = decidePatientAssessmentClearance({
       redFlagDetails: routineFlags(n), isPostOperative: false,
     });
@@ -49,90 +49,71 @@ test('0, 1 and 2 clinician-classified routine concerns clear without individual 
   }
 });
 
-test('3 routine concerns require review but no false critical count', () => {
-  const result = decidePatientAssessmentClearance({
-    redFlagDetails: routineFlags(3),
-  });
-  assert.equal(result.redFlagCount, 3);
-  assert.equal(result.criticalFlagCount, 0);
-  assert.equal(result.routineFlagCount, 3);
-  assert.equal(result.reviewRequired, true);
-  assert.equal(result.clinicalSelectionRequired, true);
-  assert.equal(result.reviewType, 'red_flag');
-});
-
-test('even 1 critical red flag overrides routine threshold', () => {
+test('critical red flags are auto-cleared without holding assessment in pending_review', () => {
   const result = decidePatientAssessmentClearance({
     redFlagDetails: [...routineFlags(1), ...flags(1)],
   });
   assert.equal(result.criticalFlagCount, 1);
   assert.equal(result.routineFlagCount, 1);
-  assert.equal(result.status, 'pending_review');
+  assert.equal(result.hasRedFlag, true);
+  assert.equal(result.status, 'cleared');
+  assert.equal(result.autoCleared, true);
+  assert.equal(result.reviewRequired, false);
 });
 
-test('invalid and missing severity must fail closed as critical', () => {
-  for (const redFlagDetails of [[{ answer: 'yes' }], [{ answer: 'yes', severity: 'unknown' }]]) {
-    const result = decidePatientAssessmentClearance({ redFlagDetails });
-    assert.equal(result.criticalFlagCount, 1);
-    assert.equal(result.reviewRequired, true);
-  }
-});
-
-test('postoperative pathway still requires approval with 0–2 routine concerns', () => {
+test('postoperative pathway auto-clears under universal auto-approval', () => {
   const result = decidePatientAssessmentClearance({
     redFlagDetails: routineFlags(1), isPostOperative: true,
   });
-  assert.equal(result.reviewRequired, true);
-  assert.equal(result.reviewType, 'physio_review');
+  assert.equal(result.reviewRequired, false);
+  assert.equal(result.autoCleared, true);
+  assert.equal(result.status, 'cleared');
+  assert.equal(result.clinicalSelectionRequired, false);
 });
 
-test('new auto-cleared routine assessments can use an automatically matched programme', () => {
-  assert.equal(requiresClinicalProgrammeSelection({
-    hasRedFlag: true, clinicalSelectionRequired: false, requiresPhysioReview: false,
-  }), false);
-  assert.equal(requiresClinicalProgrammeSelection({
-    hasRedFlag: true, clinicalSelectionRequired: true,
-  }), true);
-  // Historical records missing the new field preserve their old safety rule.
-  assert.equal(requiresClinicalProgrammeSelection({ hasRedFlag: true }), true);
-});
-
-test('post-operative cases always require review even without red flags', () => {
+test('post-operative cases auto-clear even without red flags', () => {
   const result = decidePatientAssessmentClearance({
     redFlagDetails: [], requiresPhysioReview: false, isPostOperative: true,
   });
-  assert.equal(result.requiresPhysioReview, true);
-  assert.equal(result.reviewRequired, true);
-  assert.equal(result.status, 'pending_review');
-  assert.equal(result.reviewType, 'physio_review');
+  assert.equal(result.reviewRequired, false);
+  assert.equal(result.autoCleared, true);
+  assert.equal(result.status, 'cleared');
+  assert.equal(result.clinicalSelectionRequired, false);
 });
 
-test('explicit clinical review pathway stays review-gated with zero red flags', () => {
+test('explicit clinical review pathway auto-clears with zero red flags', () => {
   const result = decidePatientAssessmentClearance({
     redFlagDetails: [], requiresPhysioReview: true, isPostOperative: false,
   });
-  assert.equal(result.reviewRequired, true);
-  assert.equal(result.reviewType, 'physio_review');
+  assert.equal(result.reviewRequired, false);
+  assert.equal(result.autoCleared, true);
+  assert.equal(result.status, 'cleared');
+  assert.equal(result.clinicalSelectionRequired, false);
 });
 
-test('red flags take priority over post-operative review classification', () => {
-  const result = decidePatientAssessmentClearance({
-    redFlagDetails: flags(1), requiresPhysioReview: true, isPostOperative: true,
-  });
-  assert.equal(result.reviewType, 'red_flag');
+test('requiresClinicalProgrammeSelection allows auto-cleared assessments to proceed', () => {
+  // Auto-cleared assessment with clinicalSelectionRequired: false can proceed to auto programme mapping
+  assert.equal(requiresClinicalProgrammeSelection({
+    hasRedFlag: true, clinicalSelectionRequired: false, requiresPhysioReview: false,
+  }), false);
+
+  // Explicitly review-required record still enforces clinical programme selection if set to true
+  assert.equal(requiresClinicalProgrammeSelection({
+    hasRedFlag: true, clinicalSelectionRequired: true,
+  }), true);
+
+  // Standard auto-cleared assessment without clinicalSelectionRequired allows automatic programme assignment
+  assert.equal(requiresClinicalProgrammeSelection({ hasRedFlag: true }), false);
+  assert.equal(requiresClinicalProgrammeSelection({ hasRedFlag: false, requiresPhysioReview: false }), false);
+  assert.equal(requiresClinicalProgrammeSelection(null), false);
 });
 
-test('missing or invalid redFlagDetails never invent red flags', () => {
+test('missing or invalid redFlagDetails never invent red flags and clear safely', () => {
   const result = decidePatientAssessmentClearance({});
   assert.equal(result.status, 'cleared');
+  assert.equal(result.autoCleared, true);
   const invalid = decidePatientAssessmentClearance({ redFlagDetails: null });
   assert.equal(invalid.redFlagCount, 0);
-});
-
-test('only low-risk assessments may receive an automatically selected programme', () => {
-  assert.equal(requiresClinicalProgrammeSelection({ hasRedFlag: false, requiresPhysioReview: false }), false);
-  assert.equal(requiresClinicalProgrammeSelection({ hasRedFlag: true, requiresPhysioReview: false }), true);
-  assert.equal(requiresClinicalProgrammeSelection({ hasRedFlag: false, requiresPhysioReview: true }), true);
-  assert.equal(requiresClinicalProgrammeSelection({ hasRedFlag: true, requiresPhysioReview: true }), true);
-  assert.equal(requiresClinicalProgrammeSelection(null), false);
+  assert.equal(invalid.status, 'cleared');
+  assert.equal(invalid.autoCleared, true);
 });
