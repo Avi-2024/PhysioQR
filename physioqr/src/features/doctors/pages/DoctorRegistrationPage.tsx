@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, type ReactNode } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -10,33 +10,31 @@ import {
   ArrowRight,
   ArrowLeft,
   ShieldCheck,
-  FileText,
-  BadgeCheck,
   QrCode,
   DollarSign,
   AlertCircle,
   Clock,
-  Sparkles
 } from 'lucide-react';
+import { State, City } from 'country-state-city';
 import apiClient from '@/lib/api-client';
 import { Logo } from '@/components/brand/Logo';
 
 const doctorRegistrationSchema = z.object({
-  fullName: z.string().min(2, 'Enter your full name with title (e.g., Dr. Rajesh Sharma)'),
-  mobile: z.string().regex(/^[6-9]\d{9}$/, 'Enter a valid 10-digit Indian mobile number'),
-  email: z.string().email('Enter a valid email address').optional().or(z.literal('')),
-  qualification: z.string().min(2, 'Enter your medical qualification (e.g. MBBS, MS Ortho, MPT, DNB)'),
-  specialization: z.string().min(2, 'Enter your specialization (e.g. Orthopedics, Sports Medicine, Spine, Physiotherapy)'),
-  medicalRegNumber: z.string().min(2, 'Enter your Medical Council registration number'),
-  registrationCouncil: z.string().optional(),
-  yearsOfExperience: z.coerce.number().min(0).max(65).optional(),
-  clinicName: z.string().min(2, 'Enter clinic or hospital name'),
+  fullName: z.string().min(2, 'Enter doctor full name'),
+  mobile: z.string().regex(/^[6-9]\d{9}$/, 'Enter valid 10-digit mobile number'),
+  email: z.string().min(1, 'Doctor email is required').email('Enter valid email address'),
+  qualification: z.string().min(2, 'Qualification required'),
+  specialization: z.string().min(2, 'Specialization required'),
+  medicalRegNumber: z.string().min(2, 'Medical registration number required'),
+  clinicName: z.string().min(2, 'Clinic name required'),
+  state: z.string().optional(),
+  city: z.string().min(2, 'City required'),
   clinicAddress: z.string().optional(),
-  city: z.string().min(2, 'Enter clinic city'),
-  state: z.string().min(2, 'Enter clinic state'),
-  postalCode: z.string().optional(),
-  revenueModel: z.enum(['split', 'platform_fee']).default('split'),
-  requestedPatientFee: z.coerce.number().min(1, 'Patient price must be at least ₹1').max(100000, 'Price exceeds limit').default(499),
+  registrationCouncil: z.string().optional(),
+  yearsOfExperience: z.preprocess(
+    (v) => (v === '' || v === undefined || v === null ? undefined : Number(v)),
+    z.number().min(0).max(65).optional(),
+  ),
 });
 
 type DoctorFormData = z.infer<typeof doctorRegistrationSchema>;
@@ -45,8 +43,10 @@ interface SubmittedDoctor {
   doctorId?: string;
   fullName: string;
   mobile: string;
+  email?: string;
   clinicName?: string;
   city?: string;
+  state?: string;
   status?: string;
 }
 
@@ -55,12 +55,23 @@ export default function DoctorRegistrationPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submittedData, setSubmittedData] = useState<SubmittedDoctor | null>(null);
+  const [selectedStateCode, setSelectedStateCode] = useState<string>('');
+  const [isCustomCity, setIsCustomCity] = useState(false);
+
+  const indianStates = useMemo(() => {
+    return State.getStatesOfCountry('IN').sort((a, b) => a.name.localeCompare(b.name));
+  }, []);
+
+  const availableCities = useMemo(() => {
+    if (!selectedStateCode) return [];
+    return City.getCitiesOfState('IN', selectedStateCode).sort((a, b) => a.name.localeCompare(b.name));
+  }, [selectedStateCode]);
 
   const {
     register,
     handleSubmit,
-    watch,
-    formState: { errors }
+    setValue,
+    formState: { errors },
   } = useForm<DoctorFormData>({
     resolver: zodResolver(doctorRegistrationSchema),
     defaultValues: {
@@ -68,54 +79,53 @@ export default function DoctorRegistrationPage() {
       mobile: '',
       email: '',
       qualification: '',
-      specialization: 'Orthopedics',
+      specialization: '',
       medicalRegNumber: '',
       registrationCouncil: '',
       clinicName: '',
       clinicAddress: '',
       city: '',
       state: '',
-      postalCode: '',
-      revenueModel: 'split',
-      requestedPatientFee: 499,
-    }
+    },
   });
 
-  const selectedRevenueModel = watch('revenueModel');
-  const patientPrice = watch('requestedPatientFee') || 499;
+  const stateRegister = register('state');
+  const cityRegister = register('city');
+
+  const handleStateChange = (stateName: string) => {
+    const found = indianStates.find((s) => s.name === stateName || s.isoCode === stateName);
+    setSelectedStateCode(found ? found.isoCode : '');
+    setValue('city', '');
+    setIsCustomCity(false);
+  };
 
   const onSubmit = async (data: DoctorFormData) => {
     setIsSubmitting(true);
     setSubmitError(null);
 
     try {
-      const payload: Record<string, any> = {
+      const payload: Record<string, unknown> = {
         fullName: data.fullName.trim(),
         mobile: data.mobile.trim(),
+        email: data.email.trim().toLowerCase(),
         qualification: data.qualification.trim(),
         specialization: data.specialization.trim(),
         medicalRegNumber: data.medicalRegNumber.trim(),
         clinicName: data.clinicName.trim(),
         city: data.city.trim(),
-        state: data.state.trim(),
-        revenueModel: data.revenueModel,
-        requestedPatientFee: Number(data.requestedPatientFee) || 499,
       };
 
-      if (data.email && data.email.trim()) {
-        payload.email = data.email.trim().toLowerCase();
-      }
-      if (data.registrationCouncil && data.registrationCouncil.trim()) {
-        payload.registrationCouncil = data.registrationCouncil.trim();
-      }
-      if (data.yearsOfExperience !== undefined && !isNaN(Number(data.yearsOfExperience))) {
-        payload.yearsOfExperience = Number(data.yearsOfExperience);
+      if (data.state && data.state.trim()) {
+        payload.state = data.state.trim();
       }
       if (data.clinicAddress && data.clinicAddress.trim()) {
         payload.clinicAddress = data.clinicAddress.trim();
       }
-      if (data.postalCode && data.postalCode.trim()) {
-        payload.postalCode = data.postalCode.trim();
+      if (data.registrationCouncil && data.registrationCouncil.trim()) {
+        payload.registrationCouncil = data.registrationCouncil.trim();
+      }
+      if (data.yearsOfExperience !== undefined) {
+        payload.yearsOfExperience = data.yearsOfExperience;
       }
 
       const response = await apiClient.post('/doctors/self-register', payload);
@@ -124,14 +134,19 @@ export default function DoctorRegistrationPage() {
         doctorId: response.data?.doctorId || response.data?._id,
         fullName: response.data?.fullName || data.fullName,
         mobile: response.data?.mobile || data.mobile,
+        email: response.data?.email || data.email,
         clinicName: response.data?.clinicName || data.clinicName,
         city: response.data?.city || data.city,
+        state: response.data?.state || data.state,
         status: response.data?.status || 'submitted',
       });
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } catch (err: any) {
+      try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch { /* noop in tests */ }
+    } catch (err: unknown) {
       console.error('Doctor registration failed:', err);
-      const message = err.response?.data?.message || err.message || 'Failed to submit registration. Please verify your details and try again.';
+      const message =
+        (err as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ||
+        (err as { message?: string })?.message ||
+        'Failed to submit registration. Please verify your details and try again.';
       setSubmitError(message);
     } finally {
       setIsSubmitting(false);
@@ -168,6 +183,7 @@ export default function DoctorRegistrationPage() {
               </p>
             </div>
 
+
             {/* Application Overview Box */}
             <div className="mt-6 rounded-xl border border-teal-100 bg-[#F4FAF8] p-4 sm:p-5">
               <h3 className="text-xs font-bold uppercase tracking-wider text-teal-800">Application Summary</h3>
@@ -181,8 +197,18 @@ export default function DoctorRegistrationPage() {
                   <div className="font-semibold text-neutral-900">{submittedData.mobile}</div>
                 </div>
                 <div>
+                  <span className="text-xs text-neutral-500">Email Address</span>
+                  <div className="font-semibold text-neutral-900">{submittedData.email || '—'}</div>
+                </div>
+                <div>
                   <span className="text-xs text-neutral-500">Clinic / Hospital</span>
                   <div className="font-semibold text-neutral-900">{submittedData.clinicName || '—'}</div>
+                </div>
+                <div>
+                  <span className="text-xs text-neutral-500">Location</span>
+                  <div className="font-semibold text-neutral-900">
+                    {[submittedData.city, submittedData.state].filter(Boolean).join(', ') || '—'}
+                  </div>
                 </div>
                 <div>
                   <span className="text-xs text-neutral-500">Verification Status</span>
@@ -298,7 +324,7 @@ export default function DoctorRegistrationPage() {
               <DollarSign className="h-5 w-5 text-teal-600 shrink-0" />
               <div className="text-xs">
                 <div className="font-bold text-neutral-900">50:50 Revenue Share</div>
-                <div className="text-neutral-500">Automated payout tracking</div>
+                <div className="text-neutral-500">Transparent split model</div>
               </div>
             </div>
           </div>
@@ -324,48 +350,34 @@ export default function DoctorRegistrationPage() {
               </div>
 
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                <div className="sm:col-span-2">
-                  <label className="block text-xs font-bold uppercase tracking-wider text-neutral-700">
-                    Full Name with Title *
-                  </label>
+                <FormField label="Doctor Full Name" required error={errors.fullName?.message}>
                   <input
                     type="text"
                     {...register('fullName')}
-                    placeholder="e.g. Dr. Rajesh Sharma"
-                    className="mt-1.5 w-full rounded-xl border border-neutral-300 px-3.5 py-2.5 text-sm text-neutral-900 focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600"
+                    placeholder="Doctor name"
+                    className={inputClass}
                   />
-                  {errors.fullName && <p className="mt-1 text-xs text-rose-600">{errors.fullName.message}</p>}
-                </div>
+                </FormField>
 
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-neutral-700">
-                    Mobile Number (Login & SMS) *
-                  </label>
-                  <div className="relative mt-1.5">
-                    <span className="absolute left-3.5 top-2.5 text-sm font-semibold text-neutral-400">+91</span>
-                    <input
-                      type="tel"
-                      maxLength={10}
-                      {...register('mobile')}
-                      placeholder="9876543210"
-                      className="w-full rounded-xl border border-neutral-300 pl-12 pr-3.5 py-2.5 text-sm text-neutral-900 focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600"
-                    />
-                  </div>
-                  {errors.mobile && <p className="mt-1 text-xs text-rose-600">{errors.mobile.message}</p>}
-                </div>
+                <FormField label="Mobile Number" required error={errors.mobile?.message}>
+                  <input
+                    type="tel"
+                    inputMode="numeric"
+                    maxLength={10}
+                    {...register('mobile')}
+                    placeholder="10-digit mobile"
+                    className={inputClass}
+                  />
+                </FormField>
 
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-neutral-700">
-                    Email Address (Optional)
-                  </label>
+                <FormField label="Email Address" required wide error={errors.email?.message}>
                   <input
                     type="email"
                     {...register('email')}
-                    placeholder="dr.rajesh@clinic.com"
-                    className="mt-1.5 w-full rounded-xl border border-neutral-300 px-3.5 py-2.5 text-sm text-neutral-900 focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600"
+                    placeholder="doctor@clinic.com"
+                    className={inputClass}
                   />
-                  {errors.email && <p className="mt-1 text-xs text-rose-600">{errors.email.message}</p>}
-                </div>
+                </FormField>
               </div>
             </div>
 
@@ -377,70 +389,52 @@ export default function DoctorRegistrationPage() {
               </div>
 
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-neutral-700">
-                    Medical Qualification *
-                  </label>
+                <FormField label="Qualification" required error={errors.qualification?.message}>
                   <input
                     type="text"
                     {...register('qualification')}
-                    placeholder="e.g. MBBS, MS (Ortho), DNB"
-                    className="mt-1.5 w-full rounded-xl border border-neutral-300 px-3.5 py-2.5 text-sm text-neutral-900 focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600"
+                    placeholder="e.g. BPT, MPT"
+                    className={inputClass}
                   />
-                  {errors.qualification && <p className="mt-1 text-xs text-rose-600">{errors.qualification.message}</p>}
-                </div>
+                </FormField>
 
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-neutral-700">
-                    Primary Specialization *
-                  </label>
+                <FormField label="Specialization" required error={errors.specialization?.message}>
                   <input
                     type="text"
                     {...register('specialization')}
-                    placeholder="e.g. Orthopedic Surgery, Spine, Sports Medicine"
-                    className="mt-1.5 w-full rounded-xl border border-neutral-300 px-3.5 py-2.5 text-sm text-neutral-900 focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600"
+                    placeholder="e.g. Orthopaedic Physio"
+                    className={inputClass}
                   />
-                  {errors.specialization && <p className="mt-1 text-xs text-rose-600">{errors.specialization.message}</p>}
-                </div>
+                </FormField>
 
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-neutral-700">
-                    Medical Reg. Number *
-                  </label>
+                <FormField label="Medical Registration Number" required error={errors.medicalRegNumber?.message}>
                   <input
                     type="text"
                     {...register('medicalRegNumber')}
-                    placeholder="e.g. DMC/R/12345 or MCI-6789"
-                    className="mt-1.5 w-full rounded-xl border border-neutral-300 px-3.5 py-2.5 text-sm text-neutral-900 focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600"
+                    placeholder="e.g. REG-12345"
+                    className={inputClass}
                   />
-                  {errors.medicalRegNumber && <p className="mt-1 text-xs text-rose-600">{errors.medicalRegNumber.message}</p>}
-                </div>
+                </FormField>
 
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-neutral-700">
-                    Registration Council
-                  </label>
+                <FormField label="Registration Council">
                   <input
                     type="text"
                     {...register('registrationCouncil')}
                     placeholder="e.g. Delhi Medical Council"
-                    className="mt-1.5 w-full rounded-xl border border-neutral-300 px-3.5 py-2.5 text-sm text-neutral-900 focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600"
+                    className={inputClass}
                   />
-                </div>
+                </FormField>
 
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-neutral-700">
-                    Years of Clinical Experience
-                  </label>
+                <FormField label="Years of Clinical Experience" wide>
                   <input
                     type="number"
                     min="0"
                     max="65"
                     {...register('yearsOfExperience')}
-                    placeholder="e.g. 12"
-                    className="mt-1.5 w-full rounded-xl border border-neutral-300 px-3.5 py-2.5 text-sm text-neutral-900 focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600"
+                    placeholder="e.g. 10"
+                    className={inputClass}
                   />
-                </div>
+                </FormField>
               </div>
             </div>
 
@@ -452,144 +446,110 @@ export default function DoctorRegistrationPage() {
               </div>
 
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                <div className="sm:col-span-2">
-                  <label className="block text-xs font-bold uppercase tracking-wider text-neutral-700">
-                    Clinic / Hospital / Practice Name *
-                  </label>
+                <FormField label="Clinic Name" required wide error={errors.clinicName?.message}>
                   <input
                     type="text"
                     {...register('clinicName')}
-                    placeholder="e.g. Apex Orthopedics & Joint Clinic"
-                    className="mt-1.5 w-full rounded-xl border border-neutral-300 px-3.5 py-2.5 text-sm text-neutral-900 focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600"
+                    placeholder="e.g. City Spine & Joint Clinic"
+                    className={inputClass}
                   />
-                  {errors.clinicName && <p className="mt-1 text-xs text-rose-600">{errors.clinicName.message}</p>}
-                </div>
+                </FormField>
 
-                <div className="sm:col-span-2">
-                  <label className="block text-xs font-bold uppercase tracking-wider text-neutral-700">
-                    Clinic Street Address
-                  </label>
-                  <input
-                    type="text"
-                    {...register('clinicAddress')}
-                    placeholder="e.g. 2nd Floor, Healthcare Tower, Ring Road"
-                    className="mt-1.5 w-full rounded-xl border border-neutral-300 px-3.5 py-2.5 text-sm text-neutral-900 focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-neutral-700">
-                    City *
-                  </label>
-                  <input
-                    type="text"
-                    {...register('city')}
-                    placeholder="e.g. New Delhi"
-                    className="mt-1.5 w-full rounded-xl border border-neutral-300 px-3.5 py-2.5 text-sm text-neutral-900 focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600"
-                  />
-                  {errors.city && <p className="mt-1 text-xs text-rose-600">{errors.city.message}</p>}
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-neutral-700">
-                    State *
-                  </label>
-                  <input
-                    type="text"
-                    {...register('state')}
-                    placeholder="e.g. Delhi"
-                    className="mt-1.5 w-full rounded-xl border border-neutral-300 px-3.5 py-2.5 text-sm text-neutral-900 focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600"
-                  />
-                  {errors.state && <p className="mt-1 text-xs text-rose-600">{errors.state.message}</p>}
-                </div>
-              </div>
-            </div>
-
-            {/* Section 4: Revenue & Commercial Model */}
-            <div>
-              <div className="flex items-center gap-2.5 border-b border-neutral-100 pb-3">
-                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-teal-100 text-teal-800 text-xs font-bold">4</div>
-                <h2 className="text-lg font-bold text-neutral-900">Commercial Partnership Preference</h2>
-              </div>
-
-              <div className="mt-4 space-y-4">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <label
-                    className={`cursor-pointer rounded-xl border p-4 transition ${
-                      selectedRevenueModel === 'split'
-                        ? 'border-teal-600 bg-teal-50/50 ring-1 ring-teal-600'
-                        : 'border-neutral-200 bg-white hover:border-neutral-300'
-                    }`}
+                <FormField label="State" error={errors.state?.message}>
+                  <select
+                    {...stateRegister}
+                    onChange={(e) => {
+                      stateRegister.onChange(e);
+                      handleStateChange(e.target.value);
+                    }}
+                    className={inputClass}
                   >
-                    <input
-                      type="radio"
-                      value="split"
-                      {...register('revenueModel')}
-                      className="sr-only"
-                    />
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-bold text-neutral-900">50:50 Split Model</span>
-                      <span className="rounded-full bg-teal-100 px-2 py-0.5 text-[11px] font-bold text-teal-800">Recommended</span>
-                    </div>
-                    <p className="mt-1.5 text-xs text-neutral-600">
-                      Standard healthcare revenue share. Doctor receives 50% of the verified patient rehabilitation payment.
-                    </p>
-                  </label>
+                    <option value="">Select State (optional)</option>
+                    {indianStates.map((st) => (
+                      <option key={st.isoCode} value={st.name}>
+                        {st.name}
+                      </option>
+                    ))}
+                  </select>
+                </FormField>
 
-                  <label
-                    className={`cursor-pointer rounded-xl border p-4 transition ${
-                      selectedRevenueModel === 'platform_fee'
-                        ? 'border-teal-600 bg-teal-50/50 ring-1 ring-teal-600'
-                        : 'border-neutral-200 bg-white hover:border-neutral-300'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      value="platform_fee"
-                      {...register('revenueModel')}
-                      className="sr-only"
-                    />
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-bold text-neutral-900">Platform Fee Model</span>
+                <FormField label="City" required error={errors.city?.message}>
+                  {selectedStateCode && availableCities.length > 0 && !isCustomCity ? (
+                    <div className="space-y-1.5">
+                      <select
+                        {...cityRegister}
+                        onChange={(e) => {
+                          if (e.target.value === '__custom__') {
+                            setIsCustomCity(true);
+                            setValue('city', '');
+                          } else {
+                            cityRegister.onChange(e);
+                          }
+                        }}
+                        className={inputClass}
+                      >
+                        <option value="">Select City</option>
+                        {availableCities.map((c) => (
+                          <option key={`${c.name}-${c.latitude || ''}`} value={c.name}>
+                            {c.name}
+                          </option>
+                        ))}
+                        <option value="__custom__">+ Other / Enter manually</option>
+                      </select>
+                      <div className="flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsCustomCity(true);
+                            setValue('city', '');
+                          }}
+                          className="text-xs font-medium text-teal-700 hover:text-teal-800 hover:underline"
+                        >
+                          City not listed? Enter manually
+                        </button>
+                      </div>
                     </div>
-                    <p className="mt-1.5 text-xs text-neutral-600">
-                      PhysioQR handles end-to-end rehabilitation delivery with full clinical platform support.
-                    </p>
-                  </label>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-neutral-700">
-                    Patient Programme Fee (₹)
-                  </label>
-                  <div className="mt-1.5 flex items-center gap-3">
-                    <div className="relative w-44">
-                      <span className="absolute left-3.5 top-2.5 text-sm font-semibold text-neutral-500">₹</span>
+                  ) : (
+                    <div className="space-y-1.5">
                       <input
-                        type="number"
-                        min="1"
-                        max="100000"
-                        {...register('requestedPatientFee')}
-                        className="w-full rounded-xl border border-neutral-300 pl-8 pr-3.5 py-2.5 text-sm font-semibold text-neutral-900 focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600"
+                        type="text"
+                        {...cityRegister}
+                        placeholder={selectedStateCode ? 'Enter city name' : 'Enter city (or select state first)'}
+                        className={inputClass}
                       />
-                    </div>
-                    <span className="text-xs text-neutral-500">
-                      {selectedRevenueModel === 'split' ? (
-                        <>Doctor share: <strong>₹{Math.floor(patientPrice / 2)}</strong> (50%) per patient</>
-                      ) : (
-                        'Standard clinic programme fee'
+                      {selectedStateCode && availableCities.length > 0 && (
+                        <div className="flex justify-end">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsCustomCity(false);
+                              setValue('city', '');
+                            }}
+                            className="text-xs font-medium text-teal-700 hover:text-teal-800 hover:underline"
+                          >
+                            ← Select from city list
+                          </button>
+                        </div>
                       )}
-                    </span>
-                  </div>
-                  {errors.requestedPatientFee && <p className="mt-1 text-xs text-rose-600">{errors.requestedPatientFee.message}</p>}
-                </div>
+                    </div>
+                  )}
+                </FormField>
+
+                <FormField label="Clinic Address" wide error={errors.clinicAddress?.message}>
+                  <textarea
+                    rows={3}
+                    {...register('clinicAddress')}
+                    placeholder="Full clinic address (e.g. Suite 402, Metro Healthcare Complex, MG Road)"
+                    className={`${inputClass} min-h-24 resize-y`}
+                  />
+                </FormField>
               </div>
             </div>
 
             {/* Terms and Submit */}
             <div className="border-t border-neutral-100 pt-5">
               <p className="mb-4 text-xs text-neutral-500 leading-relaxed">
-                By submitting this registration, you certify that you are a registered medical practitioner or clinic administrator. Your registration will be verified by the PhysioQR compliance desk prior to QR standee dispatch and account activation.
+                By submitting this registration, you certify that you are a registered medical practitioner or clinic administrator. Your registration will be verified by the PhysioQR clinical compliance desk prior to QR standee dispatch and account activation.
               </p>
 
               <button
@@ -613,3 +573,31 @@ export default function DoctorRegistrationPage() {
     </div>
   );
 }
+
+function FormField({
+  label,
+  required,
+  error,
+  wide,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  error?: string;
+  wide?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <label className={wide ? 'sm:col-span-2 block' : 'block'}>
+      <span className="block text-xs font-bold uppercase tracking-wider text-neutral-700 mb-1.5">
+        {label}
+        {required && <span className="text-rose-500 ml-0.5">*</span>}
+      </span>
+      {children}
+      {error && <p className="mt-1 text-xs text-rose-600 font-medium">{error}</p>}
+    </label>
+  );
+}
+
+const inputClass =
+  'w-full rounded-xl border border-neutral-300 px-3.5 py-2.5 text-sm text-neutral-900 focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600 disabled:bg-neutral-50 disabled:text-neutral-500';

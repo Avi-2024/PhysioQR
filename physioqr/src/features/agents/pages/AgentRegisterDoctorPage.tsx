@@ -1,10 +1,11 @@
-import { useState, type ReactNode } from 'react';
+import { useState, useMemo, type ReactNode } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, CheckCircle, Copy, Stethoscope } from 'lucide-react';
+import { State, City } from 'country-state-city';
 import apiClient from '@/lib/api-client';
 
 const optionalNumber = (min: number, max: number) => z.preprocess(
@@ -15,11 +16,14 @@ const optionalNumber = (min: number, max: number) => z.preprocess(
 const schema = z.object({
   fullName: z.string().min(2, 'Enter doctor full name'),
   mobile: z.string().regex(/^[6-9]\d{9}$/, 'Enter valid 10-digit mobile number'),
+  email: z.string().min(1, 'Doctor email is required').email('Enter valid email address'),
   qualification: z.string().min(2, 'Qualification required'),
   specialization: z.string().min(2, 'Specialization required'),
   medicalRegNumber: z.string().min(2, 'Medical registration number required'),
   clinicName: z.string().min(2, 'Clinic name required'),
+  state: z.string().optional(),
   city: z.string().min(2, 'City required'),
+  clinicAddress: z.string().optional(),
   revenueModel: z.enum(['split', 'platform_fee']),
   requestedPatientFee: z.coerce.number().min(1, 'Enter the patient price').max(100000, 'Price is too high'),
   requestedFeeShareType: z.enum(['percentage', 'fixed']).optional(),
@@ -51,6 +55,10 @@ type CreatedDoctor = {
   doctorId?: string;
   fullName?: string;
   mobile?: string;
+  email?: string;
+  clinicName?: string;
+  city?: string;
+  state?: string;
   temporaryPassword?: string;
   status?: string;
 };
@@ -60,17 +68,34 @@ export default function AgentRegisterDoctorPage() {
   const queryClient = useQueryClient();
   const [createdDoctor, setCreatedDoctor] = useState<CreatedDoctor | null>(null);
   const [copied, setCopied] = useState(false);
+  const [selectedStateCode, setSelectedStateCode] = useState<string>('');
+  const [isCustomCity, setIsCustomCity] = useState(false);
 
-  const { register, handleSubmit, watch, reset, formState: { errors } } = useForm<FormData>({
+  const indianStates = useMemo(() => {
+    return State.getStatesOfCountry('IN').sort((a, b) => a.name.localeCompare(b.name));
+  }, []);
+
+  const availableCities = useMemo(() => {
+    if (!selectedStateCode) return [];
+    return City.getCitiesOfState('IN', selectedStateCode).sort((a, b) => a.name.localeCompare(b.name));
+  }, [selectedStateCode]);
+
+  const { register, handleSubmit, watch, reset, setValue, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
       revenueModel: 'split',
       requestedFeeShareType: 'percentage',
+      state: '',
+      city: '',
+      clinicAddress: '',
     },
   });
 
   const revenueModel = watch('revenueModel');
   const commissionType = watch('requestedFeeShareType');
+  const stateRegister = register('state');
+  const cityRegister = register('city');
+
   const mutation = useMutation({
     mutationFn: async (data: FormData) => apiClient.post('/doctors', clean(data)),
     onSuccess: async (response) => {
@@ -81,6 +106,13 @@ export default function AgentRegisterDoctorPage() {
       ]);
     },
   });
+
+  const handleStateChange = (stateName: string) => {
+    const found = indianStates.find((s) => s.name === stateName || s.isoCode === stateName);
+    setSelectedStateCode(found ? found.isoCode : '');
+    setValue('city', '');
+    setIsCustomCity(false);
+  };
 
   if (createdDoctor) {
     const copyPassword = async () => {
@@ -101,6 +133,9 @@ export default function AgentRegisterDoctorPage() {
             <Info label="Doctor" value={createdDoctor.fullName || '—'} />
             <Info label="Doctor ID" value={createdDoctor.doctorId || '—'} />
             <Info label="Login mobile" value={createdDoctor.mobile || '—'} />
+            <Info label="Email" value={createdDoctor.email || '—'} />
+            <Info label="Clinic" value={createdDoctor.clinicName || '—'} />
+            <Info label="Location" value={[createdDoctor.city, createdDoctor.state].filter(Boolean).join(', ') || '—'} />
             <Info label="Status" value="Approved" />
           </div>
 
@@ -116,7 +151,18 @@ export default function AgentRegisterDoctorPage() {
           )}
 
           <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-end">
-            <button type="button" onClick={() => { setCreatedDoctor(null); reset(); }} className="min-h-11 rounded-lg border border-neutral-300 bg-white px-4 text-sm font-semibold text-neutral-700">Register another</button>
+            <button
+              type="button"
+              onClick={() => {
+                setCreatedDoctor(null);
+                setSelectedStateCode('');
+                setIsCustomCity(false);
+                reset();
+              }}
+              className="min-h-11 rounded-lg border border-neutral-300 bg-white px-4 text-sm font-semibold text-neutral-700"
+            >
+              Register another
+            </button>
             <button type="button" onClick={() => navigate(`/agent/doctors/${createdDoctor._id}`)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white"><Stethoscope className="h-4 w-4" />View doctor</button>
           </div>
         </div>
@@ -136,13 +182,112 @@ export default function AgentRegisterDoctorPage() {
 
       <form onSubmit={handleSubmit((data) => mutation.mutate(data))} className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm sm:p-7">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Doctor Full Name" required error={errors.fullName?.message}><input {...register('fullName')} className={inputClass} placeholder="Doctor name" /></Field>
-          <Field label="Mobile Number" required error={errors.mobile?.message}><input {...register('mobile')} inputMode="numeric" className={inputClass} placeholder="10-digit mobile" /></Field>
-          <Field label="Qualification" required error={errors.qualification?.message}><input {...register('qualification')} className={inputClass} placeholder="e.g. BPT, MPT" /></Field>
-          <Field label="Specialization" required error={errors.specialization?.message}><input {...register('specialization')} className={inputClass} placeholder="e.g. Orthopaedic Physio" /></Field>
-          <Field label="Medical Registration Number" required error={errors.medicalRegNumber?.message}><input {...register('medicalRegNumber')} className={inputClass} /></Field>
-          <Field label="Clinic Name" required error={errors.clinicName?.message}><input {...register('clinicName')} className={inputClass} /></Field>
-          <Field label="City" required error={errors.city?.message}><input {...register('city')} className={inputClass} /></Field>
+          <Field label="Doctor Full Name" required error={errors.fullName?.message}>
+            <input {...register('fullName')} className={inputClass} placeholder="Doctor name" />
+          </Field>
+          <Field label="Mobile Number" required error={errors.mobile?.message}>
+            <input {...register('mobile')} inputMode="numeric" className={inputClass} placeholder="10-digit mobile" />
+          </Field>
+          <Field label="Email Address" required error={errors.email?.message}>
+            <input {...register('email')} type="email" className={inputClass} placeholder="doctor@clinic.com" />
+          </Field>
+          <Field label="Qualification" required error={errors.qualification?.message}>
+            <input {...register('qualification')} className={inputClass} placeholder="e.g. BPT, MPT" />
+          </Field>
+          <Field label="Specialization" required error={errors.specialization?.message}>
+            <input {...register('specialization')} className={inputClass} placeholder="e.g. Orthopaedic Physio" />
+          </Field>
+          <Field label="Medical Registration Number" required error={errors.medicalRegNumber?.message}>
+            <input {...register('medicalRegNumber')} className={inputClass} placeholder="e.g. REG-12345" />
+          </Field>
+          <Field label="Clinic Name" required error={errors.clinicName?.message}>
+            <input {...register('clinicName')} className={inputClass} placeholder="e.g. City Spine & Joint Clinic" />
+          </Field>
+          <Field label="State" error={errors.state?.message}>
+            <select
+              {...stateRegister}
+              onChange={(e) => {
+                stateRegister.onChange(e);
+                handleStateChange(e.target.value);
+              }}
+              className={inputClass}
+            >
+              <option value="">Select State (optional)</option>
+              {indianStates.map((st) => (
+                <option key={st.isoCode} value={st.name}>
+                  {st.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="City" required error={errors.city?.message}>
+            {selectedStateCode && availableCities.length > 0 && !isCustomCity ? (
+              <div className="space-y-1.5">
+                <select
+                  {...cityRegister}
+                  onChange={(e) => {
+                    if (e.target.value === '__custom__') {
+                      setIsCustomCity(true);
+                      setValue('city', '');
+                    } else {
+                      cityRegister.onChange(e);
+                    }
+                  }}
+                  className={inputClass}
+                >
+                  <option value="">Select City</option>
+                  {availableCities.map((city) => (
+                    <option key={`${city.name}-${city.latitude || ''}`} value={city.name}>
+                      {city.name}
+                    </option>
+                  ))}
+                  <option value="__custom__">+ Other / Enter manually</option>
+                </select>
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCustomCity(true);
+                      setValue('city', '');
+                    }}
+                    className="text-xs font-medium text-primary-600 hover:text-primary-700 hover:underline"
+                  >
+                    City not listed? Enter manually
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                <input
+                  {...cityRegister}
+                  className={inputClass}
+                  placeholder={selectedStateCode ? 'Enter city name' : 'Enter city (or select state first)'}
+                />
+                {selectedStateCode && availableCities.length > 0 && (
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCustomCity(false);
+                        setValue('city', '');
+                      }}
+                      className="text-xs font-medium text-primary-600 hover:text-primary-700 hover:underline"
+                    >
+                      ← Select from city list
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </Field>
+          <Field label="Clinic Address" wide error={errors.clinicAddress?.message}>
+            <textarea
+              {...register('clinicAddress')}
+              rows={3}
+              className={`${inputClass} min-h-24 resize-y`}
+              placeholder="Full clinic address (e.g. Suite 402, Metro Healthcare Complex, MG Road)"
+            />
+          </Field>
         </div>
 
         <div className="my-6 border-t border-neutral-200" />
@@ -196,7 +341,18 @@ export default function AgentRegisterDoctorPage() {
 }
 
 const inputClass = 'min-h-11 w-full rounded-lg border border-neutral-300 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 disabled:cursor-not-allowed disabled:bg-neutral-50 disabled:text-neutral-500';
-function Field({ label, error, required, children }: { label: string; error?: string; required?: boolean; children: ReactNode }) { return <label className="block"><span className="mb-1.5 block text-sm font-semibold text-neutral-700">{label}{required && <span className="ml-0.5 text-rose-500">*</span>}</span>{children}{error && <p className="mt-1 text-xs font-medium text-rose-600">{error}</p>}</label>; }
+function Field({ label, error, required, wide, children }: { label: string; error?: string; required?: boolean; wide?: boolean; children: ReactNode }) {
+  return (
+    <label className={wide ? 'sm:col-span-2 block' : 'block'}>
+      <span className="mb-1.5 block text-sm font-semibold text-neutral-700">
+        {label}
+        {required && <span className="ml-0.5 text-rose-500">*</span>}
+      </span>
+      {children}
+      {error && <p className="mt-1 text-xs font-medium text-rose-600">{error}</p>}
+    </label>
+  );
+}
 function Info({ label, value }: { label: string; value: string }) { return <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3"><div className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{label}</div><div className="mt-1 text-sm font-semibold text-neutral-900">{value}</div></div>; }
 function clean(data: FormData) {
   const payload = { ...data } as Record<string, unknown>;

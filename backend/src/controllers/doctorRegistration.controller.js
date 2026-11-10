@@ -22,13 +22,21 @@ const REGISTRATION_FIELDS = [
 const AGENT_REGISTRATION_FIELDS = [
   'fullName',
   'mobile',
+  'whatsapp',
+  'email',
   'qualification',
   'specialization',
   'medicalRegNumber',
+  'registrationCouncil',
+  'yearsOfExperience',
   'clinicName',
+  'clinicAddress',
   'city',
-  // Rehab programmes are selected later during patient clinical onboarding,
-  // never while an Agent registers a doctor.
+  'state',
+  'postalCode',
+  'clinicContact',
+  'clinicWorkingHours',
+  'googleMapsLink',
   'revenueModel',
   'requestedPatientFee',
   'requestedFeeShareType',
@@ -44,8 +52,6 @@ const AGENT_REQUIRED_FIELDS = [
   'medicalRegNumber',
   'clinicName',
   'city',
-  'revenueModel',
-  'requestedPatientFee',
 ];
 const REVENUE_MODELS = ['split', 'platform_fee'];
 const REQUESTED_FEE_SHARE_TYPES = ['percentage', 'fixed'];
@@ -175,6 +181,13 @@ const registerDoctorSecure = asyncHandler(async (req, res) => {
   if (payload.medicalRegNumber) payload.medicalRegNumber = String(payload.medicalRegNumber).trim();
 
   if (isAgentRegistration) {
+    payload.revenueModel = payload.revenueModel || 'split';
+    if (payload.revenueModel === 'split' && !payload.requestedFeeShareType) {
+      payload.requestedFeeShareType = 'percentage';
+      if (payload.requestedFeeSharePercentage === undefined) {
+        payload.requestedFeeSharePercentage = 50;
+      }
+    }
     const validationError = validateAgentRegistration(payload);
     if (validationError) return res.status(400).json({ message: validationError });
   }

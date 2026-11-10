@@ -1,5 +1,5 @@
 const Doctor = require('../../models/Doctor.model');
-const { provisionApprovedDoctor } = require('../../services/doctorApproval.service');
+const { provisionApprovedDoctor, sendDoctorApprovalNotification } = require('../../services/doctorApproval.service');
 const { writeAuditLog } = require('../../utils/auditLogger');
 const asyncHandler = require('../../utils/asyncHandler');
 const { assertSplitTerms, normalizeRevenueConfiguration, isWebsiteDirectDoctor } = require('../../utils/splitModel');
@@ -36,10 +36,6 @@ const approveDoctor = asyncHandler(async (req, res) => {
     return res.status(400).json({ message: 'Fee share type must be percentage, fixed, or slab' });
   }
 
-  if (direct && !(Number(approvedPatientFee ?? doctor.approvedPatientFee) > 0)) {
-    return res.status(400).json({ message: 'Set an approved patient programme fee before activating a direct website doctor' });
-  }
-
   const previousValue = {
     status: doctor.status,
     approvedPatientFee: doctor.approvedPatientFee,
@@ -50,7 +46,9 @@ const approveDoctor = asyncHandler(async (req, res) => {
     feeShareHoldingDays: doctor.feeShareHoldingDays,
   };
 
-  if (approvedPatientFee !== undefined) doctor.approvedPatientFee = approvedPatientFee;
+  if (approvedPatientFee !== undefined && approvedPatientFee !== '' && approvedPatientFee !== null) {
+    doctor.approvedPatientFee = Number(approvedPatientFee);
+  }
   if (feeSharePercentage !== undefined) doctor.feeSharePercentage = feeSharePercentage;
   if (feeShareHoldingDays !== undefined) doctor.feeShareHoldingDays = feeShareHoldingDays;
   if (revenueModel !== undefined) doctor.revenueModel = revenueModel;
@@ -59,6 +57,13 @@ const approveDoctor = asyncHandler(async (req, res) => {
   if (direct) normalizeRevenueConfiguration(doctor);
 
   const { temporaryPassword } = await provisionApprovedDoctor({ doctor, password });
+
+  // Dispatch approval notifications with portal credentials to the doctor
+  if (temporaryPassword && (doctor.mobile || doctor.email)) {
+    sendDoctorApprovalNotification({ doctor, temporaryPassword }).catch((e) => {
+      console.error('Doctor approval notification error:', e.message);
+    });
+  }
 
   await writeAuditLog({
     req,
@@ -78,8 +83,12 @@ const approveDoctor = asyncHandler(async (req, res) => {
     },
   });
 
+  const message = doctor.qrCodeActive
+    ? 'Doctor approved, login enabled, wallet ready, and QR code active'
+    : 'Doctor approved, login enabled, and wallet ready. QR code will activate when patient programme fee is confirmed.';
+
   res.json({
-    message: 'Doctor approved, login enabled, wallet ready, and QR code active',
+    message,
     doctor,
     temporaryPassword,
   });

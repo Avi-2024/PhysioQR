@@ -73,10 +73,31 @@ const getRetryDelayMs = (retryCount = 0) => {
   return delaySeconds * 1000;
 };
 
+
+const isPlaceholderEmailConfig = () => {
+  const user = (process.env.EMAIL_USER || '').trim().toLowerCase();
+  const pass = (process.env.EMAIL_PASS || '').trim().toLowerCase();
+  return !user || !pass || user.includes('your_email') || pass.includes('your_email') || user.includes('example.com');
+};
+
+const isPlaceholderTwilioConfig = () => {
+  const sid = (process.env.TWILIO_ACCOUNT_SID || '').trim();
+  const token = (process.env.TWILIO_AUTH_TOKEN || '').trim();
+  return !sid || !token || sid.includes('your_') || token.includes('your_');
+};
+
 const getEmailTransport = () => {
   const { EMAIL_HOST, EMAIL_PORT, EMAIL_USER, EMAIL_PASS } = process.env;
   if (!EMAIL_HOST || !EMAIL_PORT || !EMAIL_USER || !EMAIL_PASS) throw serviceError('Email provider is not configured', 503);
-  return nodemailer.createTransport({ host: EMAIL_HOST, port: Number(EMAIL_PORT), secure: Number(EMAIL_PORT) === 465, auth: { user: EMAIL_USER, pass: EMAIL_PASS } });
+  return nodemailer.createTransport({
+    host: EMAIL_HOST,
+    port: Number(EMAIL_PORT),
+    secure: Number(EMAIL_PORT) === 465,
+    auth: { user: EMAIL_USER, pass: EMAIL_PASS },
+    connectionTimeout: 5000,
+    greetingTimeout: 5000,
+    socketTimeout: 8000,
+  });
 };
 
 const getTwilioClient = () => {
@@ -100,24 +121,47 @@ const loadRecipient = async (notification) => {
 };
 
 const resolveRecipientContact = async (notification) => {
-  if (notification.recipientContact) return notification.recipientContact;
-  if (notification.channel === 'web_push') return null;
-  if (notification.recipientType === 'admin' && !notification.adminUser && notification.channel === 'in_app') return null;
-  const recipient = await loadRecipient(notification);
-  if (!recipient) {
-    if (notification.channel === 'in_app' && notification.recipientType === 'admin') return null;
-    throw serviceError('Notification recipient profile was not found', 404);
+  let contact = notification.recipientContact;
+  if (!contact) {
+    if (notification.channel === 'web_push') return null;
+    if (notification.recipientType === 'admin' && !notification.adminUser && notification.channel === 'in_app') return null;
+    const recipient = await loadRecipient(notification);
+    if (!recipient) {
+      if (notification.channel === 'in_app' && notification.recipientType === 'admin') return null;
+      throw serviceError('Notification recipient profile was not found', 404);
+    }
+    if (notification.channel === 'email') contact = recipient.email || null;
+    if (notification.channel === 'sms') contact = recipient.mobile || recipient.whatsapp;
+    if (notification.channel === 'whatsapp') contact = recipient.whatsapp || recipient.mobile;
   }
-  if (notification.channel === 'email') return recipient.email || null;
-  if (notification.channel === 'sms') return toE164Mobile(recipient.mobile || recipient.whatsapp);
-  if (notification.channel === 'whatsapp') return `whatsapp:${toE164Mobile(recipient.whatsapp || recipient.mobile)}`;
-  return null;
+  if (!contact) return null;
+  if (notification.channel === 'sms') return toE164Mobile(contact);
+  if (notification.channel === 'whatsapp') {
+    const raw = String(contact).replace(/^whatsapp:/, '');
+    const normalized = toE164Mobile(raw);
+    return normalized ? `whatsapp:${normalized}` : null;
+  }
+  return contact;
 };
 
 const deliverInApp = async (notification) => ({ provider: 'in_app', providerMessageId: notification._id.toString() });
 
 const deliverEmail = async (notification, contact) => {
-  const result = await getEmailTransport().sendMail({ from: process.env.EMAIL_FROM || process.env.EMAIL_USER, to: contact, subject: notification.title || 'PhysioQR notification', text: notification.message });
+  if (isPlaceholderEmailConfig()) {
+    console.warn(`[Notification Email] Live SMTP skipped because EMAIL_USER/EMAIL_PASS contains placeholder credentials (${process.env.EMAIL_USER}). Logged to console.`);
+    console.log(`[Email Mock Delivered to: ${contact}] Subject: ${notification.title}\nMessage:\n${notification.message}\n`);
+    return { provider: 'email_placeholder_mock', providerMessageId: `mock_${Date.now()}` };
+  }
+  const mailOptions = {
+    from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+    to: contact,
+    subject: notification.title || 'PhysioQR notification',
+    text: notification.message,
+  };
+  if (notification.metadata?.html) {
+    mailOptions.html = notification.metadata.html;
+  }
+  const result = await getEmailTransport().sendMail(mailOptions);
   return { provider: 'email', providerMessageId: result.messageId };
 };
 
@@ -184,7 +228,12 @@ const deliverNotification = async (notificationOrId) => {
     notification.recipientContact = contact || notification.recipientContact;
     notification.lastAttemptAt = new Date();
     let result;
-    if (getDeliveryMode() === 'log') result = { provider: `log_${notification.channel}`, providerMessageId: `log_${Date.now()}` };
+    if (getDeliveryMode() === 'log') {
+      console.log(`[Notification Delivery: LOG] [Channel: ${notification.channel.toUpperCase()}] To: ${contact || notification.recipientContact || 'N/A'}`);
+      console.log(`[Subject/Title] ${notification.title || 'N/A'}`);
+      console.log(`[Message Body]\n${notification.message}\n`);
+      result = { provider: `log_${notification.channel}`, providerMessageId: `log_${Date.now()}` };
+    }
     else if (notification.channel === 'in_app') result = await deliverInApp(notification);
     else if (notification.channel === 'email') { if (!contact) throw serviceError('Email recipient contact is missing'); result = await deliverEmail(notification, contact); }
     else if (notification.channel === 'sms') { if (!contact) throw serviceError('SMS recipient contact is missing'); result = await deliverSms(notification, contact); }

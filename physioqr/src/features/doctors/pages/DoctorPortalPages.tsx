@@ -303,6 +303,17 @@ function ProfileFields({ profile }: { profile: ApiRecord }) {
       <Input name="city" label="City" defaultValue={text(profile.city)} />
       <Input name="state" label="State" defaultValue={text(profile.state)} />
       <Input name="clinicContact" label="Clinic contact" defaultValue={text(profile.clinicContact)} />
+      <div className="md:col-span-2">
+        <Input
+          name="approvedPatientFee"
+          label="Patient Programme Fee (₹)"
+          type="number"
+          defaultValue={profile.approvedPatientFee ? String(profile.approvedPatientFee) : ''}
+        />
+        <p className="mt-1 text-xs text-neutral-500">
+          50:50 Partner Split Model: Your doctor earnings are 50% of each patient payment. Setting your fee activates your reception QR standee and patient referral links.
+        </p>
+      </div>
       <Textarea name="clinicAddress" label="Clinic address" defaultValue={text(profile.clinicAddress)} />
     </div>
   );

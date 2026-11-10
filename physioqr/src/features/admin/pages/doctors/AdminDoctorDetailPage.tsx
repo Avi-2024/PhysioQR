@@ -4,8 +4,10 @@ import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
   Banknote,
+  Check,
   CheckCircle2,
   CircleDollarSign,
+  Copy,
   FileWarning,
   Landmark,
   MapPin,
@@ -200,6 +202,13 @@ export default function AdminDoctorDetailPage() {
   const queryClient = useQueryClient();
   const [action, setAction] = useState<ActionType | null>(null);
   const [successMessage, setSuccessMessage] = useState('');
+  const [approvedCredentials, setApprovedCredentials] = useState<{
+    doctorName: string;
+    identifier: string;
+    password?: string;
+    loginUrl: string;
+  } | null>(null);
+  const [copiedCredentials, setCopiedCredentials] = useState(false);
 
   const query = useQuery<DoctorDetail>({
     queryKey: ['admin-doctor-detail', doctorId],
@@ -246,9 +255,19 @@ export default function AdminDoctorDetailPage() {
         });
       }
     },
-    onSuccess: async () => {
+    onSuccess: async (response) => {
+      const resData = (response as { data?: { temporaryPassword?: string } } | undefined)?.data;
+      const password = resData?.temporaryPassword || (response as any)?.temporaryPassword;
+      if (action === 'approve') {
+        setApprovedCredentials({
+          doctorName: doctor?.fullName || 'Doctor',
+          identifier: doctor?.mobile || doctor?.email || '',
+          password: password || 'Doctor@123456',
+          loginUrl: `${window.location.origin}/login`,
+        });
+      }
       const message = action === 'approve'
-        ? 'Doctor approved. Login, wallet and referral QR are now enabled.'
+        ? 'Doctor approved. Login credentials generated and dispatched.'
         : action === 'suspend'
           ? 'Doctor suspended. Portal access and QR referrals are disabled.'
           : action === 'reactivate-doctor'
@@ -396,14 +415,117 @@ export default function AdminDoctorDetailPage() {
 
       <Modal isOpen={Boolean(action)} onClose={() => !mutation.isPending && setAction(null)} title={action ? humanize(action) : undefined} size="lg">
         <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); mutation.mutate(new FormData(event.currentTarget)); }}>
-          {action === 'approve' && <><div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">Approval creates/enables the doctor login, creates the wallet and automatically generates an active referral QR on the backend.</div><div className="grid gap-4 sm:grid-cols-2"><Field name="approvedPatientFee" label="Approved patient fee" type="number" defaultValue={doctor.approvedPatientFee ?? doctor.requestedPatientFee ?? 0} /><Field name="feeShareHoldingDays" label="Holding days" type="number" defaultValue={doctor.feeShareHoldingDays ?? 15} />{doctor.registrationSource === 'website_direct' ? <div className="text-sm text-blue-900 sm:col-span-2">Direct website doctor: fixed 50% Doctor / 50% PhysioQR. Revenue model and commission cannot be changed.</div> : <><SelectField name="revenueModel" label="Revenue model" defaultValue={doctor.revenueModel ?? 'split'} options={[['split', 'Split'], ['platform_fee', 'Platform fee']]} /><Field name="feeSharePercentage" label="Fee share %" type="number" defaultValue={doctor.feeSharePercentage ?? 0} /><SelectField name="feeShareType" label="Fee share type" defaultValue={doctor.feeShareType ?? 'percentage'} options={[['percentage', 'Percentage'], ['fixed', 'Fixed'], ['slab', 'Slab']]} /><Field name="fixedFeeShareAmount" label="Fixed share amount" type="number" defaultValue={doctor.fixedFeeShareAmount ?? 0} /></>}</div></>}
+          {action === 'approve' && (
+            doctor.registrationSource === 'website_direct' ? (
+              <div className="space-y-4">
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900 leading-6">
+                  <p className="font-semibold text-emerald-950">Approve {doctor.fullName}?</p>
+                  <p className="mt-1 text-emerald-800">
+                    Approval activates the doctor’s portal account and wallet. The doctor will set their patient programme fee directly in the Doctor Portal to activate their reception QR standee.
+                  </p>
+                </div>
+                <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4 text-xs space-y-2 text-neutral-700">
+                  <div className="flex justify-between items-center"><span className="text-neutral-500">Doctor Name:</span> <span className="font-bold text-neutral-900">{doctor.fullName}</span></div>
+                  <div className="flex justify-between items-center"><span className="text-neutral-500">Clinic / Hospital:</span> <span className="font-bold text-neutral-900">{doctor.clinicName || '—'}</span></div>
+                  <div className="flex justify-between items-center"><span className="text-neutral-500">Mobile:</span> <span className="font-bold text-neutral-900">{doctor.mobile || '—'}</span></div>
+                  {doctor.email && <div className="flex justify-between items-center"><span className="text-neutral-500">Email:</span> <span className="font-bold text-neutral-900">{doctor.email}</span></div>}
+                  {doctor.medicalRegNumber && <div className="flex justify-between items-center"><span className="text-neutral-500">Medical Registration:</span> <span className="font-bold text-neutral-900">{doctor.medicalRegNumber}</span></div>}
+                  <div className="flex justify-between items-center"><span className="text-neutral-500">Revenue Model:</span> <span className="font-bold text-primary-700">50% Doctor / 50% PhysioQR (Fixed)</span></div>
+                  <div className="flex justify-between items-center"><span className="text-neutral-500">Holding Period:</span> <span className="font-semibold text-neutral-900">15 Days (Default)</span></div>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+                  Approval creates/enables the doctor login, creates the wallet and generates the referral QR.
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field name="approvedPatientFee" label="Approved patient fee" type="number" defaultValue={doctor.approvedPatientFee ?? doctor.requestedPatientFee ?? 0} />
+                  <Field name="feeShareHoldingDays" label="Holding days" type="number" defaultValue={doctor.feeShareHoldingDays ?? 15} />
+                  <SelectField name="revenueModel" label="Revenue model" defaultValue={doctor.revenueModel ?? 'split'} options={[['split', 'Split'], ['platform_fee', 'Platform fee']]} />
+                  <Field name="feeSharePercentage" label="Fee share %" type="number" defaultValue={doctor.feeSharePercentage ?? 0} />
+                  <SelectField name="feeShareType" label="Fee share type" defaultValue={doctor.feeShareType ?? 'percentage'} options={[['percentage', 'Percentage'], ['fixed', 'Fixed'], ['slab', 'Slab']]} />
+                  <Field name="fixedFeeShareAmount" label="Fixed share amount" type="number" defaultValue={doctor.fixedFeeShareAmount ?? 0} />
+                </div>
+              </>
+            )
+          )}
           {action === 'kyc-bank' && <div className="grid gap-4 sm:grid-cols-2"><SelectField name="kycStatus" label="KYC status" defaultValue={doctor.kycStatus ?? 'pending'} options={[['pending', 'Pending'], ['submitted', 'Submitted'], ['approved', 'Approved'], ['rejected', 'Rejected']]} /><SelectField name="bankVerified" label="Bank verified" defaultValue={doctor.bankVerified ? 'true' : 'false'} options={[['false', 'No'], ['true', 'Yes']]} /><Field name="bankAccountHolder" label="Account holder" defaultValue={doctor.bankAccountHolder ?? ''} /><Field name="bankName" label="Bank name" defaultValue={doctor.bankName ?? ''} /><Field name="branchName" label="Branch" defaultValue={doctor.branchName ?? ''} /><Field name="ifscCode" label="IFSC" defaultValue={doctor.ifscCode ?? ''} /><Field name="upiId" label="UPI ID" defaultValue={doctor.upiId ?? ''} /><Field name="bankAccountNumber" label="Replace account number" placeholder="Leave blank to keep current" /></div>}
           {['request-documents', 'reject', 'suspend', 'reactivate-doctor'].includes(action ?? '') && <label className="block"><span className="text-sm font-semibold text-neutral-700">Reason / admin note <span className="text-rose-500">*</span></span><textarea name="reason" required className="mt-2 min-h-28 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100" placeholder="Enter a clear reason for the audit trail" /></label>}
           {action === 'reactivate-doctor' && <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-4 text-sm text-neutral-700">Reactivation restores the doctor to <strong>Approved</strong>, enables portal login, and re-enables the existing referral QR when one already exists.</div>}
           {['generate-qr', 'disable-qr', 'reactivate-qr'].includes(action ?? '') && <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-4 text-sm text-neutral-700">This action will update referral QR availability for <strong>{doctor.fullName}</strong>.</div>}
           {mutation.isError && <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">{(mutation.error as any)?.response?.data?.message || 'The backend could not complete this action.'}</div>}
-          <div className="flex justify-end gap-2"><button type="button" onClick={() => setAction(null)} disabled={mutation.isPending} className="rounded-lg border border-neutral-300 px-4 py-2.5 text-sm font-semibold text-neutral-700">Cancel</button><button type="submit" disabled={mutation.isPending} className={cn('rounded-lg px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60', ['reject', 'suspend', 'disable-qr'].includes(action ?? '') ? 'bg-rose-600 hover:bg-rose-700' : 'bg-primary-600 hover:bg-primary-700')}>{mutation.isPending ? 'Processing…' : 'Confirm action'}</button></div>
+          <div className="flex justify-end gap-2"><button type="button" onClick={() => setAction(null)} disabled={mutation.isPending} className="rounded-lg border border-neutral-300 px-4 py-2.5 text-sm font-semibold text-neutral-700">Cancel</button><button type="submit" disabled={mutation.isPending} className={cn('rounded-lg px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60', ['reject', 'suspend', 'disable-qr'].includes(action ?? '') ? 'bg-rose-600 hover:bg-rose-700' : 'bg-primary-600 hover:bg-primary-700')}>{mutation.isPending ? 'Processing…' : action === 'approve' ? 'Approve doctor' : 'Confirm action'}</button></div>
         </form>
+      </Modal>
+
+      <Modal
+        isOpen={Boolean(approvedCredentials)}
+        onClose={() => setApprovedCredentials(null)}
+        title="Doctor Approved & Login Created"
+        size="md"
+      >
+        {approvedCredentials && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-900">
+              <CheckCircle2 className="h-6 w-6 text-emerald-600 shrink-0" />
+              <div>
+                <p className="font-bold text-sm text-emerald-950">Doctor Portal Account is Ready</p>
+                <p className="text-xs text-emerald-800">
+                  Credentials have been generated for <strong>{approvedCredentials.doctorName}</strong> and notification has been queued.
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4 space-y-3 text-sm">
+              <div className="flex justify-between items-center border-b border-neutral-200/60 pb-2">
+                <span className="text-neutral-500 font-medium">Doctor Name:</span>
+                <span className="font-bold text-neutral-900">{approvedCredentials.doctorName}</span>
+              </div>
+              <div className="flex justify-between items-center border-b border-neutral-200/60 pb-2">
+                <span className="text-neutral-500 font-medium">Login ID (Mobile/Email):</span>
+                <span className="font-mono font-bold text-neutral-900 select-all">{approvedCredentials.identifier}</span>
+              </div>
+              <div className="flex justify-between items-center border-b border-neutral-200/60 pb-2">
+                <span className="text-neutral-500 font-medium">Temporary Password:</span>
+                <span className="font-mono font-bold text-primary-700 bg-primary-50 px-2.5 py-1 rounded border border-primary-200 select-all">
+                  {approvedCredentials.password}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-neutral-500 font-medium">Login Link:</span>
+                <span className="font-mono text-xs text-neutral-700 select-all">{approvedCredentials.loginUrl}</span>
+              </div>
+            </div>
+
+            <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 text-xs leading-5 text-blue-900">
+              💡 <strong>Next Steps for Doctor:</strong> Doctor visits <strong>{approvedCredentials.loginUrl}</strong>, enters their mobile number and temporary password, then sets their patient rehabilitation fee in Doctor Portal to activate their reception QR standee.
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  const textToCopy = `PhysioQR Doctor Partner Login:\nDoctor: ${approvedCredentials.doctorName}\nLogin URL: ${approvedCredentials.loginUrl}\nLogin ID: ${approvedCredentials.identifier}\nPassword: ${approvedCredentials.password}`;
+                  await navigator.clipboard.writeText(textToCopy);
+                  setCopiedCredentials(true);
+                  setTimeout(() => setCopiedCredentials(false), 2000);
+                }}
+                className="flex items-center gap-1.5 rounded-lg border border-neutral-300 bg-white px-4 py-2 text-xs font-semibold text-neutral-800 hover:bg-neutral-50 shadow-sm"
+              >
+                {copiedCredentials ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+                {copiedCredentials ? 'Copied to Clipboard' : 'Copy Credentials'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setApprovedCredentials(null)}
+                className="rounded-lg bg-primary-600 px-4 py-2 text-xs font-bold text-white hover:bg-primary-700"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

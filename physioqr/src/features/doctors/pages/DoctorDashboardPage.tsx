@@ -1,7 +1,7 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { ArrowUpRight, Banknote, Clock3, QrCode, TrendingUp, Users, Wallet } from 'lucide-react';
+import { ArrowUpRight, Banknote, Clock3, QrCode, TrendingUp, Users, Wallet, AlertCircle } from 'lucide-react';
 import apiClient from '@/lib/api-client';
 import ErrorState from '@/components/feedback/ErrorState';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -45,6 +45,22 @@ export default function DoctorDashboardPage() {
           <QrCode className="w-4 h-4" /> View My QR Code
         </button>
       </div>
+
+
+      {!profileQuery.isLoading && Number(profile.approvedPatientFee || summaryDoctor.approvedPatientFee || 0) <= 0 && (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-900 shadow-sm">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
+            <div>
+              <p className="font-bold">Set your Patient Programme Fee to activate your QR standee</p>
+              <p className="text-xs text-amber-800 mt-0.5">Your clinic reception QR standee and patient referral link will be generated and activated once you set your patient fee.</p>
+            </div>
+          </div>
+          <button onClick={() => navigate('/doctor/qr-referral')} className="shrink-0 rounded-lg bg-amber-600 px-4 py-2 text-xs font-bold text-white hover:bg-amber-700 transition-colors">
+            Set Fee & Activate QR &rarr;
+          </button>
+        </div>
+      )}
 
       <DoctorRecoveryOverviewPanel />
 

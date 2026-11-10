@@ -35,12 +35,13 @@ describe('Public homepage original look', () => {
     expect(apiClient.post).not.toHaveBeenCalled();
   });
 
-  it('keeps patient registration available from the original navigation header', () => {
+  it('keeps patient registration available from the navigation header modal', () => {
     render(
       <MemoryRouter initialEntries={['/']}>
         <LandingHeader onOpenPortal={vi.fn()} />
       </MemoryRouter>,
     );
-    expect(screen.getByRole('link', { name: /register as a patient/i }).getAttribute('href')).toBe('/register');
+    fireEvent.click(screen.getByRole('button', { name: /register as patient or doctor/i }));
+    expect(screen.getByRole('link', { name: 'Register as a patient' }).getAttribute('href')).toBe('/register');
   });
 });

@@ -20,7 +20,8 @@ describe('Public independent doctor registration',()=>{
     mount(<><LandingHeader onOpenPortal={vi.fn()}/><DoctorExperienceSection onOpenPortal={vi.fn()}/></>);
     const links=screen.getAllByRole('link',{name:/register as doctor/i});
     expect(links.some(link=>link.getAttribute('href')==='/doctor-register')).toBe(true);
-    expect(screen.getByRole('link',{name:'Register as a patient'}).getAttribute('href')).toBe('/register');
+    fireEvent.click(screen.getByRole('button',{name:/register as patient or doctor/i}));
+    expect(screen.getByRole('link', { name: 'Register as a patient' }).getAttribute('href')).toBe('/register');
   });
 
   it('submits an agentless application without trusting any commercial terms from the browser',async()=>{

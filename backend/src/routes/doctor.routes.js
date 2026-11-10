@@ -16,7 +16,7 @@ const {
   rejectDoctor, requestDoctorDocuments, suspendDoctor,
   generateQrCode, disableQrCode, reactivateQrCode,
   uploadKycDocument, getKycDocumentAccess, uploadMyKycDocument, getMyKycDocumentAccess,
-  getMyProfile, updateMyProfile, getMySummary, getMyPatients, getMyQrStats,
+  getMyProfile, updateMyProfile, updateMyPatientFee, getMySummary, getMyPatients, getMyQrStats,
 } = require('../controllers/doctor.controller');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
@@ -27,6 +27,8 @@ router.post('/self-register', selfRegistrationLimiter, requireFields('fullName',
 router.use(protect);
 router.get('/me/profile', authorize('doctor'), getMyProfile);
 router.put('/me/profile', authorize('doctor'), updateMyProfile);
+router.put('/me/patient-fee', authorize('doctor'), updateMyPatientFee);
+router.post('/me/patient-fee', authorize('doctor'), updateMyPatientFee);
 router.get('/me/summary', authorize('doctor'), getMySummary);
 router.get('/me/patients', authorize('doctor'), getMyPatients);
 router.get('/me/recovery-overview', authorize('doctor'), getMyRecoveryOverview);

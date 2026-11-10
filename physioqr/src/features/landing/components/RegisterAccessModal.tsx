@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { HeartPulse, Stethoscope, X, ArrowRight } from 'lucide-react';
 
 interface RegisterAccessModalProps {
@@ -9,8 +9,6 @@ interface RegisterAccessModalProps {
 }
 
 export function RegisterAccessModal({ isOpen, onClose, onSelectRole }: RegisterAccessModalProps) {
-  const navigate = useNavigate();
-
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -26,24 +24,6 @@ export function RegisterAccessModal({ isOpen, onClose, onSelectRole }: RegisterA
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
-
-  const handlePatientSelect = () => {
-    onClose();
-    if (onSelectRole) {
-      onSelectRole('patient');
-    } else {
-      navigate('/register');
-    }
-  };
-
-  const handleDoctorSelect = () => {
-    onClose();
-    if (onSelectRole) {
-      onSelectRole('doctor');
-    } else {
-      navigate('/register/doctor');
-    }
-  };
 
   return (
     <div
@@ -74,7 +54,7 @@ export function RegisterAccessModal({ isOpen, onClose, onSelectRole }: RegisterA
               borderRadius: '50%',
               cursor: 'pointer',
               color: 'var(--text-muted)',
-              flexShrink: 0
+              flexShrink: 0,
             }}
             aria-label="Close registration options"
           >
@@ -83,15 +63,26 @@ export function RegisterAccessModal({ isOpen, onClose, onSelectRole }: RegisterA
         </div>
 
         {/* Patient Registration Option */}
-        <div
+        <Link
+          to="/register"
+          role="link"
+          aria-label="Register as a patient"
           className="rc-card rc-card-interactive"
-          onClick={handlePatientSelect}
+          onClick={(e) => {
+            onClose();
+            if (onSelectRole) {
+              e.preventDefault();
+              onSelectRole('patient');
+            }
+          }}
           style={{
+            display: 'block',
+            textDecoration: 'none',
             marginBottom: '16px',
             cursor: 'pointer',
             border: '1.5px solid var(--teal-200)',
             background: 'linear-gradient(180deg, #FFFFFF 0%, #F2FAF8 100%)',
-            transition: 'all 150ms ease-in-out'
+            transition: 'all 150ms ease-in-out',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
@@ -104,7 +95,7 @@ export function RegisterAccessModal({ isOpen, onClose, onSelectRole }: RegisterA
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              flexShrink: 0
+              flexShrink: 0,
             }}>
               <HeartPulse className="w-6 h-6" />
             </div>
@@ -125,17 +116,28 @@ export function RegisterAccessModal({ isOpen, onClose, onSelectRole }: RegisterA
               </div>
             </div>
           </div>
-        </div>
+        </Link>
 
         {/* Doctor Registration Option */}
-        <div
+        <Link
+          to="/register/doctor"
+          role="link"
+          aria-label="Register as a doctor"
           className="rc-card rc-card-interactive"
-          onClick={handleDoctorSelect}
+          onClick={(e) => {
+            onClose();
+            if (onSelectRole) {
+              e.preventDefault();
+              onSelectRole('doctor');
+            }
+          }}
           style={{
+            display: 'block',
+            textDecoration: 'none',
             cursor: 'pointer',
             border: '1.5px solid var(--border-default)',
             background: '#FFFFFF',
-            transition: 'all 150ms ease-in-out'
+            transition: 'all 150ms ease-in-out',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
@@ -148,7 +150,7 @@ export function RegisterAccessModal({ isOpen, onClose, onSelectRole }: RegisterA
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              flexShrink: 0
+              flexShrink: 0,
             }}>
               <Stethoscope className="w-6 h-6" />
             </div>
@@ -169,7 +171,7 @@ export function RegisterAccessModal({ isOpen, onClose, onSelectRole }: RegisterA
               </div>
             </div>
           </div>
-        </div>
+        </Link>
       </div>
     </div>
   );

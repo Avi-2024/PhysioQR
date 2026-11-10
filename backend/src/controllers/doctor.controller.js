@@ -373,12 +373,78 @@ const getMyProfile = asyncHandler(async (req, res) => {
 
 // PUT /api/doctors/me/profile — Doctor updates their profile
 const updateMyProfile = asyncHandler(async (req, res) => {
-  // Prevent doctor from changing sensitive fields
-  const { status, feeSharePercentage, approvedPatientFee, revenueModel, qrCodeActive, ...allowedUpdates } = req.body;
+  // Prevent doctor from changing sensitive fields, but allow approvedPatientFee
+  const { status, feeSharePercentage, revenueModel, qrCodeActive, approvedPatientFee, ...allowedUpdates } = req.body;
 
-  const doctor = await Doctor.findOneAndUpdate({ user: req.user._id }, allowedUpdates, { new: true });
+  const doctor = await Doctor.findOne({ user: req.user._id });
   if (!doctor) return res.status(404).json({ message: 'Doctor profile not found' });
+
+  Object.assign(doctor, allowedUpdates);
+
+  if (approvedPatientFee !== undefined && approvedPatientFee !== null && approvedPatientFee !== '') {
+    const fee = Number(approvedPatientFee);
+    if (!isNaN(fee) && fee >= 100 && fee <= 100000) {
+      doctor.approvedPatientFee = fee;
+      if (doctor.status === 'approved') {
+        doctor.qrCodeActive = true;
+        if (!doctor.qrCodeUrl || doctor.qrCodeUrl.startsWith('data:image/')) {
+          const { qrCodeUrl } = await createReferralQr(doctor);
+          doctor.qrCodeUrl = qrCodeUrl;
+          doctor.referralCode = doctor.doctorId;
+        }
+      }
+    }
+  }
+
+  await doctor.save();
   res.json(doctor);
+});
+
+// PUT /api/doctors/me/patient-fee — Doctor sets or confirms their patient programme fee
+const updateMyPatientFee = asyncHandler(async (req, res) => {
+  const doctor = await Doctor.findOne({ user: req.user._id });
+  if (!doctor) return res.status(404).json({ message: 'Doctor profile not found' });
+
+  const rawFee = req.body.approvedPatientFee !== undefined ? req.body.approvedPatientFee : req.body.patientFee;
+  const fee = Number(rawFee);
+
+  if (isNaN(fee) || fee < 100 || fee > 100000) {
+    return res.status(400).json({ message: 'Patient programme fee must be between ₹100 and ₹1,00,000' });
+  }
+
+  const previousFee = doctor.approvedPatientFee;
+  doctor.approvedPatientFee = fee;
+
+  // Once fee is set, activate QR code if doctor is approved
+  if (doctor.status === 'approved') {
+    doctor.qrCodeActive = true;
+    if (!doctor.qrCodeUrl || doctor.qrCodeUrl.startsWith('data:image/')) {
+      const { qrCodeUrl } = await createReferralQr(doctor);
+      doctor.qrCodeUrl = qrCodeUrl;
+      doctor.referralCode = doctor.doctorId;
+    }
+  }
+
+  await doctor.save();
+
+  await writeAuditLog({
+    req,
+    action: 'doctor_patient_fee_updated',
+    module: 'Doctor',
+    recordId: doctor._id,
+    previousValue: { approvedPatientFee: previousFee },
+    newValue: { approvedPatientFee: fee, qrCodeActive: doctor.qrCodeActive },
+  });
+
+  const qrPresentation = await getActiveReferralQr(doctor);
+
+  res.json({
+    message: 'Patient programme fee confirmed and QR code activated',
+    doctor,
+    approvedPatientFee: doctor.approvedPatientFee,
+    qrCodeActive: doctor.qrCodeActive,
+    ...qrPresentation,
+  });
 });
 
 // GET /api/doctors/me/summary returns the SRS doctor dashboard financial and referral summary.
@@ -562,5 +628,5 @@ module.exports = {
   approveDoctor, rejectDoctor, requestDoctorDocuments, suspendDoctor,
   generateQrCode, disableQrCode, reactivateQrCode, updateKycAndBank,
   uploadKycDocument, getKycDocumentAccess, uploadMyKycDocument, getMyKycDocumentAccess,
-  getMyProfile, updateMyProfile, getMySummary, getMyPatients, getMyQrStats,
+  getMyProfile, updateMyProfile, updateMyPatientFee, getMySummary, getMyPatients, getMyQrStats,
 };

@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Check, Copy, Download, ExternalLink, Link2, MapPin,
   Phone, Printer, QrCode, Share2, ShieldCheck, TrendingUp, UserRoundCheck,
-  Users, Wallet, AlertCircle,
+  Users, Wallet, AlertCircle, Sparkles, Edit3, CheckCircle2,
 } from 'lucide-react';
 import apiClient from '@/lib/api-client';
 import ErrorState from '@/components/feedback/ErrorState';
@@ -93,6 +93,135 @@ function ReferralPoster({
   );
 }
 
+function DoctorFeeSetupCard({
+  currentFee,
+  doctorName,
+  onFeeSaved,
+}: {
+  currentFee?: number;
+  doctorName: string;
+  onFeeSaved?: () => void;
+}) {
+  const [feeInput, setFeeInput] = useState<string>(currentFee && currentFee > 0 ? String(currentFee) : '1500');
+  const [errorMsg, setErrorMsg] = useState('');
+  const queryClient = useQueryClient();
+
+  const mutation = useMutation({
+    mutationFn: async (fee: number) => {
+      return (await apiClient.put('/doctors/me/patient-fee', { approvedPatientFee: fee })).data;
+    },
+    onSuccess: async () => {
+      setErrorMsg('');
+      await queryClient.invalidateQueries({ queryKey: ['doctor-profile'] });
+      await queryClient.invalidateQueries({ queryKey: ['doctor-qr-stats'] });
+      await queryClient.invalidateQueries({ queryKey: ['doctor-summary'] });
+      onFeeSaved?.();
+    },
+    onError: (err: unknown) => {
+      const errRecord = asRecord((err as { response?: { data?: unknown } })?.response?.data);
+      setErrorMsg(text(errRecord.message, 'Failed to update patient fee.'));
+    },
+  });
+
+  const parsedFee = Math.max(0, Number(feeInput) || 0);
+  const doctorShare = Math.round(parsedFee * 0.5);
+  const platformShare = parsedFee - doctorShare;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (parsedFee < 100 || parsedFee > 100000) {
+      setErrorMsg('Please enter a fee between ₹100 and ₹1,00,000.');
+      return;
+    }
+    mutation.mutate(parsedFee);
+  };
+
+  return (
+    <div className="rounded-2xl border-2 border-primary-200 bg-white p-6 shadow-md sm:p-8">
+      <div className="flex items-center gap-3">
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-100 text-primary-700">
+          <Sparkles className="h-6 w-6" />
+        </div>
+        <div>
+          <h2 className="text-xl font-bold text-neutral-950">Set Patient Programme Fee</h2>
+          <p className="text-xs text-neutral-500">Activate your clinic reception QR standee</p>
+        </div>
+      </div>
+
+      <p className="mt-4 text-sm leading-6 text-neutral-600">
+        Welcome <strong>{doctorName}</strong>! Decide the rehabilitation programme fee for your referred patients.
+        Once confirmed, your reception QR standee and referral link will be instantly activated.
+      </p>
+
+      <form onSubmit={handleSubmit} className="mt-6 space-y-5">
+        <div>
+          <label htmlFor="patient-programme-fee-input" className="block text-sm font-bold text-neutral-900">
+            Patient Programme Fee (₹) <span className="text-rose-500">*</span>
+          </label>
+          <div className="relative mt-2 max-w-sm">
+            <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-base font-bold text-neutral-400">
+              ₹
+            </span>
+            <input
+              id="patient-programme-fee-input"
+              type="number"
+              min={100}
+              max={100000}
+              step={50}
+              required
+              value={feeInput}
+              onChange={(e) => { setFeeInput(e.target.value); setErrorMsg(''); }}
+              placeholder="e.g. 1500"
+              className="w-full rounded-xl border border-neutral-300 py-3 pl-9 pr-4 text-lg font-bold text-neutral-950 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
+            />
+          </div>
+          <p className="mt-1.5 text-xs text-neutral-500">
+            Recommended range: ₹1,000 – ₹3,000 per patient rehabilitation programme.
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-primary-100 bg-primary-50/60 p-4">
+          <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-primary-800">
+            <span>Direct 50:50 Revenue Share</span>
+            <span className="rounded bg-primary-200/80 px-2 py-0.5 text-[10px] text-primary-900">Fixed Partner Split</span>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <div className="rounded-lg bg-white p-3 border border-primary-100 shadow-sm">
+              <span className="text-xs text-neutral-500 font-medium">Your Earning (50%)</span>
+              <p className="mt-1 text-lg font-extrabold text-primary-700">{`₹${doctorShare.toLocaleString('en-IN')}`}</p>
+            </div>
+            <div className="rounded-lg bg-white p-3 border border-neutral-100 shadow-sm">
+              <span className="text-xs text-neutral-500 font-medium">Platform Share (50%)</span>
+              <p className="mt-1 text-lg font-bold text-neutral-700">{`₹${platformShare.toLocaleString('en-IN')}`}</p>
+            </div>
+          </div>
+        </div>
+
+        {errorMsg && (
+          <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-700">
+            {errorMsg}
+          </div>
+        )}
+
+        {mutation.isSuccess && (
+          <div role="status" className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs font-semibold text-emerald-800">
+            <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+            Fee saved successfully! Your reception QR standee is now activated.
+          </div>
+        )}
+
+        <button
+          type="submit"
+          disabled={mutation.isPending || parsedFee < 100}
+          className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary-600 px-6 text-sm font-bold text-white shadow-sm hover:bg-primary-700 disabled:opacity-50 transition-colors"
+        >
+          {mutation.isPending ? 'Activating QR Standee...' : 'Set Fee & Activate QR Standee'}
+        </button>
+      </form>
+    </div>
+  );
+}
+
 function QrMetric({ label, value, icon: Icon }: { label: string; value: string | number; icon: typeof QrCode }) {
   return (
     <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
@@ -110,6 +239,8 @@ export default function DoctorQRReferralPage() {
   const [qrImageReady, setQrImageReady] = useState(false);
   const [qrImageFailed, setQrImageFailed] = useState(false);
   const [actionMessage, setActionMessage] = useState('');
+  const [isEditingFee, setIsEditingFee] = useState(false);
+
   const profileQuery = useQuery({
     queryKey: ['doctor-profile'],
     queryFn: async () => (await apiClient.get('/doctors/me/profile')).data,
@@ -118,6 +249,7 @@ export default function DoctorQRReferralPage() {
     queryKey: ['doctor-qr-stats'],
     queryFn: async () => (await apiClient.get('/doctors/me/qr-stats')).data,
   });
+
   const profile = asRecord(profileQuery.data);
   const qr = asRecord(qrQuery.data);
   const doctorId = text(profile.doctorId);
@@ -126,14 +258,12 @@ export default function DoctorQRReferralPage() {
   const location = [text(profile.clinicAddress), text(profile.city), text(profile.state), text(profile.postalCode)]
     .filter(Boolean).join(', ');
   const mobile = text(profile.clinicContact) || text(profile.mobile);
-  // The backend referral URL and generated QR must point to the same registration destination.
   const referralLink = text(qr.referralUrl);
-  // Use the QR returned with the current backend referral URL. Saved legacy
-  // images in the profile could encode localhost, so never fall back to them.
   const qrCodeUrl = text(qr.qrCodeUrl);
-  const qrDisabled = profile.qrCodeActive === false;
+  const hasPatientFee = Number(profile.approvedPatientFee || 0) > 0;
+  const qrDisabled = profile.qrCodeActive === false && hasPatientFee;
   const isLoading = profileQuery.isLoading || qrQuery.isLoading;
-  const canUseQr = Boolean(doctorId && referralLink && qrCodeUrl && qrImageReady && !qrImageFailed && !qrDisabled);
+  const canUseQr = Boolean(doctorId && referralLink && qrCodeUrl && qrImageReady && !qrImageFailed && hasPatientFee && profile.qrCodeActive !== false);
   const scans = Number(qr.totalScans || 0);
   const registrations = Number(qr.totalRegistrations || 0);
   const paid = Number(qr.totalPaid || 0);
@@ -175,7 +305,6 @@ export default function DoctorQRReferralPage() {
       anchor.click();
       anchor.remove();
     } else {
-      // Cross-origin images cannot always be downloaded with an anchor's download attribute.
       window.open(qrCodeUrl, '_blank', 'noopener,noreferrer');
       setActionMessage('QR opened in a new tab; save the image from there.');
     }
@@ -231,24 +360,66 @@ export default function DoctorQRReferralPage() {
         </button>
       </header>
 
-      {qrDisabled && <div role="alert" className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-        <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" /> Your referral QR is currently disabled. Contact administration to reactivate it.
-      </div>}
+      {/* Active Fee Status Banner with Edit Option */}
+      {hasPatientFee && profile.qrCodeActive !== false && (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 text-emerald-950">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+              <ShieldCheck className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-sm font-bold">
+                {`Patient Programme Fee: ₹${Number(profile.approvedPatientFee).toLocaleString('en-IN')}`}
+                <span className="ml-2 font-semibold text-xs text-emerald-800">
+                  {`(Doctor Earning: ₹${Math.round(Number(profile.approvedPatientFee) * 0.5).toLocaleString('en-IN')} · 50% split)`}
+                </span>
+              </p>
+              <p className="text-xs text-emerald-700 mt-0.5">
+                Your clinic reception QR standee and referral link are active.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsEditingFee(!isEditingFee)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-white px-3.5 py-2 text-xs font-semibold text-emerald-900 hover:bg-emerald-50 transition-colors shrink-0 shadow-sm"
+          >
+            <Edit3 className="h-3.5 w-3.5" />
+            {isEditingFee ? 'Close Editor' : 'Update Fee'}
+          </button>
+        </div>
+      )}
+
+      {/* Inline Fee Editor when Doctor clicks Update Fee */}
+      {isEditingFee && (
+        <DoctorFeeSetupCard
+          currentFee={Number(profile.approvedPatientFee || 0)}
+          doctorName={doctorName}
+          onFeeSaved={() => setIsEditingFee(false)}
+        />
+      )}
+
+      {qrDisabled && (
+        <div role="alert" className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" /> Your referral QR is currently disabled. Contact administration to reactivate it.
+        </div>
+      )}
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.14fr)_minmax(320px,.86fr)]">
         <div>
-          {isLoading ? <Skeleton className="h-[620px] w-full rounded-2xl" /> :
-            !doctorId || !referralLink || !qrCodeUrl ? (
-              <div className="rounded-2xl border border-neutral-200 bg-white p-8 text-center">
-                <AlertCircle className="mx-auto h-8 w-8 text-amber-500" />
-                <h2 className="mt-3 font-semibold">Referral details are not configured</h2>
-                <p className="mt-2 text-sm text-neutral-500">Ask administration to generate an active doctor QR and referral URL.</p>
-              </div>
-            ) : <ReferralPoster
+          {isLoading ? (
+            <Skeleton className="h-[620px] w-full rounded-2xl" />
+          ) : !hasPatientFee || !referralLink || !qrCodeUrl || profile.qrCodeActive === false ? (
+            <DoctorFeeSetupCard
+              currentFee={Number(profile.approvedPatientFee || 0)}
+              doctorName={doctorName}
+            />
+          ) : (
+            <ReferralPoster
               {...poster} imageLoaded={() => { setQrImageReady(true); setQrImageFailed(false); }}
               imageFailed={() => { setQrImageReady(false); setQrImageFailed(true); }}
             />
-          }
+          )}
           {qrImageFailed && <p role="alert" className="mt-2 text-sm text-rose-700">QR image failed to load. Check your connection and reload this page.</p>}
         </div>
 
@@ -277,8 +448,8 @@ export default function DoctorQRReferralPage() {
             </div>
             <div className="mt-5 rounded-xl bg-neutral-50 p-4">
               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-neutral-500"><Link2 className="h-4 w-4" /> Your referral URL</div>
-              <p className="mt-2 select-all break-all font-mono text-xs leading-6 text-neutral-700">{referralLink || 'Not available'}</p>
-              {referralLink && <a href={referralLink} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-primary-700 hover:underline">
+              <p className="mt-2 select-all break-all font-mono text-xs leading-6 text-neutral-700">{canUseQr ? referralLink : 'Available after setting patient fee'}</p>
+              {canUseQr && referralLink && <a href={referralLink} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-primary-700 hover:underline">
                 Open registration page <ExternalLink className="h-3.5 w-3.5" />
               </a>}
             </div>
@@ -288,9 +459,10 @@ export default function DoctorQRReferralPage() {
           <section className="rounded-2xl border border-primary-100 bg-primary-50/60 p-5 sm:p-6">
             <div className="flex items-center gap-2 font-semibold text-neutral-900"><ShieldCheck className="h-5 w-5 text-primary-700" /> Clinic display checklist</div>
             <ol className="mt-4 space-y-3 text-sm leading-6 text-neutral-700">
-              <li className="flex gap-3"><span className="font-bold text-primary-700">01</span> Print the A4 poster with your doctor and clinic details.</li>
-              <li className="flex gap-3"><span className="font-bold text-primary-700">02</span> Place it at reception where patients can scan easily.</li>
-              <li className="flex gap-3"><span className="font-bold text-primary-700">03</span> Patients scan the code and complete registration online.</li>
+              <li className="flex gap-3"><span className="font-bold text-primary-700">01</span> Set your patient programme fee above.</li>
+              <li className="flex gap-3"><span className="font-bold text-primary-700">02</span> Print the A4 poster with your doctor and clinic details.</li>
+              <li className="flex gap-3"><span className="font-bold text-primary-700">03</span> Place it at reception where patients can scan easily.</li>
+              <li className="flex gap-3"><span className="font-bold text-primary-700">04</span> Patients scan the code and complete rehabilitation online.</li>
             </ol>
             <p className="mt-4 border-t border-primary-100 pt-3 text-xs text-neutral-500">The print version excludes conversion statistics, account navigation and internal commercial details.</p>
           </section>
