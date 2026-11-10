@@ -13,6 +13,10 @@ DoctorWallet.findOneAndUpdate = async () => ({});
 User.findById = async () => null;
 User.findOne = async () => null;
 User.create = async (u) => ({ ...u, _id: '507f1f77bcf86cd799439022', save: async () => {} });
+const AuthSession = require('../src/models/AuthSession.model');
+AuthSession.updateMany = async () => ({});
+const authSessionService = require('../src/services/authSession.service');
+authSessionService.revokeOwnerSessions = async () => ({});
 
 const DOCTOR_ID = '507f1f77bcf86cd799439011';
 const USER_ID = '507f1f77bcf86cd799439022';
@@ -206,5 +210,179 @@ test('sendDoctorApprovalNotification dispatches SMS and Email with required appr
     assert.match(email.metadata.html, /Approval Confirmation: Account approve ho chuka hai\./);
   } finally {
     notificationService.createNotification = origCreateNotification;
+  }
+});
+
+
+test('Admin can update doctor details via updateDoctorByAdmin', async () => {
+  const { updateDoctorByAdmin } = require('../src/controllers/doctor.controller');
+
+  let savedCalled = false;
+  const doctor = {
+    _id: DOCTOR_ID,
+    doctorId: 'DR999',
+    fullName: 'Old Doctor Name',
+    specialization: 'Medicin',
+    clinicName: 'Old Clinic',
+    mobile: '9876543210',
+    email: 'old@clinic.com',
+    async save() { savedCalled = true; },
+  };
+
+  const origFindById = Doctor.findById;
+  const origFindOne = Doctor.findOne;
+  try {
+    Doctor.findById = async () => doctor;
+    Doctor.findOne = async () => null; // no duplicate
+
+    let status = 200, responseData;
+    const req = {
+      params: { id: DOCTOR_ID },
+      body: {
+        fullName: 'Dr. Sneha Docs',
+        specialization: 'Medicine & Ortho',
+        clinicName: 'Gasto Cure Clinic',
+        city: 'Chetwayi',
+        state: 'Kerala',
+      },
+      user: { _id: 'admin1', role: 'admin' },
+    };
+    const res = {
+      status(code) { status = code; return res; },
+      json(data) { responseData = data; return res; },
+    };
+
+    await new Promise((resolve, reject) => {
+      updateDoctorByAdmin(req, res, (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+      setTimeout(resolve, 50);
+    });
+
+    assert.equal(status, 200);
+    assert.equal(doctor.fullName, 'Dr. Sneha Docs');
+    assert.equal(doctor.specialization, 'Medicine & Ortho');
+    assert.equal(doctor.clinicName, 'Gasto Cure Clinic');
+    assert.equal(doctor.city, 'Chetwayi');
+    assert.equal(doctor.state, 'Kerala');
+    assert.equal(savedCalled, true);
+    assert.match(responseData.message, /Doctor details updated successfully/);
+  } finally {
+    Doctor.findById = origFindById;
+    Doctor.findOne = origFindOne;
+  }
+});
+
+test('Password reset via OTP resets user password successfully', async () => {
+  const { resetPassword } = require('../src/controllers/auth.controller');
+  const otpService = require('../src/services/otp.service');
+
+  const user = {
+    _id: USER_ID,
+    mobile: '9876543210',
+    password: 'old_hashed_password',
+    mustChangePassword: true,
+    async save() { this.saved = true; },
+  };
+
+  const origUserFindOne = User.findOne;
+  const origVerifyOtp = otpService.verifyOtp;
+
+  try {
+    User.findOne = async () => user;
+    otpService.verifyOtp = async () => ({ mobile: '9876543210' });
+
+    let status = 200, responseData;
+    const req = {
+      body: {
+        mobile: '9876543210',
+        otp: '123456',
+        newPassword: 'MyNewStrongPassword@2026',
+      },
+    };
+    const res = {
+      status(code) { status = code; return res; },
+      json(data) { responseData = data; return res; },
+    };
+
+    await new Promise((resolve, reject) => {
+      resetPassword(req, res, (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+      setTimeout(resolve, 50);
+    });
+
+    assert.equal(status, 200);
+    assert.equal(user.password, 'MyNewStrongPassword@2026');
+    assert.equal(user.mustChangePassword, false);
+    assert.equal(user.saved, true);
+    assert.match(responseData.message, /Password reset successfully/);
+  } finally {
+    User.findOne = origUserFindOne;
+    otpService.verifyOtp = origVerifyOtp;
+  }
+});
+
+test('Admin can revert doctor approval back to under_review', async () => {
+  const { revertDoctorApproval } = require('../src/controllers/admin/doctor-approval.controller');
+
+  const doctor = {
+    _id: DOCTOR_ID,
+    doctorId: 'DR999',
+    status: 'approved',
+    approvalDate: new Date(),
+    qrCodeActive: true,
+    user: USER_ID,
+    async save() { this.saved = true; },
+  };
+
+  const linkedUser = {
+    _id: USER_ID,
+    status: 'active',
+    tokenVersion: 1,
+    role: 'doctor',
+    async save() { this.saved = true; },
+  };
+
+  const origDoctorFindById = Doctor.findById;
+  const origUserFindById = User.findById;
+
+  try {
+    Doctor.findById = async () => doctor;
+    User.findById = async () => linkedUser;
+
+    let status = 200, responseData;
+    const req = {
+      params: { id: DOCTOR_ID },
+      body: { reason: 'Approval reverted due to incomplete registration proof' },
+      user: { _id: 'admin_123', role: 'admin' },
+    };
+    const res = {
+      status(code) { status = code; return res; },
+      json(data) { responseData = data; return res; },
+    };
+
+    await new Promise((resolve, reject) => {
+      revertDoctorApproval(req, res, (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+      setTimeout(resolve, 50);
+    });
+
+    assert.equal(status, 200);
+    assert.equal(doctor.status, 'under_review');
+    assert.equal(doctor.qrCodeActive, false);
+    assert.equal(doctor.approvalDate, undefined);
+    assert.equal(linkedUser.status, 'inactive');
+    assert.equal(linkedUser.tokenVersion, 2);
+    assert.equal(doctor.saved, true);
+    assert.equal(linkedUser.saved, true);
+    assert.match(responseData.message, /approval reverted/i);
+  } finally {
+    Doctor.findById = origDoctorFindById;
+    User.findById = origUserFindById;
   }
 });

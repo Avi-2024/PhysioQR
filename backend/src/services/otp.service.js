@@ -1,7 +1,7 @@
 const twilio = require('twilio');
 const Otp = require('../models/Otp.model');
 
-const PATIENT_OTP_PURPOSES = new Set(['registration', 'login']);
+const ALLOWED_OTP_PURPOSES = new Set(['registration', 'login', 'password_reset', 'mobile_change', 'profile_change']);
 
 const httpError = (message, status = 400) => {
   const error = new Error(message);
@@ -46,8 +46,8 @@ const getTestOtp = () => {
 };
 
 const assertPatientOtpPurpose = (purpose) => {
-  if (!PATIENT_OTP_PURPOSES.has(purpose)) {
-    throw httpError('OTP is only supported for patient registration and login');
+  if (!ALLOWED_OTP_PURPOSES.has(purpose)) {
+    throw httpError('Invalid OTP purpose');
   }
 };
 

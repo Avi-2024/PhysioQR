@@ -11,6 +11,7 @@ import {
   FileWarning,
   Landmark,
   MapPin,
+  Pencil,
   QrCode,
   RefreshCw,
   RotateCcw,
@@ -126,6 +127,8 @@ type DoctorDetail = {
 
 type ActionType =
   | 'approve'
+  | 'revert-approval'
+  | 'edit-doctor'
   | 'request-documents'
   | 'reject'
   | 'suspend'
@@ -224,6 +227,9 @@ export default function AdminDoctorDetailPage() {
       const id = doctor._id;
       const reason = String(form.get('reason') || '').trim();
 
+      if (action === 'edit-doctor') {
+        return apiClient.patch(`/doctors/${id}`, Object.fromEntries(form.entries()));
+      }
       if (action === 'approve') {
         return apiClient.post(`/doctors/${id}/approve`, {
           approvedPatientFee: Number(form.get('approvedPatientFee') || doctor.approvedPatientFee || doctor.requestedPatientFee || 0),
@@ -237,6 +243,7 @@ export default function AdminDoctorDetailPage() {
       if (action === 'request-documents') return apiClient.post(`/doctors/${id}/request-documents`, { reason });
       if (action === 'reject') return apiClient.post(`/doctors/${id}/reject`, { reason });
       if (action === 'suspend') return apiClient.post(`/doctors/${id}/suspend`, { reason });
+      if (action === 'revert-approval') return apiClient.post(`/doctors/${id}/revert-approval`, { reason });
       if (action === 'reactivate-doctor') return apiClient.post(`/doctors/${id}/reactivate`, { reason });
       if (action === 'generate-qr') return apiClient.post(`/doctors/${id}/qr-code`);
       if (action === 'disable-qr') return apiClient.post(`/doctors/${id}/disable-qr`);
@@ -268,11 +275,15 @@ export default function AdminDoctorDetailPage() {
       }
       const message = action === 'approve'
         ? 'Doctor approved. Login credentials generated and dispatched.'
-        : action === 'suspend'
-          ? 'Doctor suspended. Portal access and QR referrals are disabled.'
-          : action === 'reactivate-doctor'
-            ? 'Doctor reactivated successfully.'
-            : 'Doctor record updated successfully.';
+        : action === 'revert-approval'
+          ? 'Doctor approval reverted. Status moved back to under review.'
+          : action === 'edit-doctor'
+            ? 'Doctor details updated successfully.'
+            : action === 'suspend'
+            ? 'Doctor suspended. Portal access and QR referrals are disabled.'
+            : action === 'reactivate-doctor'
+              ? 'Doctor reactivated successfully.'
+              : 'Doctor record updated successfully.';
       setSuccessMessage(message);
       setAction(null);
       await queryClient.invalidateQueries({ queryKey: ['admin-doctor-detail', doctorId] });
@@ -322,6 +333,14 @@ export default function AdminDoctorDetailPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setAction('edit-doctor')}
+              className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-neutral-300 bg-white px-3.5 text-sm font-semibold text-neutral-700 hover:bg-neutral-50 shadow-sm"
+            >
+              <Pencil className="h-4 w-4 text-neutral-600" />
+              Edit doctor
+            </button>
             <button type="button" onClick={() => query.refetch()} disabled={query.isFetching} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-neutral-300 bg-white px-3.5 text-sm font-semibold text-neutral-700 hover:bg-neutral-50 disabled:opacity-60"><RefreshCw className={cn('h-4 w-4', query.isFetching && 'animate-spin')} />Refresh</button>
           </div>
         </div>
@@ -397,11 +416,33 @@ export default function AdminDoctorDetailPage() {
             <div className="space-y-2 p-4">
               {canReview && <button type="button" onClick={() => setAction('approve')} className="flex w-full items-center gap-3 rounded-xl bg-primary-600 px-4 py-3 text-left text-sm font-semibold text-white hover:bg-primary-700"><CheckCircle2 className="h-4 w-4" />Approve doctor</button>}
               {canReactivate && <button type="button" onClick={() => setAction('reactivate-doctor')} className="flex w-full items-center gap-3 rounded-xl bg-primary-600 px-4 py-3 text-left text-sm font-semibold text-white hover:bg-primary-700"><RotateCcw className="h-4 w-4" />Reactivate doctor</button>}
+              <button type="button" onClick={() => setAction('edit-doctor')} className="flex w-full items-center gap-3 rounded-xl border border-neutral-200 px-4 py-3 text-left text-sm font-semibold text-neutral-700 hover:bg-neutral-50"><Pencil className="h-4 w-4 text-neutral-600" />Edit doctor details</button>
               <button type="button" onClick={() => setAction('kyc-bank')} className="flex w-full items-center gap-3 rounded-xl border border-neutral-200 px-4 py-3 text-left text-sm font-semibold text-neutral-700 hover:bg-neutral-50"><Landmark className="h-4 w-4" />Update KYC / bank</button>
               {canReview && <button type="button" onClick={() => setAction('request-documents')} className="flex w-full items-center gap-3 rounded-xl border border-neutral-200 px-4 py-3 text-left text-sm font-semibold text-neutral-700 hover:bg-neutral-50"><FileWarning className="h-4 w-4" />Request documents</button>}
               {canOperateQr && <button type="button" onClick={() => setAction(doctor.qrCodeActive ? 'disable-qr' : doctor.qrCodeUrl ? 'reactivate-qr' : 'generate-qr')} className="flex w-full items-center gap-3 rounded-xl border border-neutral-200 px-4 py-3 text-left text-sm font-semibold text-neutral-700 hover:bg-neutral-50"><QrCode className="h-4 w-4" />{doctor.qrCodeActive ? 'Disable QR' : doctor.qrCodeUrl ? 'Reactivate QR' : 'Generate QR'}</button>}
             </div>
-            {(canReview || canSuspend) && <div className="border-t border-neutral-100 p-4"><div className="mb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-rose-400">Danger zone</div><div className="space-y-2">{canReview && <button type="button" onClick={() => setAction('reject')} className="flex w-full items-center gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-left text-sm font-semibold text-rose-700"><XCircle className="h-4 w-4" />Reject application</button>}{canSuspend && <button type="button" onClick={() => setAction('suspend')} className="flex w-full items-center gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-left text-sm font-semibold text-rose-700"><XCircle className="h-4 w-4" />Suspend doctor</button>}</div></div>}
+            {(canReview || canSuspend) && (
+              <div className="border-t border-neutral-100 p-4">
+                <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-rose-400">Danger zone</div>
+                <div className="space-y-2">
+                  {canReview && (
+                    <button type="button" onClick={() => setAction('reject')} className="flex w-full items-center gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-left text-sm font-semibold text-rose-700 hover:bg-rose-100">
+                      <XCircle className="h-4 w-4" />Reject application
+                    </button>
+                  )}
+                  {canSuspend && (
+                    <>
+                      <button type="button" onClick={() => setAction('revert-approval')} className="flex w-full items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-left text-sm font-semibold text-amber-800 hover:bg-amber-100">
+                        <RotateCcw className="h-4 w-4 text-amber-700" />Revert approval (Back to review)
+                      </button>
+                      <button type="button" onClick={() => setAction('suspend')} className="flex w-full items-center gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-left text-sm font-semibold text-rose-700 hover:bg-rose-100">
+                        <XCircle className="h-4 w-4" />Suspend doctor
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
           </section>
 
           <section className="rounded-xl border border-neutral-200 bg-white p-4">
@@ -450,12 +491,68 @@ export default function AdminDoctorDetailPage() {
               </>
             )
           )}
+          {action === 'edit-doctor' && (
+            <div className="space-y-4">
+              <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-xs text-neutral-600">
+                Update doctor profile and clinic details. If mobile or email is modified, the doctor’s login identifier will be updated automatically.
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field name="fullName" label="Full name" defaultValue={doctor.fullName} required />
+                <Field name="qualification" label="Qualification" defaultValue={doctor.qualification || ''} placeholder="e.g. BPT, MPT, MBBS" />
+                <Field name="specialization" label="Specialization" defaultValue={doctor.specialization || ''} placeholder="e.g. Orthopaedic Physio" />
+                <Field name="medicalRegNumber" label="Medical registration number" defaultValue={doctor.medicalRegNumber || ''} />
+                <Field name="clinicName" label="Clinic / hospital name" defaultValue={doctor.clinicName || ''} />
+                <Field name="clinicContact" label="Clinic phone" defaultValue={doctor.clinicContact || ''} />
+                <Field name="mobile" label="Doctor mobile number" defaultValue={doctor.mobile || ''} required />
+                <Field name="email" label="Doctor email address" type="email" defaultValue={doctor.email || ''} />
+                <Field name="state" label="State" defaultValue={doctor.state || ''} />
+                <Field name="city" label="City" defaultValue={doctor.city || ''} />
+                <Field name="postalCode" label="Postal code / PIN" defaultValue={doctor.postalCode || ''} />
+                <Field name="yearsOfExperience" label="Years of experience" type="number" defaultValue={doctor.yearsOfExperience ?? ''} />
+              </div>
+              <label className="block">
+                <span className="text-sm font-semibold text-neutral-700">Clinic full address</span>
+                <textarea
+                  name="clinicAddress"
+                  defaultValue={doctor.clinicAddress || ''}
+                  className="mt-2 min-h-20 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
+                  placeholder="Street, area, landmarks..."
+                />
+              </label>
+            </div>
+          )}
           {action === 'kyc-bank' && <div className="grid gap-4 sm:grid-cols-2"><SelectField name="kycStatus" label="KYC status" defaultValue={doctor.kycStatus ?? 'pending'} options={[['pending', 'Pending'], ['submitted', 'Submitted'], ['approved', 'Approved'], ['rejected', 'Rejected']]} /><SelectField name="bankVerified" label="Bank verified" defaultValue={doctor.bankVerified ? 'true' : 'false'} options={[['false', 'No'], ['true', 'Yes']]} /><Field name="bankAccountHolder" label="Account holder" defaultValue={doctor.bankAccountHolder ?? ''} /><Field name="bankName" label="Bank name" defaultValue={doctor.bankName ?? ''} /><Field name="branchName" label="Branch" defaultValue={doctor.branchName ?? ''} /><Field name="ifscCode" label="IFSC" defaultValue={doctor.ifscCode ?? ''} /><Field name="upiId" label="UPI ID" defaultValue={doctor.upiId ?? ''} /><Field name="bankAccountNumber" label="Replace account number" placeholder="Leave blank to keep current" /></div>}
-          {['request-documents', 'reject', 'suspend', 'reactivate-doctor'].includes(action ?? '') && <label className="block"><span className="text-sm font-semibold text-neutral-700">Reason / admin note <span className="text-rose-500">*</span></span><textarea name="reason" required className="mt-2 min-h-28 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100" placeholder="Enter a clear reason for the audit trail" /></label>}
+          {['request-documents', 'reject', 'suspend', 'reactivate-doctor', 'revert-approval'].includes(action ?? '') && (
+            <label className="block">
+              <span className="text-sm font-semibold text-neutral-700">Reason / admin note <span className="text-rose-500">*</span></span>
+              <textarea name="reason" required className="mt-2 min-h-28 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100" placeholder="Enter a clear reason for the audit trail" />
+            </label>
+          )}
+          {action === 'revert-approval' && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900 leading-5">
+              Reverting approval will change this doctor’s status back to <strong>Under Review</strong>, deactivate their login portal access, and disable their referral QR code so you can re-verify credentials or request additional documents.
+            </div>
+          )}
           {action === 'reactivate-doctor' && <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-4 text-sm text-neutral-700">Reactivation restores the doctor to <strong>Approved</strong>, enables portal login, and re-enables the existing referral QR when one already exists.</div>}
           {['generate-qr', 'disable-qr', 'reactivate-qr'].includes(action ?? '') && <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-4 text-sm text-neutral-700">This action will update referral QR availability for <strong>{doctor.fullName}</strong>.</div>}
           {mutation.isError && <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">{(mutation.error as any)?.response?.data?.message || 'The backend could not complete this action.'}</div>}
-          <div className="flex justify-end gap-2"><button type="button" onClick={() => setAction(null)} disabled={mutation.isPending} className="rounded-lg border border-neutral-300 px-4 py-2.5 text-sm font-semibold text-neutral-700">Cancel</button><button type="submit" disabled={mutation.isPending} className={cn('rounded-lg px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60', ['reject', 'suspend', 'disable-qr'].includes(action ?? '') ? 'bg-rose-600 hover:bg-rose-700' : 'bg-primary-600 hover:bg-primary-700')}>{mutation.isPending ? 'Processing…' : action === 'approve' ? 'Approve doctor' : 'Confirm action'}</button></div>
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={() => setAction(null)} disabled={mutation.isPending} className="rounded-lg border border-neutral-300 px-4 py-2.5 text-sm font-semibold text-neutral-700">Cancel</button>
+            <button
+              type="submit"
+              disabled={mutation.isPending}
+              className={cn(
+                'rounded-lg px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60',
+                ['reject', 'suspend', 'disable-qr'].includes(action ?? '')
+                  ? 'bg-rose-600 hover:bg-rose-700'
+                  : action === 'revert-approval'
+                  ? 'bg-amber-600 hover:bg-amber-700'
+                  : 'bg-primary-600 hover:bg-primary-700'
+              )}
+            >
+              {mutation.isPending ? 'Processing…' : action === 'approve' ? 'Approve doctor' : action === 'revert-approval' ? 'Revert approval' : action === 'edit-doctor' ? 'Save doctor details' : 'Confirm action'}
+            </button>
+          </div>
         </form>
       </Modal>
 
@@ -531,8 +628,8 @@ export default function AdminDoctorDetailPage() {
   );
 }
 
-function Field({ name, label, type = 'text', defaultValue, placeholder }: { name: string; label: string; type?: string; defaultValue?: string | number; placeholder?: string }) {
-  return <label className="block"><span className="text-sm font-semibold text-neutral-700">{label}</span><input name={name} type={type} defaultValue={defaultValue} placeholder={placeholder} className="mt-2 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100" /></label>;
+function Field({ name, label, type = 'text', defaultValue, placeholder, required }: { name: string; label: string; type?: string; defaultValue?: string | number; placeholder?: string; required?: boolean }) {
+  return <label className="block"><span className="text-sm font-semibold text-neutral-700">{label}{required && <span className="text-rose-500 ml-1">*</span>}</span><input name={name} type={type} defaultValue={defaultValue} placeholder={placeholder} required={required} className="mt-2 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100" /></label>;
 }
 
 function SelectField({ name, label, defaultValue, options }: { name: string; label: string; defaultValue: string; options: Array<[string, string]> }) {

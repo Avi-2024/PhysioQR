@@ -1,4 +1,6 @@
 const Doctor = require('../../models/Doctor.model');
+const User = require('../../models/User.model');
+const authSessionService = require('../../services/authSession.service');
 const { provisionApprovedDoctor, sendDoctorApprovalNotification } = require('../../services/doctorApproval.service');
 const { writeAuditLog } = require('../../utils/auditLogger');
 const asyncHandler = require('../../utils/asyncHandler');
@@ -94,4 +96,65 @@ const approveDoctor = asyncHandler(async (req, res) => {
   });
 });
 
-module.exports = { approveDoctor };
+// POST /api/doctors/:id/revert-approval
+// Admin reverts an approved doctor back to under_review state.
+// Portal access is disabled, active sessions revoked, and QR referral code deactivated.
+const revertDoctorApproval = asyncHandler(async (req, res) => {
+  const doctor = await Doctor.findById(req.params.id);
+  if (!doctor) return res.status(404).json({ message: 'Doctor not found' });
+
+  if (doctor.status !== 'approved') {
+    return res.status(400).json({ message: 'Only approved doctors can have their approval reverted' });
+  }
+
+  const reason = String(req.body.reason || '').trim();
+  if (!reason) {
+    return res.status(400).json({ message: 'reason is required to revert doctor approval' });
+  }
+
+  const previousValue = {
+    status: doctor.status,
+    approvalDate: doctor.approvalDate,
+    qrCodeActive: doctor.qrCodeActive,
+  };
+
+  doctor.status = 'under_review';
+  doctor.approvalDate = undefined;
+  doctor.qrCodeActive = false;
+  await doctor.save();
+
+  if (doctor.user) {
+    const user = await User.findById(doctor.user);
+    if (user) {
+      user.status = 'inactive';
+      user.tokenVersion = (user.tokenVersion || 0) + 1;
+      await user.save();
+      await authSessionService.revokeOwnerSessions({
+        ownerId: user._id,
+        role: user.role,
+        reason: 'doctor_approval_reverted',
+      });
+    }
+  }
+
+  await writeAuditLog({
+    req,
+    action: 'doctor_approval_reverted',
+    module: 'Doctor',
+    recordId: doctor._id,
+    previousValue,
+    newValue: {
+      status: 'under_review',
+      qrCodeActive: false,
+      reason,
+    },
+    reason,
+  });
+
+  res.json({
+    message: 'Doctor approval reverted successfully. Status moved back to under review.',
+    doctor,
+  });
+});
+
+module.exports = { approveDoctor, revertDoctorApproval };

@@ -375,9 +375,17 @@ export default function LoginPage() {
                 )}
               </div>
               <div>
-                <label className="block text-xs font-semibold text-neutral-700 mb-1">
-                  Password
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-neutral-700">
+                    Password
+                  </label>
+                  <Link
+                    to="/forgot-password"
+                    className="text-xs font-semibold text-primary-600 hover:text-primary-700 hover:underline"
+                  >
+                    Forgot password?
+                  </Link>
+                </div>
                 <input
                   {...credentialForm.register("password")}
                   type="password"

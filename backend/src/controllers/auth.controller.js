@@ -264,12 +264,21 @@ const changePassword = asyncHandler(async (req, res) => {
 // POST /api/auth/send-otp
 const sendOtp = asyncHandler(async (req, res) => {
   const { mobile, purpose } = req.body;
+  const normalized = normalizeMobile(mobile);
   if (purpose === 'registration') {
-    const existing = await Patient.findOne({ mobile: normalizeMobile(mobile) }).select('mobileVerified');
+    const existing = await Patient.findOne({ mobile: normalized }).select('mobileVerified');
     if (existing?.mobileVerified) return res.status(409).json({
       code: 'PATIENT_ALREADY_REGISTERED',
       message: 'This number is already registered. Please sign in using patient OTP instead.',
     });
+  }
+  if (purpose === 'password_reset') {
+    const user = await User.findOne({ mobile: normalized });
+    if (!user) {
+      return res.status(404).json({
+        message: 'No registered account found with this mobile number.',
+      });
+    }
   }
   const result = await otpService.sendOtp({ mobile, purpose });
   res.json({ message: 'OTP sent successfully', ...result });
@@ -309,9 +318,40 @@ const verifyOtp = asyncHandler(async (req, res) => {
 
 // POST /api/auth/reset-password
 const resetPassword = asyncHandler(async (req, res) => {
-  res.status(400).json({
-    message: 'OTP password reset is disabled for Admin, Agent, and Doctor accounts. Use authenticated change-password or Admin-managed credential reset.',
+  const { mobile, otp, newPassword } = req.body;
+  if (!mobile || !otp || !newPassword) {
+    return res.status(400).json({ message: 'Mobile number, OTP, and new password are required' });
+  }
+
+  if (String(newPassword).length < 6) {
+    return res.status(400).json({ message: 'New password must be at least 6 characters long' });
+  }
+
+  const normalizedMobile = normalizeMobile(mobile);
+  const user = await User.findOne({ mobile: normalizedMobile });
+  if (!user) {
+    return res.status(404).json({ message: 'No account found with this mobile number' });
+  }
+
+  // Verify the OTP for password_reset
+  await otpService.verifyOtp({ mobile: normalizedMobile, otp, purpose: 'password_reset' });
+
+  user.password = newPassword;
+  user.mustChangePassword = false;
+  user.passwordChangedAt = new Date();
+  user.tokenVersion = (user.tokenVersion || 0) + 1;
+  await user.save();
+
+  await authSessionService.revokeOwnerSessions({ ownerType: 'user', ownerId: user._id, reason: 'password_reset' });
+
+  await writeAuditLog({
+    req,
+    action: 'password_reset_via_otp',
+    module: 'User',
+    recordId: user._id,
   });
+
+  res.json({ message: 'Password reset successfully. You can now sign in with your new password.' });
 });
 
 module.exports = {

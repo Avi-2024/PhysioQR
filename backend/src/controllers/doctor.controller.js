@@ -623,8 +623,87 @@ const getMyQrStats = asyncHandler(async (req, res) => {
   });
 });
 
+
+// PATCH /api/doctors/:id — Admin updates doctor details
+const updateDoctorByAdmin = asyncHandler(async (req, res) => {
+  const doctor = await Doctor.findById(req.params.id);
+  if (!doctor) return res.status(404).json({ message: 'Doctor not found' });
+
+  const editableFields = [
+    'fullName',
+    'qualification',
+    'specialization',
+    'medicalRegNumber',
+    'registrationCouncil',
+    'yearsOfExperience',
+    'clinicName',
+    'clinicAddress',
+    'city',
+    'state',
+    'postalCode',
+    'clinicContact',
+    'clinicEmail',
+    'clinicWorkingHours',
+    'googleMapsLink',
+    'consultationFee',
+    'email',
+    'mobile',
+  ];
+
+  const previousValue = {};
+  editableFields.forEach((field) => {
+    previousValue[field] = doctor[field];
+  });
+
+  const { email, mobile } = req.body;
+
+  // Check duplicate mobile or email if changed
+  if (mobile && String(mobile).trim() !== doctor.mobile) {
+    const normalizedMobile = String(mobile).trim();
+    const existing = await Doctor.findOne({ mobile: normalizedMobile, _id: { $ne: doctor._id } });
+    if (existing) return res.status(409).json({ message: 'Another doctor with this mobile number already exists' });
+    doctor.mobile = normalizedMobile;
+  }
+
+  if (email && String(email).trim().toLowerCase() !== doctor.email) {
+    const normalizedEmail = String(email).trim().toLowerCase();
+    const existing = await Doctor.findOne({ email: normalizedEmail, _id: { $ne: doctor._id } });
+    if (existing) return res.status(409).json({ message: 'Another doctor with this email address already exists' });
+    doctor.email = normalizedEmail;
+  }
+
+  editableFields.forEach((field) => {
+    if (field !== 'mobile' && field !== 'email' && req.body[field] !== undefined) {
+      doctor[field] = req.body[field];
+    }
+  });
+
+  // If mobile or email changed and doctor has a User login, update User login too
+  if (doctor.user && (mobile || email)) {
+    const user = await User.findById(doctor.user);
+    if (user) {
+      if (doctor.mobile) user.mobile = doctor.mobile;
+      if (doctor.email) user.email = doctor.email;
+      await user.save();
+    }
+  }
+
+  await doctor.save();
+
+  await writeAuditLog({
+    req,
+    action: 'doctor_profile_updated_by_admin',
+    module: 'Doctor',
+    recordId: doctor._id,
+    previousValue,
+    newValue: Object.fromEntries(editableFields.map((f) => [f, doctor[f]])),
+  });
+
+  res.json({ message: 'Doctor details updated successfully', doctor });
+});
+
 module.exports = {
-  registerDoctor, getAllDoctors, getDoctorById,
+  registerDoctor, getAllDoctors, getDoctorById, updateDoctorByAdmin,
   approveDoctor, rejectDoctor, requestDoctorDocuments, suspendDoctor,
   generateQrCode, disableQrCode, reactivateQrCode, updateKycAndBank,
   uploadKycDocument, getKycDocumentAccess, uploadMyKycDocument, getMyKycDocumentAccess,
